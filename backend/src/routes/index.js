@@ -11,6 +11,7 @@ router.use('/addresses', require('./address.routes'));
 router.use('/orders', require('./order.routes'));
 router.use('/coupons', require('./coupon.routes'));
 router.use('/config', require('./config.routes'));
+router.use('/admin', require('./admin.routes'));
 
 // Further resource routers are mounted here as each phase adds them,
 // e.g. router.use('/reviews', require('./review.routes'));
