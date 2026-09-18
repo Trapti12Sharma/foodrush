@@ -7,4 +7,5 @@ export const restaurantService = {
   create: (payload) => api.post('/restaurants', payload).then((r) => r.data.restaurant),
   update: (id, payload) => api.put(`/restaurants/${id}`, payload).then((r) => r.data.restaurant),
   remove: (id) => api.delete(`/restaurants/${id}`),
+  getDashboard: (id) => api.get(`/restaurants/${id}/dashboard`).then((r) => r.data),
 };

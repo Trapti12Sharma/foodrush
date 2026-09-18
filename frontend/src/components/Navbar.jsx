@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, MapPin, User, ShoppingCart, Menu, X, LogOut, ClipboardList, Heart, MapPinned } from 'lucide-react';
+import { Search, MapPin, User, ShoppingCart, Menu, X, LogOut, ClipboardList, Heart, MapPinned, Store } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useCityPreference } from '../hooks/useCityPreference';
@@ -90,6 +90,15 @@ export default function Navbar() {
               </button>
               {profileOpen && (
                 <div className="absolute right-0 mt-2 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                  {user.role === 'RESTAURANT_OWNER' && (
+                    <Link
+                      to="/restaurant/dashboard"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50"
+                    >
+                      <Store size={14} /> Restaurant dashboard
+                    </Link>
+                  )}
                   <Link
                     to="/profile"
                     onClick={() => setProfileOpen(false)}
@@ -170,6 +179,15 @@ export default function Navbar() {
             </Link>
             {user ? (
               <>
+                {user.role === 'RESTAURANT_OWNER' && (
+                  <Link
+                    to="/restaurant/dashboard"
+                    onClick={() => setMobileOpen(false)}
+                    className="rounded px-2 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50"
+                  >
+                    Restaurant dashboard
+                  </Link>
+                )}
                 <Link to="/profile" onClick={() => setMobileOpen(false)} className="rounded px-2 py-2 text-sm hover:bg-gray-50">
                   Profile
                 </Link>

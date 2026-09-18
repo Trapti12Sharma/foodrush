@@ -125,7 +125,14 @@ async function listOrdersForUser(user, query) {
 
   if (user.role === ROLES.RESTAURANT_OWNER) {
     const restaurantIds = await Restaurant.find({ owner: user._id }).distinct('_id');
-    filter = { restaurant: { $in: restaurantIds } };
+    if (query.restaurant) {
+      if (!restaurantIds.map(String).includes(query.restaurant)) {
+        throw ApiError.forbidden('You can only view orders for your own restaurant');
+      }
+      filter = { restaurant: query.restaurant };
+    } else {
+      filter = { restaurant: { $in: restaurantIds } };
+    }
   } else if (user.role === ROLES.ADMIN) {
     filter = {};
   } else {

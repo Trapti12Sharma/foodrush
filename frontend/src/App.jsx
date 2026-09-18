@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './layouts/MainLayout';
+import RestaurantOwnerLayout from './layouts/RestaurantOwnerLayout';
 
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -16,6 +17,11 @@ import Checkout from './pages/Checkout';
 import Orders from './pages/Orders';
 import OrderDetail from './pages/OrderDetail';
 import Addresses from './pages/Addresses';
+import OwnerDashboard from './pages/owner/Dashboard';
+import OwnerOrders from './pages/owner/Orders';
+import OwnerMenu from './pages/owner/Menu';
+import OwnerCategories from './pages/owner/Categories';
+import OwnerProfile from './pages/owner/Profile';
 import ComingSoon from './pages/ComingSoon';
 import NotFound from './pages/NotFound';
 
@@ -82,6 +88,22 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
+            <Route
+              path="/restaurant"
+              element={
+                <ProtectedRoute roles={['RESTAURANT_OWNER']}>
+                  <RestaurantOwnerLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route path="dashboard" element={<OwnerDashboard />} />
+              <Route path="orders" element={<OwnerOrders />} />
+              <Route path="menu" element={<OwnerMenu />} />
+              <Route path="categories" element={<OwnerCategories />} />
+              <Route path="profile" element={<OwnerProfile />} />
+              <Route path="reviews" element={<ComingSoon title="Reviews" phase="Phase 11" />} />
+            </Route>
 
             <Route path="*" element={<NotFound />} />
           </Route>
