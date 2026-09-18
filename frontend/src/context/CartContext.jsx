@@ -66,11 +66,35 @@ export function CartProvider({ children }) {
     return updated;
   }, []);
 
+  const applyCoupon = useCallback(async (code) => {
+    const updated = await cartService.applyCoupon(code);
+    setCart(updated);
+    return updated;
+  }, []);
+
+  const removeCoupon = useCallback(async () => {
+    const updated = await cartService.removeCoupon();
+    setCart(updated);
+    return updated;
+  }, []);
+
   const itemCount = useMemo(() => cart.items.reduce((sum, i) => sum + i.quantity, 0), [cart.items]);
 
   return (
     <CartContext.Provider
-      value={{ cart, loading, itemCount, refresh, addItem, switchRestaurant, updateQuantity, removeItem, clear }}
+      value={{
+        cart,
+        loading,
+        itemCount,
+        refresh,
+        addItem,
+        switchRestaurant,
+        updateQuantity,
+        removeItem,
+        clear,
+        applyCoupon,
+        removeCoupon,
+      }}
     >
       {children}
     </CartContext.Provider>

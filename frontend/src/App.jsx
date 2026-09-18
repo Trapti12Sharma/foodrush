@@ -12,6 +12,10 @@ import RestaurantListing from './pages/RestaurantListing';
 import RestaurantDetail from './pages/RestaurantDetail';
 import Search from './pages/Search';
 import Cart from './pages/Cart';
+import Checkout from './pages/Checkout';
+import Orders from './pages/Orders';
+import OrderDetail from './pages/OrderDetail';
+import Addresses from './pages/Addresses';
 import ComingSoon from './pages/ComingSoon';
 import NotFound from './pages/NotFound';
 
@@ -34,7 +38,7 @@ function App() {
               path="/checkout"
               element={
                 <ProtectedRoute>
-                  <ComingSoon title="Checkout" phase="Phase 7" />
+                  <Checkout />
                 </ProtectedRoute>
               }
             />
@@ -42,7 +46,7 @@ function App() {
               path="/orders"
               element={
                 <ProtectedRoute>
-                  <ComingSoon title="Your orders" phase="Phase 8" />
+                  <Orders />
                 </ProtectedRoute>
               }
             />
@@ -50,7 +54,7 @@ function App() {
               path="/orders/:id"
               element={
                 <ProtectedRoute>
-                  <ComingSoon title="Order details" phase="Phase 8" />
+                  <OrderDetail />
                 </ProtectedRoute>
               }
             />
@@ -66,7 +70,7 @@ function App() {
               path="/profile/addresses"
               element={
                 <ProtectedRoute>
-                  <ComingSoon title="Saved addresses" phase="a follow-up phase" />
+                  <Addresses />
                 </ProtectedRoute>
               }
             />

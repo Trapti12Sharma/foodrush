@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, MapPin, User, ShoppingCart, Menu, X, LogOut, ClipboardList, Heart } from 'lucide-react';
+import { Search, MapPin, User, ShoppingCart, Menu, X, LogOut, ClipboardList, Heart, MapPinned } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useCityPreference } from '../hooks/useCityPreference';
@@ -105,6 +105,13 @@ export default function Navbar() {
                     <ClipboardList size={14} /> My orders
                   </Link>
                   <Link
+                    to="/profile/addresses"
+                    onClick={() => setProfileOpen(false)}
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    <MapPinned size={14} /> Addresses
+                  </Link>
+                  <Link
                     to="/favorites"
                     onClick={() => setProfileOpen(false)}
                     className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -168,6 +175,9 @@ export default function Navbar() {
                 </Link>
                 <Link to="/orders" onClick={() => setMobileOpen(false)} className="rounded px-2 py-2 text-sm hover:bg-gray-50">
                   My orders
+                </Link>
+                <Link to="/profile/addresses" onClick={() => setMobileOpen(false)} className="rounded px-2 py-2 text-sm hover:bg-gray-50">
+                  Addresses
                 </Link>
                 <Link to="/favorites" onClick={() => setMobileOpen(false)} className="rounded px-2 py-2 text-sm hover:bg-gray-50">
                   Favorites
