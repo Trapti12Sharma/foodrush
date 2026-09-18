@@ -63,6 +63,23 @@ async function listPublicRestaurants(query) {
     filter.isOpen = true;
   }
 
+  // "Restaurants near me" — query.near is "lng,lat" from the browser Geolocation API.
+  // $near always returns results pre-sorted by distance, so it can't be combined with
+  // a regular .sort(); and $near isn't valid inside an aggregation $match, so we skip
+  // the countDocuments() total for this branch rather than force an inaccurate one.
+  const nearMatch = /^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/.exec(query.near || '');
+  if (nearMatch) {
+    const [, lng, lat] = nearMatch;
+    filter.location = {
+      $near: {
+        $geometry: { type: 'Point', coordinates: [Number(lng), Number(lat)] },
+        $maxDistance: (Number(query.maxDistanceKm) || 10) * 1000,
+      },
+    };
+    const items = await Restaurant.find(filter).skip(skip).limit(limit);
+    return { items, pagination: buildPaginationMeta(items.length, page, limit) };
+  }
+
   const sort = SORT_MAP[query.sort] || '-rating';
 
   const [items, total] = await Promise.all([
