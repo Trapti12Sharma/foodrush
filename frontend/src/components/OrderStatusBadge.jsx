@@ -9,7 +9,7 @@ const STYLES = {
   rejected: 'bg-red-100 text-red-700',
 };
 
-const LABELS = {
+export const ORDER_STATUS_LABELS = {
   pending: 'Pending',
   confirmed: 'Confirmed',
   preparing: 'Preparing',
@@ -23,7 +23,7 @@ const LABELS = {
 export default function OrderStatusBadge({ status }) {
   return (
     <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${STYLES[status] || 'bg-gray-100 text-gray-600'}`}>
-      {LABELS[status] || status}
+      {ORDER_STATUS_LABELS[status] || status}
     </span>
   );
 }

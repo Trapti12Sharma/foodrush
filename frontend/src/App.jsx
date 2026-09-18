@@ -5,6 +5,7 @@ import { CartProvider } from './context/CartContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import MainLayout from './layouts/MainLayout';
 import RestaurantOwnerLayout from './layouts/RestaurantOwnerLayout';
+import AdminLayout from './layouts/AdminLayout';
 
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -22,6 +23,10 @@ import OwnerOrders from './pages/owner/Orders';
 import OwnerMenu from './pages/owner/Menu';
 import OwnerCategories from './pages/owner/Categories';
 import OwnerProfile from './pages/owner/Profile';
+import AdminDashboard from './pages/admin/Dashboard';
+import AdminUsers from './pages/admin/Users';
+import AdminRestaurants from './pages/admin/Restaurants';
+import AdminOrders from './pages/admin/Orders';
 import ComingSoon from './pages/ComingSoon';
 import NotFound from './pages/NotFound';
 
@@ -103,6 +108,20 @@ function App() {
               <Route path="categories" element={<OwnerCategories />} />
               <Route path="profile" element={<OwnerProfile />} />
               <Route path="reviews" element={<ComingSoon title="Reviews" phase="Phase 11" />} />
+            </Route>
+
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute roles={['ADMIN']}>
+                  <AdminLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route path="dashboard" element={<AdminDashboard />} />
+              <Route path="users" element={<AdminUsers />} />
+              <Route path="restaurants" element={<AdminRestaurants />} />
+              <Route path="orders" element={<AdminOrders />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />

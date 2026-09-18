@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, MapPin, User, ShoppingCart, Menu, X, LogOut, ClipboardList, Heart, MapPinned, Store } from 'lucide-react';
+import { Search, MapPin, User, ShoppingCart, Menu, X, LogOut, ClipboardList, Heart, MapPinned, Store, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useCityPreference } from '../hooks/useCityPreference';
@@ -99,6 +99,15 @@ export default function Navbar() {
                       <Store size={14} /> Restaurant dashboard
                     </Link>
                   )}
+                  {user.role === 'ADMIN' && (
+                    <Link
+                      to="/admin/dashboard"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50"
+                    >
+                      <LayoutDashboard size={14} /> Admin dashboard
+                    </Link>
+                  )}
                   <Link
                     to="/profile"
                     onClick={() => setProfileOpen(false)}
@@ -186,6 +195,15 @@ export default function Navbar() {
                     className="rounded px-2 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50"
                   >
                     Restaurant dashboard
+                  </Link>
+                )}
+                {user.role === 'ADMIN' && (
+                  <Link
+                    to="/admin/dashboard"
+                    onClick={() => setMobileOpen(false)}
+                    className="rounded px-2 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50"
+                  >
+                    Admin dashboard
                   </Link>
                 )}
                 <Link to="/profile" onClick={() => setMobileOpen(false)} className="rounded px-2 py-2 text-sm hover:bg-gray-50">
