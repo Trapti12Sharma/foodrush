@@ -27,4 +27,9 @@ const cancelOrder = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, 'Order cancelled', { order }));
 });
 
-module.exports = { createOrder, listOrders, getOrder, updateStatus, cancelOrder };
+const verifyPayment = asyncHandler(async (req, res) => {
+  const order = await orderService.verifyOnlinePayment(req.user, req.params.id, req.body);
+  res.json(new ApiResponse(200, 'Payment verified', { order }));
+});
+
+module.exports = { createOrder, listOrders, getOrder, updateStatus, cancelOrder, verifyPayment };

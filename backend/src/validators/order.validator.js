@@ -12,4 +12,10 @@ const updateStatusValidator = [
 
 const cancelOrderValidator = [body('reason').optional({ checkFalsy: true }).trim().isString()];
 
-module.exports = { createOrderValidator, updateStatusValidator, cancelOrderValidator };
+const verifyPaymentValidator = [
+  body('razorpayOrderId').trim().notEmpty().withMessage('razorpayOrderId is required'),
+  body('razorpayPaymentId').trim().notEmpty().withMessage('razorpayPaymentId is required'),
+  body('signature').trim().notEmpty().withMessage('signature is required'),
+];
+
+module.exports = { createOrderValidator, updateStatusValidator, cancelOrderValidator, verifyPaymentValidator };

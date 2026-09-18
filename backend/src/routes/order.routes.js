@@ -1,6 +1,11 @@
 const express = require('express');
 const orderController = require('../controllers/order.controller');
-const { createOrderValidator, updateStatusValidator, cancelOrderValidator } = require('../validators/order.validator');
+const {
+  createOrderValidator,
+  updateStatusValidator,
+  cancelOrderValidator,
+  verifyPaymentValidator,
+} = require('../validators/order.validator');
 const validate = require('../middleware/validate');
 const { authenticateUser, authorizeRoles } = require('../middleware/auth.middleware');
 const { ROLES } = require('../utils/constants');
@@ -20,5 +25,6 @@ router.patch(
   orderController.updateStatus
 );
 router.post('/:id/cancel', cancelOrderValidator, validate, orderController.cancelOrder);
+router.post('/:id/verify-payment', verifyPaymentValidator, validate, orderController.verifyPayment);
 
 module.exports = router;

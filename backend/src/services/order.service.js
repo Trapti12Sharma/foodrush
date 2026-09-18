@@ -7,7 +7,7 @@ const ApiError = require('../utils/ApiError');
 const paymentService = require('./payment.service');
 const couponService = require('./coupon.service');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
-const { ORDER_STATUS, ORDER_STATUS_TRANSITIONS, PAYMENT_METHODS, ROLES } = require('../utils/constants');
+const { ORDER_STATUS, ORDER_STATUS_TRANSITIONS, PAYMENT_METHODS, PAYMENT_STATUS, ROLES } = require('../utils/constants');
 
 const TAX_RATE = 0.05; // kept in sync with cart.service.js's rate — same order math, computed fresh here
 
@@ -211,4 +211,31 @@ async function cancelOrder(user, orderId, reason) {
   return order;
 }
 
-module.exports = { createOrder, listOrdersForUser, getOrderById, updateOrderStatus, cancelOrder };
+// Called by the frontend once Razorpay's Checkout.js hands back a payment
+// confirmation, to prove that confirmation actually came from Razorpay rather
+// than being forged client-side. Only reachable today via ONLINE orders
+// inserted directly (createOrder itself always rejects ONLINE in this
+// unconfigured deployment — see payment.service.js) — kept as a complete,
+// independently-tested piece of the payment abstraction regardless.
+async function verifyOnlinePayment(user, orderId, { razorpayOrderId, razorpayPaymentId, signature }) {
+  const order = await Order.findById(orderId);
+  if (!order) throw ApiError.notFound('Order not found');
+  if (order.user.toString() !== user._id.toString()) throw ApiError.forbidden('You cannot verify payment for this order');
+  if (order.paymentMethod !== PAYMENT_METHODS.ONLINE) throw ApiError.badRequest('This order is not an online payment');
+
+  if (order.paymentStatus === PAYMENT_STATUS.PAID) return order; // idempotent — already verified
+
+  const isValid = paymentService.verifyPaymentSignature({ razorpayOrderId, razorpayPaymentId, signature });
+  if (!isValid) {
+    order.paymentStatus = PAYMENT_STATUS.FAILED;
+    await order.save();
+    throw ApiError.badRequest('Payment verification failed');
+  }
+
+  order.paymentStatus = PAYMENT_STATUS.PAID;
+  order.transactionId = razorpayPaymentId;
+  await order.save();
+  return order;
+}
+
+module.exports = { createOrder, listOrdersForUser, getOrderById, updateOrderStatus, cancelOrder, verifyOnlinePayment };
