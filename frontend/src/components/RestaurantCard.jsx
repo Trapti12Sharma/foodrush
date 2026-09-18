@@ -1,13 +1,36 @@
-import { Link } from 'react-router-dom';
-import { Star, Clock, Bike } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Star, Clock, Bike, Heart } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
+import { useFavorites } from '../context/FavoritesContext';
 
 export default function RestaurantCard({ restaurant }) {
+  const { user } = useAuth();
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const navigate = useNavigate();
+  const favorited = isFavorite(restaurant._id);
+
+  async function handleHeartClick(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!user) {
+      toast.error('Please log in to save favorites');
+      navigate('/login');
+      return;
+    }
+    try {
+      await toggleFavorite(restaurant._id);
+    } catch (err) {
+      toast.error(err.message || 'Could not update favorites');
+    }
+  }
+
   return (
     <Link
       to={`/restaurants/${restaurant._id}`}
       className="group block overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition hover:shadow-md"
     >
-      <div className="aspect-[4/3] w-full overflow-hidden bg-gray-100">
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-gray-100">
         {restaurant.image ? (
           <img
             src={restaurant.image}
@@ -17,6 +40,14 @@ export default function RestaurantCard({ restaurant }) {
         ) : (
           <div className="flex h-full w-full items-center justify-center text-gray-300">No image</div>
         )}
+        <button
+          type="button"
+          onClick={handleHeartClick}
+          aria-label={favorited ? 'Remove from favorites' : 'Add to favorites'}
+          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm hover:bg-white"
+        >
+          <Heart size={16} className={favorited ? 'fill-red-500 text-red-500' : 'text-gray-500'} />
+        </button>
       </div>
       <div className="p-4">
         <div className="flex items-start justify-between gap-2">

@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { Star, Clock, Bike, Wallet, ArrowLeft } from 'lucide-react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { Star, Clock, Bike, Wallet, ArrowLeft, Heart } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { restaurantService } from '../services/restaurantService';
 import { foodService } from '../services/foodService';
 import EmptyState from '../components/EmptyState';
 import FoodMenuItem from '../components/FoodMenuItem';
 import ConfirmDialog from '../components/ConfirmDialog';
+import ReviewsSection from '../components/ReviewsSection';
 import { useAddToCart } from '../hooks/useAddToCart';
+import { useAuth } from '../context/AuthContext';
+import { useFavorites } from '../context/FavoritesContext';
 
 export default function RestaurantDetail() {
   const { id } = useParams();
@@ -16,6 +20,13 @@ export default function RestaurantDetail() {
   const [error, setError] = useState(null);
   const [menuSearch, setMenuSearch] = useState('');
   const { requestAdd, conflict, confirmSwitch, cancelSwitch } = useAddToCart();
+  const { user } = useAuth();
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const navigate = useNavigate();
+
+  function loadRestaurant() {
+    return restaurantService.getById(id).then(setRestaurant);
+  }
 
   useEffect(() => {
     setLoading(true);
@@ -28,6 +39,19 @@ export default function RestaurantDetail() {
       .catch((err) => setError(err.message || 'Restaurant not found'))
       .finally(() => setLoading(false));
   }, [id]);
+
+  async function handleHeartClick() {
+    if (!user) {
+      toast.error('Please log in to save favorites');
+      navigate('/login');
+      return;
+    }
+    try {
+      await toggleFavorite(id);
+    } catch (err) {
+      toast.error(err.message || 'Could not update favorites');
+    }
+  }
 
   const groupedMenu = useMemo(() => {
     const term = menuSearch.trim().toLowerCase();
@@ -78,9 +102,19 @@ export default function RestaurantDetail() {
         </Link>
 
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{restaurant.name}</h1>
-            <p className="mt-1 text-sm text-gray-500">{restaurant.cuisine.join(', ')} · {restaurant.city}</p>
+          <div className="flex items-start gap-2">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">{restaurant.name}</h1>
+              <p className="mt-1 text-sm text-gray-500">{restaurant.cuisine.join(', ')} · {restaurant.city}</p>
+            </div>
+            <button
+              type="button"
+              onClick={handleHeartClick}
+              aria-label={isFavorite(id) ? 'Remove from favorites' : 'Add to favorites'}
+              className="mt-1 flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 hover:bg-gray-50"
+            >
+              <Heart size={16} className={isFavorite(id) ? 'fill-red-500 text-red-500' : 'text-gray-400'} />
+            </button>
           </div>
           <span className="flex items-center gap-1 rounded bg-green-600 px-2 py-1 text-sm font-medium text-white">
             <Star size={14} fill="white" /> {restaurant.totalReviews > 0 ? restaurant.rating.toFixed(1) : 'New'}
@@ -124,6 +158,10 @@ export default function RestaurantDetail() {
               </div>
             </section>
           ))}
+        </div>
+
+        <div className="mt-10 border-t border-gray-100 pt-8">
+          <ReviewsSection restaurantId={id} onReviewChange={loadRestaurant} />
         </div>
       </div>
 
