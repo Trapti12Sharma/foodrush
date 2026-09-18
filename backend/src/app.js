@@ -4,10 +4,10 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
 const mongoSanitize = require('express-mongo-sanitize');
-const rateLimit = require('express-rate-limit');
 
 const errorHandler = require('./middleware/errorHandler');
 const notFound = require('./middleware/notFound');
+const { apiLimiter } = require('./middleware/rateLimiter');
 const routes = require('./routes');
 
 const app = express();
@@ -28,13 +28,7 @@ if (process.env.NODE_ENV !== 'test') {
   app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 }
 
-// General API rate limit; auth routes apply a stricter limit of their own.
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 300,
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+// General API rate limit; auth routes apply a stricter limit of their own (rateLimiter.js).
 app.use('/api', apiLimiter);
 
 app.use('/uploads', express.static('uploads'));
