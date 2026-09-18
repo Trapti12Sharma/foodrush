@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import ImageUploadField from './ImageUploadField';
 
 export default function CreateRestaurantForm({ onSubmit, submitting }) {
   const {
@@ -6,11 +8,13 @@ export default function CreateRestaurantForm({ onSubmit, submitting }) {
     handleSubmit,
     formState: { errors },
   } = useForm();
+  const [image, setImage] = useState('');
 
   function submit(values) {
     onSubmit({
       name: values.name,
       description: values.description,
+      image,
       cuisine: values.cuisine.split(',').map((c) => c.trim()).filter(Boolean),
       address: { addressLine: values.addressLine, state: values.state, pincode: values.pincode },
       city: values.city,
@@ -22,6 +26,7 @@ export default function CreateRestaurantForm({ onSubmit, submitting }) {
 
   return (
     <form onSubmit={handleSubmit(submit)} className="mx-auto max-w-lg space-y-4 rounded-xl border border-gray-200 bg-white p-6">
+      <ImageUploadField label="Restaurant image" value={image} onChange={setImage} />
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">Restaurant name</label>
         <input {...register('name', { required: true })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />

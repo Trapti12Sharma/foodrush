@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { Plus, Trash2 } from 'lucide-react';
+import ImageUploadField from './ImageUploadField';
 
 export default function FoodForm({ categories, initialValues, onSubmit, onCancel, submitting }) {
   const {
@@ -13,10 +15,12 @@ export default function FoodForm({ categories, initialValues, onSubmit, onCancel
       : { name: '', description: '', category: categories[0]?._id || '', price: '', isVeg: true, preparationTime: 15, addons: [] },
   });
   const { fields, append, remove } = useFieldArray({ control, name: 'addons' });
+  const [image, setImage] = useState(initialValues?.image || '');
 
   function submit(values) {
     onSubmit({
       ...values,
+      image,
       price: Number(values.price),
       discountPrice: values.discountPrice ? Number(values.discountPrice) : undefined,
       preparationTime: Number(values.preparationTime) || undefined,
@@ -26,6 +30,7 @@ export default function FoodForm({ categories, initialValues, onSubmit, onCancel
 
   return (
     <form onSubmit={handleSubmit(submit)} className="space-y-4 rounded-xl border border-gray-200 bg-white p-4">
+      <ImageUploadField label="Food image (optional)" value={image} onChange={setImage} />
       <div>
         <label className="mb-1 block text-xs font-medium text-gray-600">Name</label>
         <input {...register('name', { required: 'Name is required' })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />

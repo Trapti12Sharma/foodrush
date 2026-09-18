@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import ImageUploadField from './ImageUploadField';
 
 export default function CategoryForm({ initialValues, onSubmit, onCancel, submitting }) {
   const {
@@ -6,9 +8,15 @@ export default function CategoryForm({ initialValues, onSubmit, onCancel, submit
     handleSubmit,
     formState: { errors },
   } = useForm({ defaultValues: initialValues || { name: '', description: '' } });
+  const [image, setImage] = useState(initialValues?.image || '');
+
+  function submit(values) {
+    onSubmit({ ...values, image });
+  }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
+    <form onSubmit={handleSubmit(submit)} className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
+      <ImageUploadField label="Category image (optional)" value={image} onChange={setImage} />
       <div>
         <label className="mb-1 block text-xs font-medium text-gray-600">Category name</label>
         <input

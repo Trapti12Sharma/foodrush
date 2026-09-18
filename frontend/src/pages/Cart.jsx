@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import QuantityStepper from '../components/QuantityStepper';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EmptyState from '../components/EmptyState';
+import { resolveImageUrl } from '../components/ImageUploadField';
 
 function Row({ label, value, emphasis }) {
   return (
@@ -119,7 +120,7 @@ export default function Cart() {
       <div className="mt-6 divide-y divide-gray-100 rounded-xl border border-gray-100 bg-white">
         {cart.items.map((item) => (
           <div key={item._id} className="flex items-center gap-4 p-4">
-            {item.food?.image && <img src={item.food.image} alt={item.food.name} className="h-16 w-16 rounded-lg object-cover" />}
+            {item.food?.image && <img src={resolveImageUrl(item.food.image)} alt={item.food.name} className="h-16 w-16 rounded-lg object-cover" />}
             <div className="flex-1">
               <p className="font-medium text-gray-900">{item.food?.name || 'Item no longer available'}</p>
               {item.addons.length > 0 && (

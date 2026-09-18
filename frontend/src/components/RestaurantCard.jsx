@@ -3,6 +3,7 @@ import { Star, Clock, Bike, Heart } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
+import { resolveImageUrl } from './ImageUploadField';
 
 export default function RestaurantCard({ restaurant }) {
   const { user } = useAuth();
@@ -33,7 +34,7 @@ export default function RestaurantCard({ restaurant }) {
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-gray-100">
         {restaurant.image ? (
           <img
-            src={restaurant.image}
+            src={resolveImageUrl(restaurant.image)}
             alt={restaurant.name}
             className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
           />

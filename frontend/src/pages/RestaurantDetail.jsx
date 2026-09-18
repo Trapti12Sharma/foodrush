@@ -8,6 +8,7 @@ import EmptyState from '../components/EmptyState';
 import FoodMenuItem from '../components/FoodMenuItem';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ReviewsSection from '../components/ReviewsSection';
+import { resolveImageUrl } from '../components/ImageUploadField';
 import { useAddToCart } from '../hooks/useAddToCart';
 import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
@@ -92,7 +93,7 @@ export default function RestaurantDetail() {
     <div>
       <div className="aspect-[3/1] w-full bg-gray-200">
         {restaurant.image && (
-          <img src={restaurant.image} alt={restaurant.name} className="h-full w-full object-cover" />
+          <img src={resolveImageUrl(restaurant.image)} alt={restaurant.name} className="h-full w-full object-cover" />
         )}
       </div>
 

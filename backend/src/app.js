@@ -12,7 +12,13 @@ const routes = require('./routes');
 
 const app = express();
 
-app.use(helmet());
+// Helmet's default Cross-Origin-Resource-Policy is "same-origin", which blocks
+// the SPA frontend (a different origin/port in dev, and typically a different
+// domain in production) from loading anything this server serves — including
+// uploaded images meant to be publicly displayed. They're not sensitive, so
+// "cross-origin" is the correct policy here, not a weakening of anything else
+// Helmet sets.
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(
   cors({
     origin: process.env.CLIENT_URL || 'http://localhost:5173',

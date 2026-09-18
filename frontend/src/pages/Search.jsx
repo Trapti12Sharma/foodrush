@@ -6,6 +6,7 @@ import { foodService } from '../services/foodService';
 import RestaurantCard from '../components/RestaurantCard';
 import SkeletonCard from '../components/SkeletonCard';
 import EmptyState from '../components/EmptyState';
+import { resolveImageUrl } from '../components/ImageUploadField';
 
 export default function Search() {
   const [params, setParams] = useSearchParams();
@@ -108,7 +109,7 @@ export default function Search() {
                     )}
                   </p>
                 </div>
-                {food.image && <img src={food.image} alt={food.name} className="h-16 w-16 rounded-lg object-cover" />}
+                {food.image && <img src={resolveImageUrl(food.image)} alt={food.name} className="h-16 w-16 rounded-lg object-cover" />}
               </Link>
             ))}
           </div>
