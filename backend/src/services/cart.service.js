@@ -25,6 +25,13 @@ function addonKey(addons) {
 // same "never trust a stored/client price" rule from Phase 4, applied proactively
 // here so the cart the customer sees is never stale.
 async function syncAndRecalculate(cart) {
+  if (cart.items.length > 0) {
+    const restaurant = await Restaurant.findById(cart.restaurant);
+    const restaurantGone = !restaurant || !restaurant.isApproved || !restaurant.isActive;
+    if (restaurantGone) cart.items = [];
+    else await applyCatalogPricing(cart, restaurant);
+  }
+
   if (cart.items.length === 0) {
     cart.restaurant = null;
     cart.subtotal = 0;
@@ -32,25 +39,19 @@ async function syncAndRecalculate(cart) {
     cart.tax = 0;
     cart.discount = 0;
     cart.total = 0;
-    await cart.save();
-    return cart;
   }
 
-  const restaurant = await Restaurant.findById(cart.restaurant);
-  const restaurantGone = !restaurant || !restaurant.isApproved || !restaurant.isActive;
+  await cart.save();
+  // Display-only: names/images for the frontend. Price is never read from this —
+  // it's already been set on each item from FoodItem.effectivePrice() above.
+  await cart.populate([
+    { path: 'items.food', select: 'name image isVeg' },
+    { path: 'restaurant', select: 'name image isOpen deliveryFee minimumOrder' },
+  ]);
+  return cart;
+}
 
-  if (restaurantGone) {
-    cart.items = [];
-    cart.restaurant = null;
-    cart.subtotal = 0;
-    cart.deliveryFee = 0;
-    cart.tax = 0;
-    cart.discount = 0;
-    cart.total = 0;
-    await cart.save();
-    return cart;
-  }
-
+async function applyCatalogPricing(cart, restaurant) {
   const foods = await FoodItem.find({ _id: { $in: cart.items.map((i) => i.food) } });
   const foodMap = new Map(foods.map((f) => [f._id.toString(), f]));
 
@@ -61,20 +62,17 @@ async function syncAndRecalculate(cart) {
     return true;
   });
 
-  if (cart.items.length === 0) cart.restaurant = null;
+  if (cart.items.length === 0) return; // syncAndRecalculate zeroes totals and clears the restaurant lock
 
   const subtotal = cart.items.reduce((sum, item) => {
     const addonsTotal = item.addons.reduce((a, addon) => a + addon.price, 0);
     return sum + (item.price + addonsTotal) * item.quantity;
   }, 0);
-  const deliveryFee = cart.items.length ? restaurant.deliveryFee : 0;
   const tax = Math.round(subtotal * TAX_RATE * 100) / 100;
-  const discount = cart.items.length ? cart.discount || 0 : 0;
-  const total = Math.max(subtotal + deliveryFee + tax - discount, 0);
+  const discount = cart.discount || 0;
+  const total = Math.max(subtotal + restaurant.deliveryFee + tax - discount, 0);
 
-  Object.assign(cart, { subtotal, deliveryFee, tax, discount, total });
-  await cart.save();
-  return cart;
+  Object.assign(cart, { subtotal, deliveryFee: restaurant.deliveryFee, tax, discount, total });
 }
 
 async function getCart(userId) {

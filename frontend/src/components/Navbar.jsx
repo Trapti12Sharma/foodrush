@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, MapPin, User, ShoppingCart, Menu, X, LogOut, ClipboardList, Heart } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 import { useCityPreference } from '../hooks/useCityPreference';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
+  const { itemCount } = useCart();
   const navigate = useNavigate();
   const [city, setCity] = useCityPreference();
   const [query, setQuery] = useState('');
@@ -68,8 +70,13 @@ export default function Navbar() {
           <Link to="/restaurants" className="text-sm font-medium text-gray-700 hover:text-brand-600">
             Restaurants
           </Link>
-          <Link to="/cart" className="text-gray-700 hover:text-brand-600" aria-label="Cart">
+          <Link to="/cart" className="relative text-gray-700 hover:text-brand-600" aria-label="Cart">
             <ShoppingCart size={20} />
+            {itemCount > 0 && (
+              <span className="absolute -right-2 -top-2 flex h-4 w-4 items-center justify-center rounded-full bg-brand-600 text-[10px] font-semibold text-white">
+                {itemCount > 9 ? '9+' : itemCount}
+              </span>
+            )}
           </Link>
 
           {user ? (

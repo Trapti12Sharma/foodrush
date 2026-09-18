@@ -4,19 +4,9 @@ import { Star, Clock, Bike, Wallet, ArrowLeft } from 'lucide-react';
 import { restaurantService } from '../services/restaurantService';
 import { foodService } from '../services/foodService';
 import EmptyState from '../components/EmptyState';
-
-function VegDot({ isVeg }) {
-  return (
-    <span
-      className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center border ${
-        isVeg ? 'border-green-600' : 'border-red-600'
-      }`}
-      title={isVeg ? 'Vegetarian' : 'Non-vegetarian'}
-    >
-      <span className={`h-1.5 w-1.5 rounded-full ${isVeg ? 'bg-green-600' : 'bg-red-600'}`} />
-    </span>
-  );
-}
+import FoodMenuItem from '../components/FoodMenuItem';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { useAddToCart } from '../hooks/useAddToCart';
 
 export default function RestaurantDetail() {
   const { id } = useParams();
@@ -25,6 +15,7 @@ export default function RestaurantDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [menuSearch, setMenuSearch] = useState('');
+  const { requestAdd, conflict, confirmSwitch, cancelSwitch } = useAddToCart();
 
   useEffect(() => {
     setLoading(true);
@@ -128,39 +119,26 @@ export default function RestaurantDetail() {
               <h2 className="mb-3 text-lg font-bold text-gray-900">{categoryName}</h2>
               <div className="divide-y divide-gray-100 rounded-xl border border-gray-100 bg-white">
                 {items.map((food) => (
-                  <div key={food._id} className="flex items-start justify-between gap-4 p-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <VegDot isVeg={food.isVeg} />
-                        <p className="font-medium text-gray-900">{food.name}</p>
-                      </div>
-                      {food.description && <p className="mt-1 text-sm text-gray-500">{food.description}</p>}
-                      <p className="mt-2 text-sm font-semibold text-gray-900">
-                        {food.discountPrice != null ? (
-                          <>
-                            ₹{food.discountPrice}{' '}
-                            <span className="ml-1 text-xs font-normal text-gray-400 line-through">₹{food.price}</span>
-                          </>
-                        ) : (
-                          `₹${food.price}`
-                        )}
-                      </p>
-                      {food.addons?.length > 0 && (
-                        <p className="mt-1 text-xs text-gray-400">
-                          Add-ons available: {food.addons.map((a) => a.name).join(', ')}
-                        </p>
-                      )}
-                    </div>
-                    {food.image && (
-                      <img src={food.image} alt={food.name} className="h-20 w-20 shrink-0 rounded-lg object-cover" />
-                    )}
-                  </div>
+                  <FoodMenuItem key={food._id} food={food} requestAdd={requestAdd} disabled={!restaurant.isOpen} />
                 ))}
               </div>
             </section>
           ))}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={!!conflict}
+        title="Start a new cart?"
+        description={
+          conflict
+            ? `Your cart has items from ${conflict.existingRestaurantName}. Adding this item will clear it and start a new cart for ${restaurant.name}.`
+            : ''
+        }
+        confirmLabel="Clear cart & add"
+        onConfirm={confirmSwitch}
+        onCancel={cancelSwitch}
+      />
     </div>
   );
 }

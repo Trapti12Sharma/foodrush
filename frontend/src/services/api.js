@@ -19,10 +19,11 @@ api.interceptors.response.use(
     const status = error.response?.status;
     const message = error.response?.data?.message || error.message || 'Something went wrong';
     const errors = error.response?.data?.errors || [];
+    const data = error.response?.data?.data; // e.g. cart's cross-restaurant conflict payload
 
     if (status === 401 && onUnauthorized) onUnauthorized();
 
-    return Promise.reject({ status, message, errors });
+    return Promise.reject({ status, message, errors, data });
   }
 );
 
