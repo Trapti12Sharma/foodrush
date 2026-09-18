@@ -12,9 +12,8 @@ router.use('/orders', require('./order.routes'));
 router.use('/coupons', require('./coupon.routes'));
 router.use('/config', require('./config.routes'));
 router.use('/admin', require('./admin.routes'));
-
-// Further resource routers are mounted here as each phase adds them,
-// e.g. router.use('/reviews', require('./review.routes'));
+router.use('/reviews', require('./review.routes'));
+router.use('/favorites', require('./favorite.routes'));
 
 router.get('/', (req, res) => {
   res.json({ success: true, message: 'FoodRush API root', data: { version: '1.0.0' } });

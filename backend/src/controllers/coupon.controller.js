@@ -18,4 +18,19 @@ const validateCoupon = asyncHandler(async (req, res) => {
   );
 });
 
-module.exports = { validateCoupon };
+const createCoupon = asyncHandler(async (req, res) => {
+  const coupon = await couponService.createCoupon(req.body);
+  res.status(201).json(new ApiResponse(201, 'Coupon created', { coupon }));
+});
+
+const listCoupons = asyncHandler(async (req, res) => {
+  const { items, pagination } = await couponService.listCoupons(req.query);
+  res.json(new ApiResponse(200, 'Coupons fetched', { coupons: items, pagination }));
+});
+
+const updateCoupon = asyncHandler(async (req, res) => {
+  const coupon = await couponService.updateCoupon(req.params.id, req.body);
+  res.json(new ApiResponse(200, 'Coupon updated', { coupon }));
+});
+
+module.exports = { validateCoupon, createCoupon, listCoupons, updateCoupon };

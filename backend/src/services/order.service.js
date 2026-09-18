@@ -137,6 +137,10 @@ async function listOrdersForUser(user, query) {
     filter = {};
   } else {
     filter = { user: user._id };
+    // Lets a customer check "have I ordered from this restaurant" — used by
+    // the review-eligibility check (Phase 11: only a delivered order unlocks
+    // reviewing that restaurant).
+    if (query.restaurant) filter.restaurant = query.restaurant;
   }
   if (query.status) filter.orderStatus = query.status;
 

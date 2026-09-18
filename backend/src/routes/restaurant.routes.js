@@ -1,6 +1,7 @@
 const express = require('express');
 const restaurantController = require('../controllers/restaurant.controller');
 const dashboardController = require('../controllers/dashboard.controller');
+const reviewController = require('../controllers/review.controller');
 const { createRestaurantValidator, updateRestaurantValidator } = require('../validators/restaurant.validator');
 const validate = require('../middleware/validate');
 const { authenticateUser, authorizeRoles, optionalAuth } = require('../middleware/auth.middleware');
@@ -16,6 +17,7 @@ router.get(
   authorizeRoles(ROLES.RESTAURANT_OWNER, ROLES.ADMIN),
   dashboardController.getRestaurantDashboard
 );
+router.get('/:id/reviews', reviewController.listForRestaurant);
 router.get('/:id', optionalAuth, restaurantController.getById);
 
 router.post(

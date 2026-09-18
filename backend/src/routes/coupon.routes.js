@@ -1,8 +1,10 @@
 const express = require('express');
 const { body } = require('express-validator');
 const couponController = require('../controllers/coupon.controller');
+const { createCouponValidator, updateCouponValidator } = require('../validators/coupon.validator');
 const validate = require('../middleware/validate');
-const { authenticateUser } = require('../middleware/auth.middleware');
+const { authenticateUser, authorizeRoles } = require('../middleware/auth.middleware');
+const { ROLES } = require('../utils/constants');
 
 const router = express.Router();
 
@@ -14,6 +16,10 @@ router.post(
   couponController.validateCoupon
 );
 
-// Full coupon CRUD (create/list/deactivate) is an admin capability — Phase 11.
+router.use(authenticateUser, authorizeRoles(ROLES.ADMIN));
+
+router.post('/', createCouponValidator, validate, couponController.createCoupon);
+router.get('/', couponController.listCoupons);
+router.patch('/:id', updateCouponValidator, validate, couponController.updateCoupon);
 
 module.exports = router;

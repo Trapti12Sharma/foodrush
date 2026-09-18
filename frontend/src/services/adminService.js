@@ -9,4 +9,7 @@ export const adminService = {
   setRestaurantActive: (id, isActive) =>
     api.patch(`/admin/restaurants/${id}/status`, { isActive }).then((r) => r.data.restaurant),
   listOrders: (params) => api.get('/admin/orders', { params }).then((r) => r.data),
+  createCoupon: (payload) => api.post('/coupons', payload).then((r) => r.data.coupon),
+  listCoupons: (params) => api.get('/coupons', { params }).then((r) => r.data),
+  updateCoupon: (id, payload) => api.patch(`/coupons/${id}`, payload).then((r) => r.data.coupon),
 };
