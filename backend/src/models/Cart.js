@@ -60,6 +60,10 @@ const cartSchema = new mongoose.Schema(
     deliveryFee: { type: Number, default: 0, min: 0 },
     tax: { type: Number, default: 0, min: 0 },
     discount: { type: Number, default: 0, min: 0 },
+    // The code behind `discount`, kept so it can be re-validated on every
+    // recalculation (coupon expired/deactivated since it was applied) and copied
+    // onto the Order at checkout — Phase 7.
+    couponCode: { type: String, default: null },
     total: { type: Number, default: 0, min: 0 },
   },
   { timestamps: true }

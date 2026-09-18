@@ -2,8 +2,14 @@ const Cart = require('../models/Cart');
 const FoodItem = require('../models/FoodItem');
 const Restaurant = require('../models/Restaurant');
 const ApiError = require('../utils/ApiError');
+const couponService = require('./coupon.service');
 
 const TAX_RATE = 0.05; // flat 5% — a real deployment would vary this by jurisdiction/item
+
+const POPULATE_PATHS = [
+  { path: 'items.food', select: 'name image isVeg' },
+  { path: 'restaurant', select: 'name image isOpen deliveryFee minimumOrder' },
+];
 
 async function getOrCreateCart(userId) {
   let cart = await Cart.findOne({ user: userId });
@@ -18,13 +24,14 @@ function addonKey(addons) {
     .join('|');
 }
 
-// Runs on every read/write: drops items whose FoodItem was deleted or made
-// unavailable since they were added, clears the cart entirely if its restaurant
-// was disabled/deapproved, and always recomputes prices from the current
-// FoodItem — never from the price snapshot stored on the cart line. This is the
-// same "never trust a stored/client price" rule from Phase 4, applied proactively
-// here so the cart the customer sees is never stale.
-async function syncAndRecalculate(cart) {
+// Drops items whose FoodItem was deleted/made unavailable, recomputes every
+// price from the current FoodItem (never from the stored snapshot), re-validates
+// any applied coupon against the fresh subtotal (silently dropping it if it no
+// longer qualifies), and clears the restaurant lock once the cart is empty.
+// Mutates `cart` in place; does NOT save or populate — callers do that once,
+// after any additional mutation of their own (e.g. applying a coupon), so a
+// populated document is never accidentally re-saved.
+async function recalculate(cart) {
   if (cart.items.length > 0) {
     const restaurant = await Restaurant.findById(cart.restaurant);
     const restaurantGone = !restaurant || !restaurant.isApproved || !restaurant.isActive;
@@ -34,6 +41,7 @@ async function syncAndRecalculate(cart) {
 
   if (cart.items.length === 0) {
     cart.restaurant = null;
+    cart.couponCode = null;
     cart.subtotal = 0;
     cart.deliveryFee = 0;
     cart.tax = 0;
@@ -41,13 +49,6 @@ async function syncAndRecalculate(cart) {
     cart.total = 0;
   }
 
-  await cart.save();
-  // Display-only: names/images for the frontend. Price is never read from this —
-  // it's already been set on each item from FoodItem.effectivePrice() above.
-  await cart.populate([
-    { path: 'items.food', select: 'name image isVeg' },
-    { path: 'restaurant', select: 'name image isOpen deliveryFee minimumOrder' },
-  ]);
   return cart;
 }
 
@@ -62,22 +63,38 @@ async function applyCatalogPricing(cart, restaurant) {
     return true;
   });
 
-  if (cart.items.length === 0) return; // syncAndRecalculate zeroes totals and clears the restaurant lock
+  if (cart.items.length === 0) return; // recalculate() zeroes totals and clears the restaurant lock
 
   const subtotal = cart.items.reduce((sum, item) => {
     const addonsTotal = item.addons.reduce((a, addon) => a + addon.price, 0);
     return sum + (item.price + addonsTotal) * item.quantity;
   }, 0);
+
+  let discount = 0;
+  if (cart.couponCode) {
+    const result = await couponService.validateCoupon(cart.couponCode, subtotal).catch(() => null);
+    if (result) discount = result.discountAmount;
+    else cart.couponCode = null; // coupon no longer valid for this cart — drop it rather than show a stale discount
+  }
+
   const tax = Math.round(subtotal * TAX_RATE * 100) / 100;
-  const discount = cart.discount || 0;
   const total = Math.max(subtotal + restaurant.deliveryFee + tax - discount, 0);
 
   Object.assign(cart, { subtotal, deliveryFee: restaurant.deliveryFee, tax, discount, total });
 }
 
+async function finalize(cart) {
+  await cart.save();
+  // Display-only: names/images for the frontend. Price is never read from this —
+  // it's already been set on each item from FoodItem.effectivePrice() above.
+  await cart.populate(POPULATE_PATHS);
+  return cart;
+}
+
 async function getCart(userId) {
   const cart = await getOrCreateCart(userId);
-  return syncAndRecalculate(cart);
+  await recalculate(cart);
+  return finalize(cart);
 }
 
 async function addItem(userId, { foodId, quantity = 1, addons = [] }) {
@@ -129,8 +146,8 @@ async function addItem(userId, { foodId, quantity = 1, addons = [] }) {
     cart.items.push({ food: food._id, quantity, price: food.effectivePrice(), addons: validatedAddons });
   }
 
-  await cart.save();
-  return syncAndRecalculate(cart);
+  await recalculate(cart);
+  return finalize(cart);
 }
 
 async function updateItemQuantity(userId, itemId, quantity) {
@@ -141,8 +158,8 @@ async function updateItemQuantity(userId, itemId, quantity) {
   if (!item) throw ApiError.notFound('Cart item not found');
 
   item.quantity = quantity;
-  await cart.save();
-  return syncAndRecalculate(cart);
+  await recalculate(cart);
+  return finalize(cart);
 }
 
 async function removeItem(userId, itemId) {
@@ -151,17 +168,51 @@ async function removeItem(userId, itemId) {
   if (!item) throw ApiError.notFound('Cart item not found');
 
   item.deleteOne();
-  await cart.save();
-  return syncAndRecalculate(cart);
+  await recalculate(cart);
+  return finalize(cart);
 }
 
 async function clearCart(userId) {
   const cart = await getOrCreateCart(userId);
   cart.items = [];
   cart.restaurant = null;
+  cart.couponCode = null;
   cart.discount = 0;
-  await cart.save();
-  return syncAndRecalculate(cart);
+  await recalculate(cart);
+  return finalize(cart);
 }
 
-module.exports = { getCart, addItem, updateItemQuantity, removeItem, clearCart };
+async function applyCoupon(userId, code) {
+  if (!code || !code.trim()) throw ApiError.badRequest('Coupon code is required');
+
+  const cart = await getOrCreateCart(userId);
+  if (cart.items.length === 0) throw ApiError.badRequest('Your cart is empty');
+
+  // Refresh pricing first so the coupon is validated against a genuinely current subtotal.
+  cart.couponCode = null;
+  await recalculate(cart);
+
+  const { coupon, discountAmount } = await couponService.validateCoupon(code, cart.subtotal);
+  cart.couponCode = coupon.code;
+  cart.discount = discountAmount;
+  cart.total = Math.max(cart.subtotal + cart.deliveryFee + cart.tax - discountAmount, 0);
+
+  return finalize(cart);
+}
+
+async function removeCoupon(userId) {
+  const cart = await getOrCreateCart(userId);
+  cart.couponCode = null;
+  await recalculate(cart);
+  return finalize(cart);
+}
+
+module.exports = {
+  getCart,
+  addItem,
+  updateItemQuantity,
+  removeItem,
+  clearCart,
+  applyCoupon,
+  removeCoupon,
+};

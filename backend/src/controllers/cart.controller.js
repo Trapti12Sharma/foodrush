@@ -27,4 +27,14 @@ const clearCart = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, 'Cart cleared', { cart }));
 });
 
-module.exports = { getCart, addItem, updateItem, removeItem, clearCart };
+const applyCoupon = asyncHandler(async (req, res) => {
+  const cart = await cartService.applyCoupon(req.user._id, req.body.code);
+  res.json(new ApiResponse(200, 'Coupon applied', { cart }));
+});
+
+const removeCoupon = asyncHandler(async (req, res) => {
+  const cart = await cartService.removeCoupon(req.user._id);
+  res.json(new ApiResponse(200, 'Coupon removed', { cart }));
+});
+
+module.exports = { getCart, addItem, updateItem, removeItem, clearCart, applyCoupon, removeCoupon };
