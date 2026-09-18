@@ -39,4 +39,22 @@ const authorizeRoles = (...roles) => (req, res, next) => {
   next();
 };
 
-module.exports = { authenticateUser, authorizeRoles };
+// For public browse endpoints (restaurant/menu listings) that behave slightly
+// differently for a logged-in owner/admin (e.g. revealing their own unapproved
+// restaurant) but must never reject an anonymous visitor. Invalid/expired tokens
+// are silently ignored here rather than raising 401 — the route stays public.
+const optionalAuth = asyncHandler(async (req, res, next) => {
+  const token = extractToken(req);
+  if (!token) return next();
+
+  try {
+    const payload = verifyToken(token);
+    const user = await User.findById(payload.sub);
+    if (user && user.isActive) req.user = user;
+  } catch (err) {
+    // ignore — anonymous request
+  }
+  next();
+});
+
+module.exports = { authenticateUser, authorizeRoles, optionalAuth };
