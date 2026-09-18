@@ -56,6 +56,21 @@ npm install
 npm run dev               # http://localhost:5173
 ```
 
+## Testing
+
+```bash
+cd backend
+npm test                  # runs the full Jest suite against a local MongoDB
+```
+
+Requires a MongoDB server reachable at `MONGODB_URI` (the same one `npm run dev`
+uses) — tests run against a separate `foodrush_test` database on that server,
+never the real one, and drop it automatically when the run finishes. No
+external test infra (e.g. mongodb-memory-server) is used, since it would
+require downloading a MongoDB binary that may not be reachable in every
+environment; pointing at a real local MongoDB with an isolated database name
+is the more portable choice here.
+
 ## Status
 
 Phase 1 (project setup) complete. See conversation history / commit log for phase-by-phase progress notes.
