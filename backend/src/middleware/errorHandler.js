@@ -40,11 +40,12 @@ function errorHandler(err, req, res, next) {
     console.error(err);
   }
 
-  res.status(statusCode).json({
-    success: false,
-    message,
-    errors,
-  });
+  const body = { success: false, message, errors };
+  // Lets a specific error (e.g. cart's cross-restaurant conflict) attach a small
+  // structured payload the frontend can act on, beyond just the message string.
+  if (err.data !== undefined) body.data = err.data;
+
+  res.status(statusCode).json(body);
 }
 
 module.exports = errorHandler;
