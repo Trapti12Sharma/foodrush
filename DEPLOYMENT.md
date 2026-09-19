@@ -15,7 +15,7 @@ A free-tier deployment path: **MongoDB Atlas** (database) + **Render** (backend)
 
 ## 2. Backend — Render
 
-`backend/render.yaml` describes the service; either point Render at this repo
+`render.yaml` describes the service; either point Render at this repo
 and let it read that file, or configure manually:
 
 - Root directory: `backend`

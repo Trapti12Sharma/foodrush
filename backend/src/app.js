@@ -14,6 +14,12 @@ const swaggerSpec = require('./config/swagger');
 
 const app = express();
 
+// Render (and most PaaS hosts) terminate TLS at a single reverse proxy in front
+// of the app. Trusting exactly one hop makes req.ip / req.secure reflect the
+// real client from X-Forwarded-*, which the rate limiter keys on — without this
+// every user shares the proxy's IP and one rate-limit bucket.
+app.set('trust proxy', 1);
+
 // Helmet's default Cross-Origin-Resource-Policy is "same-origin", which blocks
 // the SPA frontend (a different origin/port in dev, and typically a different
 // domain in production) from loading anything this server serves — including
