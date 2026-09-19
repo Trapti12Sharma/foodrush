@@ -4,11 +4,13 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
 const mongoSanitize = require('express-mongo-sanitize');
+const swaggerUi = require('swagger-ui-express');
 
 const errorHandler = require('./middleware/errorHandler');
 const notFound = require('./middleware/notFound');
 const { apiLimiter } = require('./middleware/rateLimiter');
 const routes = require('./routes');
+const swaggerSpec = require('./config/swagger');
 
 const app = express();
 
@@ -42,6 +44,11 @@ app.use('/uploads', express.static('uploads'));
 app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'FoodRush API is running', data: null });
 });
+
+// Interactive API docs at /api/docs; the raw OpenAPI document at /api/docs.json
+// (handy for importing into Postman/Insomnia, or for CI contract checks).
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.get('/api/docs.json', (req, res) => res.json(swaggerSpec));
 
 app.use('/api', routes);
 

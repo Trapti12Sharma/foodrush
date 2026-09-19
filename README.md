@@ -71,6 +71,14 @@ require downloading a MongoDB binary that may not be reachable in every
 environment; pointing at a real local MongoDB with an isolated database name
 is the more portable choice here.
 
+## API documentation
+
+With the backend running, interactive Swagger UI is at
+`http://localhost:5000/api/docs` (the raw OpenAPI 3.0 document is at
+`/api/docs.json`). Every endpoint is documented — parameters, request body,
+auth requirement, and response/error shapes — and "Try it out" executes
+real requests against the running server.
+
 ## Status
 
 Phase 1 (project setup) complete. See conversation history / commit log for phase-by-phase progress notes.
