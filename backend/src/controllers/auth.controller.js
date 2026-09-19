@@ -24,7 +24,12 @@ const login = asyncHandler(async (req, res) => {
 });
 
 const logout = asyncHandler(async (req, res) => {
-  res.clearCookie(COOKIE_NAME, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production' });
+  // Reuse the same httpOnly/secure/sameSite the cookie was set with (a
+  // mismatch there can fail to actually clear the cookie in some browsers) —
+  // but drop maxAge: passing it to clearCookie is deprecated in Express and
+  // makes it set a cookie that expires in the future instead of immediately.
+  const { maxAge, ...clearOptions } = cookieOptions();
+  res.clearCookie(COOKIE_NAME, clearOptions);
   res.status(200).json(new ApiResponse(200, 'Logged out successfully'));
 });
 

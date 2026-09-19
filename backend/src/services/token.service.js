@@ -21,10 +21,18 @@ function verifyToken(token) {
 }
 
 function cookieOptions() {
+  const isProduction = process.env.NODE_ENV === 'production';
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: isProduction,
+    // In dev, frontend and backend are different ports on localhost, which
+    // browsers still treat as the same *site* — Lax is sent fine there. In a
+    // real deployment they're different domains entirely (e.g. a Vercel
+    // frontend calling a Render backend), which is cross-SITE, and a Lax
+    // cookie is never attached to a cross-site fetch/XHR (only to top-level
+    // navigations) — only None does that, and browsers require Secure
+    // (HTTPS) alongside None, which `isProduction` already guarantees here.
+    sameSite: isProduction ? 'none' : 'lax',
     maxAge: parseDurationToMs(process.env.JWT_EXPIRES_IN),
   };
 }

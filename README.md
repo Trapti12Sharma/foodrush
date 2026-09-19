@@ -56,6 +56,23 @@ npm install
 npm run dev               # http://localhost:5173
 ```
 
+### Demo data (optional)
+
+```bash
+cd backend
+npm run seed               # creates demo accounts + a sample restaurant/menu/order/review/coupon
+```
+
+Prints the demo login credentials (`admin@example.com`, `restaurant@example.com`,
+`customer@example.com`) when it finishes. Safe to re-run.
+
+## Deployment
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for a free-tier path (MongoDB Atlas +
+Render + Vercel), including the cross-origin auth-cookie configuration a
+split-domain deployment needs and what to expect from image uploads on a
+free-tier host's ephemeral disk.
+
 ## Testing
 
 ```bash
