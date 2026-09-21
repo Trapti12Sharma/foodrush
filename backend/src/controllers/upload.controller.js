@@ -5,7 +5,7 @@ const storageService = require('../services/storage.service');
 
 const uploadImage = asyncHandler(async (req, res) => {
   if (!req.file) throw ApiError.badRequest('No file uploaded');
-  const { url } = await storageService.saveUploadedFile(req.file);
+  const { url } = await storageService.saveUploadedFile(req.file, { purpose: req.uploadPurpose, userId: req.user._id.toString() });
   res.status(201).json(new ApiResponse(201, 'Image uploaded', { url }));
 });
 

@@ -30,7 +30,7 @@ export default function FoodForm({ categories, initialValues, onSubmit, onCancel
 
   return (
     <form onSubmit={handleSubmit(submit)} className="space-y-4 rounded-xl border border-gray-200 bg-white p-4">
-      <ImageUploadField label="Food image (optional)" value={image} onChange={setImage} />
+      <ImageUploadField label="Food image (optional)" value={image} onChange={setImage} purpose="food" />
       <div>
         <label className="mb-1 block text-xs font-medium text-gray-600">Name</label>
         <input {...register('name', { required: 'Name is required' })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />

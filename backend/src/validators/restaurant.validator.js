@@ -1,4 +1,9 @@
 const { body } = require('express-validator');
+const { isSafeImageUrl } = require('../utils/imageUrl');
+
+const imageRules = ['image', 'coverImage', 'logo'].map((field) =>
+  body(field).optional({ nullable: true }).custom(isSafeImageUrl).withMessage(`${field} must be an uploaded image or an https:// URL`)
+);
 
 const createRestaurantValidator = [
   body('name').trim().notEmpty().withMessage('Restaurant name is required').isLength({ max: 120 }),
@@ -16,6 +21,7 @@ const createRestaurantValidator = [
     .optional()
     .isArray({ min: 2, max: 2 })
     .withMessage('location.coordinates must be [lng, lat]'),
+  ...imageRules,
 ];
 
 const updateRestaurantValidator = [
@@ -30,6 +36,7 @@ const updateRestaurantValidator = [
   body('minimumOrder').optional().isFloat({ min: 0 }),
   body('isOpen').optional().isBoolean(),
   body('location.coordinates').optional().isArray({ min: 2, max: 2 }),
+  ...imageRules,
 ];
 
 module.exports = { createRestaurantValidator, updateRestaurantValidator };

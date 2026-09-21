@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useCart } from '../context/CartContext';
 import QuantityStepper from './QuantityStepper';
-import { resolveImageUrl } from './ImageUploadField';
+import SmartImage from './SmartImage';
 
 export function VegDot({ isVeg }) {
   return (
@@ -147,7 +147,7 @@ export default function FoodMenuItem({ food, requestAdd, disabled }) {
       </div>
 
       <div className="flex shrink-0 flex-col items-end gap-2">
-        {food.image && <img src={resolveImageUrl(food.image)} alt={food.name} className="h-20 w-20 rounded-lg object-cover" />}
+        <SmartImage src={food.image} alt={food.name} widths={[160, 240]} sizes="80px" className="h-20 w-20 rounded-lg" />
         {!hasAddons &&
           (simpleLine ? (
             <QuantityStepper

@@ -8,9 +8,13 @@ import ImageUploadField from '../../components/ImageUploadField';
 export default function Profile() {
   const { selectedRestaurant, refresh } = useRestaurantOwner();
   const [image, setImage] = useState('');
+  const [coverImage, setCoverImage] = useState('');
+  const [logo, setLogo] = useState('');
 
   useEffect(() => {
     setImage(selectedRestaurant?.image || '');
+    setCoverImage(selectedRestaurant?.coverImage || '');
+    setLogo(selectedRestaurant?.logo || '');
   }, [selectedRestaurant]);
 
   const {
@@ -41,6 +45,8 @@ export default function Profile() {
         name: values.name,
         description: values.description,
         image,
+        coverImage,
+        logo,
         cuisine: values.cuisine.split(',').map((c) => c.trim()).filter(Boolean),
         address: { addressLine: values.addressLine, state: values.state, pincode: values.pincode },
         city: values.city,
@@ -66,7 +72,9 @@ export default function Profile() {
       </p>
 
       <form onSubmit={handleSubmit(onSubmit)} className="mt-6 max-w-lg space-y-4">
-        <ImageUploadField label="Restaurant image" value={image} onChange={setImage} />
+        <ImageUploadField label="Card image (shown in listings)" value={image} onChange={setImage} purpose="restaurant" />
+        <ImageUploadField label="Cover banner (top of your page — wide, e.g. 3:1)" value={coverImage} onChange={setCoverImage} purpose="restaurant" />
+        <ImageUploadField label="Logo" value={logo} onChange={setLogo} purpose="restaurant" />
         <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
           <input type="checkbox" {...register('isOpen')} /> Open for orders right now
         </label>

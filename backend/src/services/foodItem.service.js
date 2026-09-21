@@ -6,6 +6,7 @@ const { escapeRegex } = require('../utils/regex');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { assertOwnerOrAdmin } = require('../utils/ownership');
 const restaurantService = require('./restaurant.service');
+const storageService = require('./storage.service');
 const { PERMISSIONS, hasPermission } = require('../utils/permissions');
 
 const SORT_MAP = {
@@ -122,8 +123,10 @@ async function updateFood(id, requester, payload) {
   }
 
   const data = pickFields(payload, UPDATE_FIELDS);
+  const previousImage = food.image;
   Object.assign(food, data);
   await food.save();
+  await storageService.cleanupReplaced(previousImage, food.image, restaurant.owner);
   return food;
 }
 
@@ -140,6 +143,7 @@ async function deleteFood(id, requester) {
   assertOwnerOrAdmin(restaurant.owner, requester, 'You can only manage your own restaurant');
 
   await food.deleteOne();
+  await storageService.deleteIfOwned(food.image, restaurant.owner);
 }
 
 module.exports = { listFoods, getFoodById, createFood, updateFood, deleteFood };

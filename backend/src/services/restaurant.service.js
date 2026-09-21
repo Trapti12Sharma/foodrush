@@ -4,6 +4,7 @@ const { escapeRegex } = require('../utils/regex');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { assertOwnerOrAdmin } = require('../utils/ownership');
 const { PERMISSIONS, hasPermission } = require('../utils/permissions');
+const storageService = require('./storage.service');
 
 const SORT_MAP = {
   rating: '-rating',
@@ -16,6 +17,8 @@ const CREATE_FIELDS = [
   'name',
   'description',
   'image',
+  'coverImage',
+  'logo',
   'cuisine',
   'address',
   'city',
@@ -26,6 +29,7 @@ const CREATE_FIELDS = [
 ];
 
 const UPDATE_FIELDS = [...CREATE_FIELDS, 'isOpen'];
+const IMAGE_FIELDS = ['image', 'coverImage', 'logo'];
 
 function isPubliclyVisible(restaurant) {
   return restaurant.isApproved && restaurant.isActive;
@@ -128,8 +132,14 @@ async function updateRestaurant(id, requester, payload) {
   assertOwnerOrAdmin(restaurant.owner, requester, 'You can only modify your own restaurant');
 
   const data = pickFields(payload, UPDATE_FIELDS);
+  const previous = { image: restaurant.image, coverImage: restaurant.coverImage, logo: restaurant.logo };
   Object.assign(restaurant, data);
   await restaurant.save();
+
+  // Only after the save succeeded: remove Cloudinary images that were just replaced.
+  await Promise.all(
+    IMAGE_FIELDS.map((field) => storageService.cleanupReplaced(previous[field], restaurant[field], restaurant.owner))
+  );
   return restaurant;
 }
 

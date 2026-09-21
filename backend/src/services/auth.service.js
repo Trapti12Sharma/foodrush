@@ -4,6 +4,7 @@ const ApiError = require('../utils/ApiError');
 const { ROLES } = require('../utils/constants');
 const emailService = require('./email.service');
 const { getAppUrl } = require('../config/cors');
+const storageService = require('./storage.service');
 
 const RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
 const RESET_REQUEST_COOLDOWN_MS = 60 * 1000;
@@ -61,11 +62,13 @@ async function updateProfile(userId, { currentPassword, email, ...fields }) {
     emailChanged = true;
   }
 
+  const previousAvatar = user.avatar;
   PROFILE_FIELDS.forEach((field) => {
     if (fields[field] !== undefined) user[field] = fields[field];
   });
 
   await user.save();
+  await storageService.cleanupReplaced(previousAvatar, user.avatar, user._id);
   return { user, emailChanged };
 }
 

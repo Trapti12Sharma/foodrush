@@ -13,15 +13,22 @@ const GOOD_PROD = {
 
 describe('validateEnv', () => {
   it('accepts a correct production config', () => {
-    const { errors, warnings } = validateEnv({ ...GOOD_PROD, EMAIL_PROVIDER: 'resend', EMAIL_FROM: 'a@example.com', RESEND_API_KEY: 'k' });
+    const { errors, warnings } = validateEnv({
+      ...GOOD_PROD,
+      EMAIL_PROVIDER: 'resend', EMAIL_FROM: 'a@example.com', RESEND_API_KEY: 'k',
+      CLOUDINARY_CLOUD_NAME: 'c', CLOUDINARY_API_KEY: 'k', CLOUDINARY_API_SECRET: 's',
+    });
     expect(errors).toEqual([]);
     expect(warnings).toEqual([]);
   });
 
-  it('only warns — never blocks boot — when no email provider is configured in production', () => {
+  it('only warns — never blocks boot — when email and Cloudinary are not configured in production', () => {
     const { errors, warnings } = validateEnv(GOOD_PROD);
     expect(errors).toEqual([]);
-    expect(warnings).toEqual(['EMAIL_PROVIDER is not set — password-reset emails will not be delivered.']);
+    expect(warnings).toEqual([
+      'EMAIL_PROVIDER is not set — password-reset emails will not be delivered.',
+      'Cloudinary is not configured — uploaded images will be lost on every restart or deploy.',
+    ]);
   });
 
   it('requires MONGODB_URI, JWT_SECRET and a client origin in production', () => {

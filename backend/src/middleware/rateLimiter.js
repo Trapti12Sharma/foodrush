@@ -28,4 +28,18 @@ const authLimiter = rateLimit({
   },
 });
 
-module.exports = { apiLimiter, authLimiter };
+// Uploads are the most expensive thing a client can ask for (bandwidth, storage and, on
+// Cloudinary, quota), so they get their own tighter ceiling on top of the general one.
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isTest ? 100000 : 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many uploads. Please try again later.',
+    errors: [],
+  },
+});
+
+module.exports = { apiLimiter, authLimiter, uploadLimiter };

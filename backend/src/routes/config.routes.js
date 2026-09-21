@@ -1,5 +1,6 @@
 const express = require('express');
 const { isOnlinePaymentConfigured } = require('../services/payment.service');
+const { isPersistentStorage } = require('../services/storage.service');
 const ApiResponse = require('../utils/ApiResponse');
 
 const router = express.Router();
@@ -20,10 +21,16 @@ const router = express.Router();
  *             schema:
  *               type: object
  *               properties:
- *                 data: { type: object, properties: { onlinePaymentsEnabled: { type: boolean } } }
+ *                 data: { type: object, properties: { onlinePaymentsEnabled: { type: boolean }, imageStoragePersistent: { type: boolean } } }
  */
 router.get('/', (req, res) => {
-  res.json(new ApiResponse(200, 'Public config', { onlinePaymentsEnabled: isOnlinePaymentConfigured() }));
+  res.json(
+    new ApiResponse(200, 'Public config', {
+      onlinePaymentsEnabled: isOnlinePaymentConfigured(),
+      // false = uploaded images will vanish on restart (production without Cloudinary); the UI warns owners.
+      imageStoragePersistent: isPersistentStorage(),
+    })
+  );
 });
 
 module.exports = router;

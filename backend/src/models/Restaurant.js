@@ -19,7 +19,16 @@ const restaurantSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    // `image` is the card thumbnail; `coverImage` the wide banner on the restaurant page.
     image: {
+      type: String,
+      default: '',
+    },
+    coverImage: {
+      type: String,
+      default: '',
+    },
+    logo: {
       type: String,
       default: '',
     },

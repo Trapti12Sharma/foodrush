@@ -8,7 +8,7 @@ import EmptyState from '../components/EmptyState';
 import FoodMenuItem from '../components/FoodMenuItem';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ReviewsSection from '../components/ReviewsSection';
-import { resolveImageUrl } from '../components/ImageUploadField';
+import SmartImage from '../components/SmartImage';
 import { useAddToCart } from '../hooks/useAddToCart';
 import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
@@ -91,11 +91,16 @@ export default function RestaurantDetail() {
 
   return (
     <div>
-      <div className="aspect-[3/1] w-full bg-gray-200">
-        {restaurant.image && (
-          <img src={resolveImageUrl(restaurant.image)} alt={restaurant.name} className="h-full w-full object-cover" />
-        )}
-      </div>
+      <SmartImage
+        src={restaurant.coverImage || restaurant.image}
+        alt={restaurant.name}
+        cuisine={restaurant.cuisine}
+        aspect={3 / 1}
+        widths={[640, 1024, 1600]}
+        sizes="100vw"
+        eager
+        className="w-full"
+      />
 
       <div className="mx-auto max-w-5xl px-4 py-6">
         <Link to="/restaurants" className="mb-3 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-brand-600">
@@ -104,6 +109,9 @@ export default function RestaurantDetail() {
 
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-start gap-2">
+            {restaurant.logo && (
+              <SmartImage src={restaurant.logo} alt={`${restaurant.name} logo`} widths={[96, 192]} sizes="56px" className="h-14 w-14 shrink-0 rounded-full border border-gray-200" />
+            )}
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{restaurant.name}</h1>
               <p className="mt-1 text-sm text-gray-500">{restaurant.cuisine.join(', ')} · {restaurant.city}</p>
