@@ -12,6 +12,13 @@ function extractToken(req) {
   return null;
 }
 
+// A token issued before the user's last password change is no longer valid. JWT
+// `iat` has one-second resolution, so compare in whole seconds.
+function isRevoked(payload, user) {
+  if (!user.passwordChangedAt) return false;
+  return payload.iat < Math.floor(user.passwordChangedAt.getTime() / 1000);
+}
+
 // Verifies the JWT, then re-loads the user from the DB (not just trusting the
 // token payload) so a deactivated account or role change takes effect immediately
 // instead of waiting for the token to expire.
@@ -22,7 +29,7 @@ const authenticateUser = asyncHandler(async (req, res, next) => {
   const payload = verifyToken(token); // throws JsonWebTokenError/TokenExpiredError -> errorHandler
   const user = await User.findById(payload.sub);
 
-  if (!user || !user.isActive) {
+  if (!user || !user.isActive || isRevoked(payload, user)) {
     throw ApiError.unauthorized('Session expired. Please login again.');
   }
 
@@ -72,7 +79,7 @@ const optionalAuth = asyncHandler(async (req, res, next) => {
   try {
     const payload = verifyToken(token);
     const user = await User.findById(payload.sub);
-    if (user && user.isActive) req.user = user;
+    if (user && user.isActive && !isRevoked(payload, user)) req.user = user;
   } catch (err) {
     // ignore — anonymous request
   }

@@ -13,7 +13,15 @@ const GOOD_PROD = {
 
 describe('validateEnv', () => {
   it('accepts a correct production config', () => {
-    expect(validateEnv(GOOD_PROD)).toEqual({ errors: [], warnings: [] });
+    const { errors, warnings } = validateEnv({ ...GOOD_PROD, EMAIL_PROVIDER: 'resend', EMAIL_FROM: 'a@example.com', RESEND_API_KEY: 'k' });
+    expect(errors).toEqual([]);
+    expect(warnings).toEqual([]);
+  });
+
+  it('only warns — never blocks boot — when no email provider is configured in production', () => {
+    const { errors, warnings } = validateEnv(GOOD_PROD);
+    expect(errors).toEqual([]);
+    expect(warnings).toEqual(['EMAIL_PROVIDER is not set — password-reset emails will not be delivered.']);
   });
 
   it('requires MONGODB_URI, JWT_SECRET and a client origin in production', () => {

@@ -32,7 +32,9 @@ import AdminUsers from './pages/admin/Users';
 import AdminRestaurants from './pages/admin/Restaurants';
 import AdminOrders from './pages/admin/Orders';
 import AdminCoupons from './pages/admin/Coupons';
-import ComingSoon from './pages/ComingSoon';
+import Profile from './pages/Profile';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import NotFound from './pages/NotFound';
 
 function App() {
@@ -46,6 +48,8 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/restaurants" element={<RestaurantListing />} />
               <Route path="/restaurants/:id" element={<RestaurantDetail />} />
               <Route path="/search" element={<Search />} />
@@ -79,7 +83,7 @@ function App() {
                 path="/profile"
                 element={
                   <ProtectedRoute>
-                    <ComingSoon title="Your profile" phase="a follow-up phase" />
+                    <Profile />
                   </ProtectedRoute>
                 }
               />
