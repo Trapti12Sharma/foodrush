@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
+const mongoose = require('mongoose');
 const mongoSanitize = require('express-mongo-sanitize');
 const swaggerUi = require('swagger-ui-express');
 
@@ -11,6 +12,7 @@ const notFound = require('./middleware/notFound');
 const { apiLimiter } = require('./middleware/rateLimiter');
 const routes = require('./routes');
 const swaggerSpec = require('./config/swagger');
+const { corsOptions } = require('./config/cors');
 
 const app = express();
 
@@ -27,12 +29,8 @@ app.set('trust proxy', 1);
 // "cross-origin" is the correct policy here, not a weakening of anything else
 // Helmet sets.
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(
-  cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
-    credentials: true,
-  })
-);
+// Allow-list built from CLIENT_URL / CLIENT_URLS (config/cors.js).
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -46,6 +44,19 @@ if (process.env.NODE_ENV !== 'test') {
 app.use('/api', apiLimiter);
 
 app.use('/uploads', express.static('uploads'));
+
+// Liveness/readiness probe for uptime monitors and Render's health check. Sits outside
+// /api so it is not counted against the API rate limit. Returns 503 while the database
+// is unreachable so a broken instance is not mistaken for a healthy one. Deliberately
+// exposes nothing about configuration or versions.
+app.get('/health', (req, res) => {
+  const dbConnected = mongoose.connection.readyState === 1;
+  res.status(dbConnected ? 200 : 503).json({
+    success: dbConnected,
+    message: dbConnected ? 'FoodRush API is healthy' : 'FoodRush API is degraded',
+    data: { status: dbConnected ? 'ok' : 'degraded', db: dbConnected ? 'connected' : 'disconnected', uptimeSeconds: Math.round(process.uptime()) },
+  });
+});
 
 app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'FoodRush API is running', data: null });

@@ -6,7 +6,7 @@ const { escapeRegex } = require('../utils/regex');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { assertOwnerOrAdmin } = require('../utils/ownership');
 const restaurantService = require('./restaurant.service');
-const { ROLES } = require('../utils/constants');
+const { PERMISSIONS, hasPermission } = require('../utils/permissions');
 
 const SORT_MAP = {
   price_asc: 'price',
@@ -34,7 +34,8 @@ async function listFoods(query, requester) {
   if (query.restaurant) {
     const restaurant = await restaurantService.getRestaurantById(query.restaurant, requester);
     const isManager =
-      requester && (requester.role === ROLES.ADMIN || restaurant.owner.toString() === requester._id.toString());
+      requester &&
+      (hasPermission(requester, PERMISSIONS.RESTAURANTS_READ_ALL) || restaurant.owner.toString() === requester._id.toString());
 
     filter.restaurant = restaurant._id;
     if (!isManager) filter.isAvailable = true;

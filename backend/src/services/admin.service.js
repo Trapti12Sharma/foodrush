@@ -5,6 +5,7 @@ const ApiError = require('../utils/ApiError');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { escapeRegex } = require('../utils/regex');
 const { ORDER_STATUS } = require('../utils/constants');
+const { PERMISSIONS, hasPermission, isStaffRole } = require('../utils/permissions');
 
 // Platform-wide stats (unscoped) — the admin equivalent of Phase 9's
 // per-restaurant dashboard.service.js. Revenue is delivered-orders-only, same
@@ -67,9 +68,18 @@ async function listUsers(query) {
   return { items, pagination: buildPaginationMeta(total, page, limit) };
 }
 
-async function setUserActive(id, isActive) {
+// Privilege guards: nobody can lock themselves out by accident, and only someone
+// who may manage admins (SUPER_ADMIN) can enable/disable a staff account, so an
+// ADMIN can never disable the SUPER_ADMIN above them.
+async function setUserActive(id, isActive, actor) {
   const user = await User.findById(id);
   if (!user) throw ApiError.notFound('User not found');
+  if (actor && user._id.toString() === actor._id.toString()) {
+    throw ApiError.badRequest('You cannot change the status of your own account');
+  }
+  if (actor && isStaffRole(user.role) && !hasPermission(actor, PERMISSIONS.ADMINS_MANAGE)) {
+    throw ApiError.forbidden('Only a super admin can change the status of a staff account');
+  }
   user.isActive = isActive;
   await user.save();
   return user;

@@ -1,6 +1,7 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiResponse = require('../utils/ApiResponse');
 const orderService = require('../services/order.service');
+const auditService = require('../services/audit.service');
 
 const createOrder = asyncHandler(async (req, res) => {
   const order = await orderService.createOrder(req.user, req.body);
@@ -19,11 +20,25 @@ const getOrder = asyncHandler(async (req, res) => {
 
 const updateStatus = asyncHandler(async (req, res) => {
   const order = await orderService.updateOrderStatus(req.user, req.params.id, req.body.status);
+  await auditService.record({
+    req,
+    action: 'order.status_update',
+    entityType: 'Order',
+    entityId: order._id,
+    metadata: { status: order.orderStatus },
+  });
   res.json(new ApiResponse(200, 'Order status updated', { order }));
 });
 
 const cancelOrder = asyncHandler(async (req, res) => {
   const order = await orderService.cancelOrder(req.user, req.params.id, req.body.reason);
+  await auditService.record({
+    req,
+    action: 'order.cancel',
+    entityType: 'Order',
+    entityId: order._id,
+    metadata: { reason: req.body.reason || null, cancelledByCustomer: order.user.toString() === req.user._id.toString() },
+  });
   res.json(new ApiResponse(200, 'Order cancelled', { order }));
 });
 

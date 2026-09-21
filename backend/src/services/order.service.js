@@ -6,10 +6,11 @@ const Address = require('../models/Address');
 const ApiError = require('../utils/ApiError');
 const paymentService = require('./payment.service');
 const couponService = require('./coupon.service');
+const pricing = require('./pricing.service');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { ORDER_STATUS, ORDER_STATUS_TRANSITIONS, PAYMENT_METHODS, PAYMENT_STATUS, ROLES } = require('../utils/constants');
+const { PERMISSIONS, hasPermission } = require('../utils/permissions');
 
-const TAX_RATE = 0.05; // kept in sync with cart.service.js's rate — same order math, computed fresh here
 
 // Unlike the cart's browsing view (which silently drops changed/unavailable
 // items so the customer can keep shopping), order placement fails loudly: if
@@ -46,27 +47,28 @@ async function createOrder(user, { addressId, paymentMethod }) {
     return { food: food._id, name: food.name, price: food.effectivePrice(), quantity: item.quantity, addons: item.addons };
   });
 
-  const subtotal = orderItems.reduce((sum, item) => {
-    const addonsTotal = item.addons.reduce((a, addon) => a + addon.price, 0);
-    return sum + (item.price + addonsTotal) * item.quantity;
-  }, 0);
+  const subtotal = pricing.subtotalOf(orderItems);
 
   if (subtotal < restaurant.minimumOrder) {
     throw ApiError.badRequest(`This restaurant requires a minimum order of ₹${restaurant.minimumOrder}`);
   }
 
+  // Fail loudly, like every other check here: if the coupon the customer saw in
+  // their cart no longer applies, silently charging the undiscounted price would
+  // be a nasty surprise — so the order is rejected and they can review the cart.
   let coupon = null;
   let discount = 0;
   if (cart.couponCode) {
-    const result = await couponService.validateCoupon(cart.couponCode, subtotal).catch(() => null);
-    if (result) {
+    try {
+      const result = await couponService.validateCoupon(cart.couponCode, subtotal);
       coupon = result.coupon;
       discount = result.discountAmount;
+    } catch (err) {
+      throw ApiError.conflict(`Coupon "${cart.couponCode}" can no longer be applied (${err.message}). Please review your cart.`);
     }
   }
 
-  const tax = Math.round(subtotal * TAX_RATE * 100) / 100;
-  const totalAmount = Math.max(subtotal + restaurant.deliveryFee + tax - discount, 0);
+  const { tax, total: totalAmount } = pricing.computeTotals({ subtotal, deliveryFee: restaurant.deliveryFee, discount });
 
   if (!Object.values(PAYMENT_METHODS).includes(paymentMethod)) {
     throw ApiError.badRequest('Invalid payment method');
@@ -77,7 +79,7 @@ async function createOrder(user, { addressId, paymentMethod }) {
     orderRef: null,
   });
 
-  const order = await Order.create({
+  const orderData = {
     user: user._id,
     restaurant: restaurant._id,
     items: orderItems,
@@ -102,9 +104,22 @@ async function createOrder(user, { addressId, paymentMethod }) {
     orderStatus: ORDER_STATUS.PENDING,
     statusHistory: [{ status: ORDER_STATUS.PENDING, changedBy: user._id }],
     estimatedDeliveryTime: new Date(Date.now() + restaurant.deliveryTime * 60 * 1000),
-  });
+  };
 
-  if (coupon) await couponService.incrementUsage(coupon._id);
+  // Claim the coupon use atomically right before the order is written, and hand it
+  // back if the write fails, so the usage limit holds under concurrent checkouts
+  // and a failed checkout doesn't burn the customer's coupon.
+  if (coupon && !(await couponService.redeemCoupon(coupon._id))) {
+    throw ApiError.conflict(`Coupon "${coupon.code}" has just reached its usage limit. Please review your cart.`);
+  }
+
+  let order;
+  try {
+    order = await Order.create(orderData);
+  } catch (err) {
+    if (coupon) await couponService.releaseCoupon(coupon._id);
+    throw err;
+  }
 
   cart.items = [];
   cart.restaurant = null;
@@ -133,7 +148,7 @@ async function listOrdersForUser(user, query) {
     } else {
       filter = { restaurant: { $in: restaurantIds } };
     }
-  } else if (user.role === ROLES.ADMIN) {
+  } else if (hasPermission(user, PERMISSIONS.ORDERS_READ_ALL)) {
     filter = {};
   } else {
     filter = { user: user._id };
@@ -158,7 +173,7 @@ async function getOrderById(user, orderId) {
 
   const isCustomer = order.user.toString() === user._id.toString();
   const isOwner = user.role === ROLES.RESTAURANT_OWNER && order.restaurant.owner.toString() === user._id.toString();
-  const isAdmin = user.role === ROLES.ADMIN;
+  const isAdmin = hasPermission(user, PERMISSIONS.ORDERS_READ_ALL);
   if (!isCustomer && !isOwner && !isAdmin) throw ApiError.notFound('Order not found');
 
   return order;
@@ -169,7 +184,7 @@ async function updateOrderStatus(user, orderId, nextStatus) {
   if (!order) throw ApiError.notFound('Order not found');
 
   const isOwner = user.role === ROLES.RESTAURANT_OWNER && order.restaurant.owner.toString() === user._id.toString();
-  const isAdmin = user.role === ROLES.ADMIN;
+  const isAdmin = hasPermission(user, PERMISSIONS.ORDERS_MANAGE);
   if (!isOwner && !isAdmin) throw ApiError.forbidden('Only the restaurant or an admin can update order status');
 
   const allowed = ORDER_STATUS_TRANSITIONS[order.orderStatus] || [];
@@ -189,7 +204,7 @@ async function cancelOrder(user, orderId, reason) {
 
   const isCustomer = order.user.toString() === user._id.toString();
   const isOwner = user.role === ROLES.RESTAURANT_OWNER && order.restaurant.owner.toString() === user._id.toString();
-  const isAdmin = user.role === ROLES.ADMIN;
+  const isAdmin = hasPermission(user, PERMISSIONS.ORDERS_MANAGE);
   if (!isCustomer && !isOwner && !isAdmin) throw ApiError.forbidden('You cannot cancel this order');
 
   const allowed = ORDER_STATUS_TRANSITIONS[order.orderStatus] || [];

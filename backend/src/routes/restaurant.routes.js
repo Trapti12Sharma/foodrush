@@ -4,8 +4,14 @@ const dashboardController = require('../controllers/dashboard.controller');
 const reviewController = require('../controllers/review.controller');
 const { createRestaurantValidator, updateRestaurantValidator } = require('../validators/restaurant.validator');
 const validate = require('../middleware/validate');
-const { authenticateUser, authorizeRoles, optionalAuth } = require('../middleware/auth.middleware');
+const {
+  authenticateUser,
+  authorizeRoles,
+  requireOwnerOrPermission,
+  optionalAuth,
+} = require('../middleware/auth.middleware');
 const { ROLES } = require('../utils/constants');
+const { PERMISSIONS } = require('../utils/permissions');
 
 const router = express.Router();
 
@@ -119,7 +125,7 @@ router.get('/mine', authenticateUser, authorizeRoles(ROLES.RESTAURANT_OWNER), re
 router.get(
   '/:id/dashboard',
   authenticateUser,
-  authorizeRoles(ROLES.RESTAURANT_OWNER, ROLES.ADMIN),
+  requireOwnerOrPermission(PERMISSIONS.RESTAURANTS_READ_ALL),
   dashboardController.getRestaurantDashboard
 );
 
@@ -265,7 +271,7 @@ router.post(
 router.put(
   '/:id',
   authenticateUser,
-  authorizeRoles(ROLES.RESTAURANT_OWNER, ROLES.ADMIN),
+  requireOwnerOrPermission(PERMISSIONS.RESTAURANTS_MANAGE),
   updateRestaurantValidator,
   validate,
   restaurantController.update
@@ -292,7 +298,7 @@ router.put(
 router.delete(
   '/:id',
   authenticateUser,
-  authorizeRoles(ROLES.RESTAURANT_OWNER, ROLES.ADMIN),
+  requireOwnerOrPermission(PERMISSIONS.RESTAURANTS_MANAGE),
   restaurantController.remove
 );
 

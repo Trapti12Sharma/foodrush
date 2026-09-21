@@ -7,8 +7,8 @@ const {
   verifyPaymentValidator,
 } = require('../validators/order.validator');
 const validate = require('../middleware/validate');
-const { authenticateUser, authorizeRoles } = require('../middleware/auth.middleware');
-const { ROLES } = require('../utils/constants');
+const { authenticateUser, requireOwnerOrPermission } = require('../middleware/auth.middleware');
+const { PERMISSIONS } = require('../utils/permissions');
 
 const router = express.Router();
 
@@ -161,7 +161,7 @@ router.get('/:id', orderController.getOrder);
  */
 router.patch(
   '/:id/status',
-  authorizeRoles(ROLES.RESTAURANT_OWNER, ROLES.ADMIN),
+  requireOwnerOrPermission(PERMISSIONS.ORDERS_MANAGE),
   updateStatusValidator,
   validate,
   orderController.updateStatus

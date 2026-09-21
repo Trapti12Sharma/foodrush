@@ -8,6 +8,7 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "seed": "node seeds/seed.js",
+    "bootstrap:admin": "node scripts/bootstrap-super-admin.js",
     "test": "jest --runInBand --forceExit"
   },
   "dependencies": {

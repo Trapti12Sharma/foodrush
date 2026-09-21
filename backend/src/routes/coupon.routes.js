@@ -3,8 +3,8 @@ const { body } = require('express-validator');
 const couponController = require('../controllers/coupon.controller');
 const { createCouponValidator, updateCouponValidator } = require('../validators/coupon.validator');
 const validate = require('../middleware/validate');
-const { authenticateUser, authorizeRoles } = require('../middleware/auth.middleware');
-const { ROLES } = require('../utils/constants');
+const { authenticateUser, requirePermission } = require('../middleware/auth.middleware');
+const { PERMISSIONS } = require('../utils/permissions');
 
 const router = express.Router();
 
@@ -52,7 +52,7 @@ router.post(
   couponController.validateCoupon
 );
 
-router.use(authenticateUser, authorizeRoles(ROLES.ADMIN));
+router.use(authenticateUser, requirePermission(PERMISSIONS.COUPONS_MANAGE));
 
 /**
  * @swagger

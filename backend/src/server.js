@@ -1,5 +1,10 @@
 require('dotenv').config();
 
+const { assertEnv } = require('./config/env');
+
+// Fail fast (before touching the database) if required configuration is missing or malformed.
+assertEnv();
+
 const app = require('./app');
 const connectDB = require('./config/db');
 
