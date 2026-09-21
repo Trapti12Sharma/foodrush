@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Star, Clock, Bike, Heart } from 'lucide-react';
+import { Star, Clock, Bike, Heart, MapPin, Leaf } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
@@ -10,6 +10,11 @@ export default function RestaurantCard({ restaurant }) {
   const { isFavorite, toggleFavorite } = useFavorites();
   const navigate = useNavigate();
   const favorited = isFavorite(restaurant._id);
+
+  // Present only on results from the location-aware search; plain listings simply omit them.
+  const hasDistance = typeof restaurant.distanceKm === 'number';
+  const eta = restaurant.estimatedDeliveryMinutes ?? restaurant.deliveryTime;
+  const closed = restaurant.isOpen === false;
 
   async function handleHeartClick(e) {
     e.preventDefault();
@@ -37,8 +42,18 @@ export default function RestaurantCard({ restaurant }) {
           alt={restaurant.name}
           cuisine={restaurant.cuisine}
           aspect={4 / 3}
-          className="w-full transition duration-300 group-hover:scale-105"
+          className={`w-full transition duration-300 group-hover:scale-105 ${closed ? 'grayscale' : ''}`}
         />
+        {restaurant.hasOffer && !closed && (
+          <span className="absolute left-2 top-2 rounded bg-brand-600 px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm">
+            Offers available
+          </span>
+        )}
+        {closed && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/45 text-sm font-semibold tracking-wide text-white">
+            Currently closed
+          </div>
+        )}
         <button
           type="button"
           onClick={handleHeartClick}
@@ -56,15 +71,27 @@ export default function RestaurantCard({ restaurant }) {
           </span>
         </div>
         <p className="mt-1 line-clamp-1 text-sm text-gray-500">{restaurant.cuisine?.join(', ')}</p>
-        <div className="mt-2 flex items-center gap-3 text-xs text-gray-500">
-          <span className="flex items-center gap-1">
-            <Clock size={14} /> {restaurant.deliveryTime} min
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+          <span className="flex items-center gap-1" title={hasDistance ? 'Estimated delivery time' : undefined}>
+            <Clock size={14} /> {hasDistance ? '~' : ''}{eta} min
           </span>
+          {hasDistance && (
+            <span className="flex items-center gap-1">
+              <MapPin size={14} /> {restaurant.distanceKm} km
+            </span>
+          )}
           <span className="flex items-center gap-1">
             <Bike size={14} /> {restaurant.deliveryFee === 0 ? 'Free delivery' : `₹${restaurant.deliveryFee}`}
           </span>
         </div>
-        <p className="mt-1 text-xs text-gray-400">{restaurant.city}</p>
+        <div className="mt-1 flex items-center gap-2 text-xs text-gray-400">
+          <span>{restaurant.city}</span>
+          {restaurant.isPureVeg && (
+            <span className="flex items-center gap-0.5 font-medium text-green-700">
+              <Leaf size={11} /> Pure veg
+            </span>
+          )}
+        </div>
       </div>
     </Link>
   );

@@ -1,6 +1,7 @@
 const express = require('express');
 const { isOnlinePaymentConfigured } = require('../services/payment.service');
 const { isPersistentStorage } = require('../services/storage.service');
+const { isConfigured: isLocationSearchConfigured } = require('../services/geo.service');
 const ApiResponse = require('../utils/ApiResponse');
 
 const router = express.Router();
@@ -21,7 +22,7 @@ const router = express.Router();
  *             schema:
  *               type: object
  *               properties:
- *                 data: { type: object, properties: { onlinePaymentsEnabled: { type: boolean }, imageStoragePersistent: { type: boolean } } }
+ *                 data: { type: object, properties: { onlinePaymentsEnabled: { type: boolean }, imageStoragePersistent: { type: boolean }, locationSearchEnabled: { type: boolean } } }
  */
 router.get('/', (req, res) => {
   res.json(
@@ -29,6 +30,8 @@ router.get('/', (req, res) => {
       onlinePaymentsEnabled: isOnlinePaymentConfigured(),
       // false = uploaded images will vanish on restart (production without Cloudinary); the UI warns owners.
       imageStoragePersistent: isPersistentStorage(),
+      // false = address search / reverse geocoding is unavailable; the UI falls back to GPS + popular cities.
+      locationSearchEnabled: isLocationSearchConfigured(),
     })
   );
 });

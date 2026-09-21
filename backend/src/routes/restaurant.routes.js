@@ -1,5 +1,7 @@
 const express = require('express');
 const restaurantController = require('../controllers/restaurant.controller');
+const restaurantGeoController = require('../controllers/restaurantGeo.controller');
+const { nearbyValidator, deliveryCheckValidator } = require('../validators/restaurantGeo.validator');
 const dashboardController = require('../controllers/dashboard.controller');
 const reviewController = require('../controllers/review.controller');
 const { createRestaurantValidator, updateRestaurantValidator } = require('../validators/restaurant.validator');
@@ -73,6 +75,82 @@ const router = express.Router();
  *                     pagination: { $ref: '#/components/schemas/Pagination' }
  */
 router.get('/', restaurantController.list);
+
+/**
+ * @swagger
+ * /restaurants/nearby:
+ *   get:
+ *     summary: Restaurants around a point, with real distance, ETA estimate and menu-derived flags
+ *     description: >
+ *       Public. Uses a geospatial query, so only restaurants that have coordinates can appear. By default only
+ *       restaurants that actually deliver to the point (distance within their own delivery radius) are returned;
+ *       pass `includeOutOfRange=true` to include the rest, flagged `deliverable: false`.
+ *       `estimatedDeliveryMinutes` is an estimate (restaurant time + ~3 min per km), not live routing.
+ *       `hasOffer`, `isPureVeg`, `servesNonVeg` and `avgPrice` are derived from the restaurant's available menu.
+ *     tags: [Restaurants]
+ *     security: []
+ *     parameters:
+ *       - { in: query, name: lat, required: true, schema: { type: number } }
+ *       - { in: query, name: lng, required: true, schema: { type: number } }
+ *       - { in: query, name: radius, schema: { type: number, default: 10, maximum: 50 }, description: Search radius in km }
+ *       - { in: query, name: search, schema: { type: string } }
+ *       - { in: query, name: cuisine, schema: { type: string } }
+ *       - { in: query, name: minRating, schema: { type: number } }
+ *       - { in: query, name: maxDeliveryTime, schema: { type: integer }, description: Max estimated minutes }
+ *       - { in: query, name: maxPrice, schema: { type: number }, description: Max typical item price }
+ *       - { in: query, name: veg, schema: { type: boolean }, description: Pure-veg restaurants only }
+ *       - { in: query, name: nonVeg, schema: { type: boolean }, description: Restaurants that serve non-veg }
+ *       - { in: query, name: hasOffer, schema: { type: boolean } }
+ *       - { in: query, name: openNow, schema: { type: boolean } }
+ *       - { in: query, name: includeOutOfRange, schema: { type: boolean } }
+ *       - { in: query, name: sort, schema: { type: string, enum: [recommended, distance, rating, deliveryTime, deliveryFee, price], default: recommended } }
+ *       - { in: query, name: page, schema: { type: integer } }
+ *       - { in: query, name: limit, schema: { type: integer } }
+ *     responses:
+ *       200: { description: 'Page of restaurants with distanceKm, estimatedDeliveryMinutes, deliverable, hasOffer, isPureVeg, servesNonVeg and avgPrice' }
+ *       422: { $ref: '#/components/responses/ValidationError' }
+ */
+router.get('/nearby', nearbyValidator, validate, restaurantGeoController.nearby);
+
+/**
+ * @swagger
+ * /restaurants/cities:
+ *   get:
+ *     summary: Cities that currently have live restaurants (with an average position)
+ *     description: Powers the "popular cities" location picker; works without any Google key.
+ *     tags: [Restaurants]
+ *     security: []
+ *     responses:
+ *       200: { description: "cities: [{city, restaurantCount, latitude, longitude}] — coordinates are null if no restaurant there has a location" }
+ */
+router.get('/cities', restaurantGeoController.cities);
+
+/**
+ * @swagger
+ * /restaurants/{id}/delivery-check:
+ *   post:
+ *     summary: Does this restaurant deliver to a point?
+ *     description: >
+ *       Returns `deliverable` (true/false, or null when the restaurant has no location and it cannot be measured),
+ *       the distance and the restaurant's delivery radius. Order creation enforces the same rule.
+ *     tags: [Restaurants]
+ *     security: []
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [latitude, longitude]
+ *             properties: { latitude: { type: number }, longitude: { type: number } }
+ *     responses:
+ *       200: { description: "{deliverable, distanceKm, radiusKm}" }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       422: { $ref: '#/components/responses/ValidationError' }
+ */
+router.post('/:id/delivery-check', optionalAuth, deliveryCheckValidator, validate, restaurantGeoController.deliveryCheck);
 
 /**
  * @swagger

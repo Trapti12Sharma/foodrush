@@ -1,5 +1,14 @@
 const { body } = require('express-validator');
 const { isSafeImageUrl } = require('../utils/imageUrl');
+const { isValidPointCoordinates } = require('../utils/geo');
+
+const locationRules = [
+  body('location.coordinates')
+    .optional()
+    .custom((coordinates) => isValidPointCoordinates(coordinates))
+    .withMessage('location.coordinates must be a real [longitude, latitude]'),
+  body('deliveryRadiusKm').optional().isFloat({ min: 0.5, max: 50 }).withMessage('deliveryRadiusKm must be between 0.5 and 50'),
+];
 
 const imageRules = ['image', 'coverImage', 'logo'].map((field) =>
   body(field).optional({ nullable: true }).custom(isSafeImageUrl).withMessage(`${field} must be an uploaded image or an https:// URL`)
@@ -17,10 +26,7 @@ const createRestaurantValidator = [
   body('deliveryTime').isFloat({ min: 0 }).withMessage('Delivery time must be a positive number'),
   body('deliveryFee').optional().isFloat({ min: 0 }),
   body('minimumOrder').optional().isFloat({ min: 0 }),
-  body('location.coordinates')
-    .optional()
-    .isArray({ min: 2, max: 2 })
-    .withMessage('location.coordinates must be [lng, lat]'),
+  ...locationRules,
   ...imageRules,
 ];
 
@@ -35,7 +41,7 @@ const updateRestaurantValidator = [
   body('deliveryFee').optional().isFloat({ min: 0 }),
   body('minimumOrder').optional().isFloat({ min: 0 }),
   body('isOpen').optional().isBoolean(),
-  body('location.coordinates').optional().isArray({ min: 2, max: 2 }),
+  ...locationRules,
   ...imageRules,
 ];
 

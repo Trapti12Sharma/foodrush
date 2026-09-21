@@ -3,18 +3,17 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Search, MapPin, User, ShoppingCart, Menu, X, LogOut, ClipboardList, Heart, MapPinned, Store, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
-import { useCityPreference } from '../hooks/useCityPreference';
+import { useDeliveryLocation } from '../context/LocationContext';
 import { isAdminPanelUser } from '../constants/roles';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const { itemCount } = useCart();
   const navigate = useNavigate();
-  const [city, setCity] = useCityPreference();
+  const { location, openPicker } = useDeliveryLocation();
   const [query, setQuery] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [editingCity, setEditingCity] = useState(false);
 
   function submitSearch(e) {
     e.preventDefault();
@@ -36,23 +35,12 @@ export default function Navbar() {
 
         <button
           type="button"
-          onClick={() => setEditingCity((v) => !v)}
+          onClick={openPicker}
+          aria-label="Choose delivery location"
           className="hidden shrink-0 items-center gap-1 rounded-md px-2 py-1 text-sm text-gray-600 hover:bg-gray-100 md:flex"
         >
-          <MapPin size={16} />
-          {editingCity ? (
-            <input
-              autoFocus
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              onBlur={() => setEditingCity(false)}
-              onKeyDown={(e) => e.key === 'Enter' && setEditingCity(false)}
-              placeholder="Your city"
-              className="w-28 border-b border-brand-400 bg-transparent outline-none"
-            />
-          ) : (
-            <span className="max-w-[8rem] truncate">{city || 'Set location'}</span>
-          )}
+          <MapPin size={16} className="text-brand-600" />
+          <span className="max-w-[10rem] truncate">{location?.label || 'Set location'}</span>
         </button>
 
         <form onSubmit={submitSearch} className="hidden flex-1 md:block">
@@ -169,6 +157,20 @@ export default function Navbar() {
 
       {mobileOpen && (
         <div className="border-t border-gray-200 px-4 py-3 md:hidden">
+          <button
+            type="button"
+            onClick={() => {
+              setMobileOpen(false);
+              openPicker();
+            }}
+            className="mb-3 flex w-full items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-left text-sm text-gray-700"
+          >
+            <MapPin size={16} className="shrink-0 text-brand-600" />
+            <span className="min-w-0 flex-1 truncate">
+              <span className="text-gray-400">Deliver to </span>
+              {location?.label || 'Set location'}
+            </span>
+          </button>
           <form onSubmit={submitSearch} className="mb-3">
             <div className="relative">
               <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />

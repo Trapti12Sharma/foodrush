@@ -24,7 +24,11 @@ const orderItemSchema = new mongoose.Schema(
 const deliveryAddressSchema = new mongoose.Schema(
   {
     label: String,
+    name: String,
+    phone: String,
     addressLine: { type: String, required: true },
+    addressLine2: String,
+    landmark: String,
     city: { type: String, required: true },
     state: String,
     pincode: { type: String, required: true },
@@ -68,6 +72,12 @@ const orderSchema = new mongoose.Schema(
     deliveryAddress: {
       type: deliveryAddressSchema,
       required: true,
+    },
+    // Straight-line km from the restaurant, measured at order time (null when the address
+    // had no coordinates). Basis for delivery pricing/earnings in later milestones.
+    deliveryDistanceKm: {
+      type: Number,
+      default: null,
     },
     subtotal: { type: Number, required: true, min: 0 },
     deliveryFee: { type: Number, required: true, min: 0 },
