@@ -4,6 +4,7 @@ import { Search, MapPin, User, ShoppingCart, Menu, X, LogOut, ClipboardList, Hea
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useCityPreference } from '../hooks/useCityPreference';
+import { isAdminPanelUser } from '../constants/roles';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -99,7 +100,7 @@ export default function Navbar() {
                       <Store size={14} /> Restaurant dashboard
                     </Link>
                   )}
-                  {user.role === 'ADMIN' && (
+                  {isAdminPanelUser(user) && (
                     <Link
                       to="/admin/dashboard"
                       onClick={() => setProfileOpen(false)}
@@ -197,7 +198,7 @@ export default function Navbar() {
                     Restaurant dashboard
                   </Link>
                 )}
-                {user.role === 'ADMIN' && (
+                {isAdminPanelUser(user) && (
                   <Link
                     to="/admin/dashboard"
                     onClick={() => setMobileOpen(false)}

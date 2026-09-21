@@ -2,12 +2,12 @@ const express = require('express');
 const { body } = require('express-validator');
 const adminController = require('../controllers/admin.controller');
 const validate = require('../middleware/validate');
-const { authenticateUser, authorizeRoles } = require('../middleware/auth.middleware');
-const { ROLES } = require('../utils/constants');
+const { authenticateUser, requirePermission } = require('../middleware/auth.middleware');
+const { PERMISSIONS } = require('../utils/permissions');
 
 const router = express.Router();
 
-router.use(authenticateUser, authorizeRoles(ROLES.ADMIN));
+router.use(authenticateUser);
 
 /**
  * @swagger
@@ -41,7 +41,7 @@ router.use(authenticateUser, authorizeRoles(ROLES.ADMIN));
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  */
-router.get('/dashboard', adminController.getDashboard);
+router.get('/dashboard', requirePermission(PERMISSIONS.DASHBOARD_VIEW), adminController.getDashboard);
 
 /**
  * @swagger
@@ -79,7 +79,7 @@ router.get('/dashboard', adminController.getDashboard);
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  */
-router.get('/users', adminController.listUsers);
+router.get('/users', requirePermission(PERMISSIONS.USERS_READ), adminController.listUsers);
 
 /**
  * @swagger
@@ -109,7 +109,13 @@ router.get('/users', adminController.listUsers);
  *       404: { $ref: '#/components/responses/NotFound' }
  *       422: { $ref: '#/components/responses/ValidationError' }
  */
-router.patch('/users/:id/status', [body('isActive').isBoolean()], validate, adminController.setUserActive);
+router.patch(
+  '/users/:id/status',
+  requirePermission(PERMISSIONS.USERS_MANAGE),
+  [body('isActive').isBoolean()],
+  validate,
+  adminController.setUserActive
+);
 
 /**
  * @swagger
@@ -149,7 +155,7 @@ router.patch('/users/:id/status', [body('isActive').isBoolean()], validate, admi
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  */
-router.get('/restaurants', adminController.listRestaurants);
+router.get('/restaurants', requirePermission(PERMISSIONS.RESTAURANTS_READ_ALL), adminController.listRestaurants);
 
 /**
  * @swagger
@@ -172,7 +178,7 @@ router.get('/restaurants', adminController.listRestaurants);
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
  */
-router.patch('/restaurants/:id/approve', adminController.approveRestaurant);
+router.patch('/restaurants/:id/approve', requirePermission(PERMISSIONS.RESTAURANTS_APPROVE), adminController.approveRestaurant);
 
 /**
  * @swagger
@@ -202,7 +208,13 @@ router.patch('/restaurants/:id/approve', adminController.approveRestaurant);
  *       404: { $ref: '#/components/responses/NotFound' }
  *       422: { $ref: '#/components/responses/ValidationError' }
  */
-router.patch('/restaurants/:id/status', [body('isActive').isBoolean()], validate, adminController.setRestaurantActive);
+router.patch(
+  '/restaurants/:id/status',
+  requirePermission(PERMISSIONS.RESTAURANTS_MANAGE),
+  [body('isActive').isBoolean()],
+  validate,
+  adminController.setRestaurantActive
+);
 
 /**
  * @swagger
@@ -237,6 +249,27 @@ router.patch('/restaurants/:id/status', [body('isActive').isBoolean()], validate
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  */
-router.get('/orders', adminController.listOrders);
+router.get('/orders', requirePermission(PERMISSIONS.ORDERS_READ_ALL), adminController.listOrders);
+
+/**
+ * @swagger
+ * /admin/audit-logs:
+ *   get:
+ *     summary: Browse the append-only audit trail (SUPER_ADMIN only)
+ *     description: Requires the audit:read permission. Filter by action, actor, entityType/entityId and a createdAt range.
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: query, name: action, schema: { type: string }, description: 'e.g. restaurant.approve' }
+ *       - { in: query, name: actor, schema: { type: string }, description: Actor user id }
+ *       - { in: query, name: entityType, schema: { type: string } }
+ *       - { in: query, name: entityId, schema: { type: string } }
+ *       - { in: query, name: from, schema: { type: string, format: date-time } }
+ *       - { in: query, name: to, schema: { type: string, format: date-time } }
+ *     responses:
+ *       200: { description: Audit log page }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+router.get('/audit-logs', requirePermission(PERMISSIONS.AUDIT_READ), adminController.listAuditLogs);
 
 module.exports = router;

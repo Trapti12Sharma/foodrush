@@ -2,6 +2,8 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const User = require('../models/User');
 const { verifyToken, COOKIE_NAME } = require('../services/token.service');
+const { ROLES } = require('../utils/constants');
+const { hasPermission } = require('../utils/permissions');
 
 function extractToken(req) {
   if (req.cookies && req.cookies[COOKIE_NAME]) return req.cookies[COOKIE_NAME];
@@ -39,6 +41,26 @@ const authorizeRoles = (...roles) => (req, res, next) => {
   next();
 };
 
+// Restricts a route to users holding EVERY listed permission. Prefer this over
+// authorizeRoles for anything platform-wide (admin/staff features) — see
+// utils/permissions.js. Like authorizeRoles it never checks resource ownership.
+const requirePermission = (...permissions) => (req, res, next) => {
+  if (!req.user) return next(ApiError.unauthorized('Authentication required'));
+  if (!permissions.every((permission) => hasPermission(req.user, permission))) {
+    return next(ApiError.forbidden('You do not have permission to perform this action'));
+  }
+  next();
+};
+
+// For routes a restaurant owner may use on their OWN resources and platform staff
+// may use on ANY resource: passes for owners, or for anyone holding `permission`.
+// The per-resource ownership check still happens in the service.
+const requireOwnerOrPermission = (permission) => (req, res, next) => {
+  if (!req.user) return next(ApiError.unauthorized('Authentication required'));
+  if (req.user.role === ROLES.RESTAURANT_OWNER || hasPermission(req.user, permission)) return next();
+  next(ApiError.forbidden('You do not have permission to perform this action'));
+};
+
 // For public browse endpoints (restaurant/menu listings) that behave slightly
 // differently for a logged-in owner/admin (e.g. revealing their own unapproved
 // restaurant) but must never reject an anonymous visitor. Invalid/expired tokens
@@ -57,4 +79,4 @@ const optionalAuth = asyncHandler(async (req, res, next) => {
   next();
 });
 
-module.exports = { authenticateUser, authorizeRoles, optionalAuth };
+module.exports = { authenticateUser, authorizeRoles, requirePermission, requireOwnerOrPermission, optionalAuth };

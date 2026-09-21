@@ -1,4 +1,5 @@
 const swaggerJsdoc = require('swagger-jsdoc');
+const { ROLES } = require('../utils/constants');
 
 // swagger-jsdoc scans the `apis` glob for `@swagger` JSDoc blocks above each
 // route definition and merges them into this base document — so every
@@ -90,7 +91,7 @@ const options = {
             name: { type: 'string' },
             email: { type: 'string', format: 'email' },
             phone: { type: 'string' },
-            role: { type: 'string', enum: ['CUSTOMER', 'RESTAURANT_OWNER', 'ADMIN'] },
+            role: { type: 'string', enum: Object.values(ROLES) },
             avatar: { type: 'string' },
             isActive: { type: 'boolean' },
             createdAt: { type: 'string', format: 'date-time' },

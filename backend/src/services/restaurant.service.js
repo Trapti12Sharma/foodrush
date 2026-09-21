@@ -3,7 +3,7 @@ const ApiError = require('../utils/ApiError');
 const { escapeRegex } = require('../utils/regex');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { assertOwnerOrAdmin } = require('../utils/ownership');
-const { ROLES } = require('../utils/constants');
+const { PERMISSIONS, hasPermission } = require('../utils/permissions');
 
 const SORT_MAP = {
   rating: '-rating',
@@ -36,7 +36,7 @@ function isPubliclyVisible(restaurant) {
 function canView(restaurant, requester) {
   if (isPubliclyVisible(restaurant)) return true;
   if (!requester) return false;
-  return requester.role === ROLES.ADMIN || restaurant.owner.toString() === requester._id.toString();
+  return hasPermission(requester, PERMISSIONS.RESTAURANTS_READ_ALL) || restaurant.owner.toString() === requester._id.toString();
 }
 
 async function listPublicRestaurants(query) {

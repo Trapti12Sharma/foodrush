@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { FavoritesProvider } from './context/FavoritesContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import { ADMIN_PANEL_ROLES } from './constants/roles';
 import MainLayout from './layouts/MainLayout';
 import RestaurantOwnerLayout from './layouts/RestaurantOwnerLayout';
 import AdminLayout from './layouts/AdminLayout';
@@ -118,7 +119,7 @@ function App() {
               <Route
                 path="/admin"
                 element={
-                  <ProtectedRoute roles={['ADMIN']}>
+                  <ProtectedRoute roles={ADMIN_PANEL_ROLES}>
                     <AdminLayout />
                   </ProtectedRoute>
                 }

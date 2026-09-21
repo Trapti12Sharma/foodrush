@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const { ROLES } = require('../utils/constants');
+const { getPermissions } = require('../utils/permissions');
 
 const userSchema = new mongoose.Schema(
   {
@@ -76,6 +77,9 @@ userSchema.methods.comparePassword = function comparePassword(candidate) {
 userSchema.methods.toSafeObject = function toSafeObject() {
   const obj = this.toObject();
   delete obj.password;
+  // Lets the frontend show/hide staff UI per permission. Display only — the
+  // backend re-checks the permission on every request.
+  obj.permissions = getPermissions(this.role);
   return obj;
 };
 

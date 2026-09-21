@@ -2,8 +2,8 @@ const express = require('express');
 const categoryController = require('../controllers/foodCategory.controller');
 const { createCategoryValidator, updateCategoryValidator } = require('../validators/foodCategory.validator');
 const validate = require('../middleware/validate');
-const { authenticateUser, authorizeRoles, optionalAuth } = require('../middleware/auth.middleware');
-const { ROLES } = require('../utils/constants');
+const { authenticateUser, requireOwnerOrPermission, optionalAuth } = require('../middleware/auth.middleware');
+const { PERMISSIONS } = require('../utils/permissions');
 
 const router = express.Router();
 
@@ -88,7 +88,7 @@ router.get('/:id', categoryController.getById);
 router.post(
   '/',
   authenticateUser,
-  authorizeRoles(ROLES.RESTAURANT_OWNER, ROLES.ADMIN),
+  requireOwnerOrPermission(PERMISSIONS.RESTAURANTS_MANAGE),
   createCategoryValidator,
   validate,
   categoryController.create
@@ -128,7 +128,7 @@ router.post(
 router.put(
   '/:id',
   authenticateUser,
-  authorizeRoles(ROLES.RESTAURANT_OWNER, ROLES.ADMIN),
+  requireOwnerOrPermission(PERMISSIONS.RESTAURANTS_MANAGE),
   updateCategoryValidator,
   validate,
   categoryController.update
@@ -156,7 +156,7 @@ router.put(
 router.delete(
   '/:id',
   authenticateUser,
-  authorizeRoles(ROLES.RESTAURANT_OWNER, ROLES.ADMIN),
+  requireOwnerOrPermission(PERMISSIONS.RESTAURANTS_MANAGE),
   categoryController.remove
 );
 

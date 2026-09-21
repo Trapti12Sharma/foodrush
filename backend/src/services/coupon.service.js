@@ -6,7 +6,8 @@ const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 // Pure validation + discount calculation, reused by both the standalone
 // "validate this code" endpoint and cart.service's apply/recalculate paths.
 // Does NOT increment usedCount — that only happens once an order is actually
-// placed (Phase 7 order.service.js), so merely checking a code doesn't burn a use.
+// placed (redeemCoupon, called from order.service.js), so merely checking a code
+// doesn't burn a use.
 async function validateCoupon(code, subtotal) {
   if (!code) throw ApiError.badRequest('Coupon code is required');
 
@@ -32,8 +33,27 @@ async function validateCoupon(code, subtotal) {
   return { coupon, discountAmount };
 }
 
-async function incrementUsage(couponId) {
-  await Coupon.findByIdAndUpdate(couponId, { $inc: { usedCount: 1 } });
+// Atomically claims one use of a coupon. The usage-limit check and the increment
+// happen in a single database operation, so two simultaneous checkouts can never
+// both take the last remaining use (validateCoupon's read-then-check alone can't
+// guarantee that). Returns null when the coupon is inactive, expired or exhausted.
+async function redeemCoupon(couponId) {
+  return Coupon.findOneAndUpdate(
+    {
+      _id: couponId,
+      isActive: true,
+      expiryDate: { $gt: new Date() },
+      $or: [{ usageLimit: null }, { $expr: { $lt: ['$usedCount', '$usageLimit'] } }],
+    },
+    { $inc: { usedCount: 1 } },
+    { new: true }
+  );
+}
+
+// Hands a redeemed use back — called when the order it was claimed for failed to
+// be created, so a failed checkout doesn't burn a customer's coupon.
+async function releaseCoupon(couponId) {
+  await Coupon.updateOne({ _id: couponId, usedCount: { $gt: 0 } }, { $inc: { usedCount: -1 } });
 }
 
 const CREATE_FIELDS = ['description', 'discountType', 'discountValue', 'minimumOrder', 'maximumDiscount', 'expiryDate', 'usageLimit'];
@@ -75,4 +95,4 @@ async function updateCoupon(id, payload) {
   return coupon;
 }
 
-module.exports = { validateCoupon, incrementUsage, createCoupon, listCoupons, updateCoupon };
+module.exports = { validateCoupon, redeemCoupon, releaseCoupon, createCoupon, listCoupons, updateCoupon };

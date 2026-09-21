@@ -3,7 +3,8 @@ const Order = require('../models/Order');
 const Restaurant = require('../models/Restaurant');
 const ApiError = require('../utils/ApiError');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
-const { ORDER_STATUS, ROLES } = require('../utils/constants');
+const { ORDER_STATUS } = require('../utils/constants');
+const { PERMISSIONS, hasPermission } = require('../utils/permissions');
 
 async function recalculateRestaurantRating(restaurantId) {
   // A plain find() lets Mongoose cast the restaurantId string against the
@@ -57,7 +58,7 @@ async function listForRestaurant(restaurantId, query) {
 async function updateReview(user, reviewId, payload) {
   const review = await Review.findById(reviewId);
   if (!review) throw ApiError.notFound('Review not found');
-  if (review.user.toString() !== user._id.toString() && user.role !== ROLES.ADMIN) {
+  if (review.user.toString() !== user._id.toString() && !hasPermission(user, PERMISSIONS.REVIEWS_MODERATE)) {
     throw ApiError.forbidden('You can only edit your own review');
   }
 
@@ -72,7 +73,7 @@ async function updateReview(user, reviewId, payload) {
 async function deleteReview(user, reviewId) {
   const review = await Review.findById(reviewId);
   if (!review) throw ApiError.notFound('Review not found');
-  if (review.user.toString() !== user._id.toString() && user.role !== ROLES.ADMIN) {
+  if (review.user.toString() !== user._id.toString() && !hasPermission(user, PERMISSIONS.REVIEWS_MODERATE)) {
     throw ApiError.forbidden('You can only delete your own review');
   }
 

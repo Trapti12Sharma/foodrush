@@ -29,6 +29,7 @@ and let it read that file, or configure manually:
   | `JWT_SECRET` | a long random string (Render can generate one) |
   | `JWT_EXPIRES_IN` | `7d` |
   | `CLIENT_URL` | your Vercel URL — add this *after* step 3, then redeploy |
+  | `CLIENT_URLS` | optional — extra allowed frontend origins, comma-separated (e.g. a custom domain). Exact match; `https://` required in production |
   | `UPLOAD_DIR` | `uploads` |
   | `MAX_UPLOAD_SIZE_MB` | `5` |
   | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | leave blank unless you have real Razorpay test-mode keys — see [Payments](#payments) below |
@@ -57,6 +58,32 @@ than `/` would 404).
 
 Deploy, then note the URL (e.g. `https://foodrush.vercel.app`) and go back to
 Render to set `CLIENT_URL` to it, then redeploy the backend so CORS allows it.
+
+### Startup checks and health probe
+
+On start the backend validates its configuration and **refuses to boot** (printing which
+variable is wrong, never its value) if `MONGODB_URI` or `JWT_SECRET` is missing, if
+`JWT_SECRET` is a placeholder or shorter than 32 characters in production, or if a client
+URL is not a valid `https://` origin. `CLIENT_URL`/`CLIENT_URLS` are trimmed and reduced to
+a bare origin, so a stray space or trailing slash pasted into the dashboard is tolerated.
+
+`GET /health` returns `200` when the database is connected and `503` when it is not — point
+Render's health check or an uptime monitor at it. (`GET /api/health` is unchanged.)
+
+### Creating the real super admin
+
+The public demo `ADMIN` account should not be your production admin. From `backend/`, with
+`MONGODB_URI` pointing at the target database:
+
+```bash
+# dry run — prints what it would do, changes nothing
+SUPER_ADMIN_EMAIL=you@yourdomain.com npm run bootstrap:admin
+# apply — promotes that user (or creates it; then SUPER_ADMIN_PASSWORD, 12+ chars, is required)
+SUPER_ADMIN_EMAIL=you@yourdomain.com npm run bootstrap:admin -- --apply
+```
+
+It modifies only that one user and records an audit-log entry. Only a `SUPER_ADMIN` can read
+`GET /api/admin/audit-logs` or change the status of staff accounts.
 
 ## 4. Cross-origin auth cookie
 

@@ -3,8 +3,7 @@ const FoodItem = require('../models/FoodItem');
 const Restaurant = require('../models/Restaurant');
 const ApiError = require('../utils/ApiError');
 const couponService = require('./coupon.service');
-
-const TAX_RATE = 0.05; // flat 5% — a real deployment would vary this by jurisdiction/item
+const pricing = require('./pricing.service');
 
 const POPULATE_PATHS = [
   { path: 'items.food', select: 'name image isVeg' },
@@ -65,10 +64,7 @@ async function applyCatalogPricing(cart, restaurant) {
 
   if (cart.items.length === 0) return; // recalculate() zeroes totals and clears the restaurant lock
 
-  const subtotal = cart.items.reduce((sum, item) => {
-    const addonsTotal = item.addons.reduce((a, addon) => a + addon.price, 0);
-    return sum + (item.price + addonsTotal) * item.quantity;
-  }, 0);
+  const subtotal = pricing.subtotalOf(cart.items);
 
   let discount = 0;
   if (cart.couponCode) {
@@ -77,10 +73,7 @@ async function applyCatalogPricing(cart, restaurant) {
     else cart.couponCode = null; // coupon no longer valid for this cart — drop it rather than show a stale discount
   }
 
-  const tax = Math.round(subtotal * TAX_RATE * 100) / 100;
-  const total = Math.max(subtotal + restaurant.deliveryFee + tax - discount, 0);
-
-  Object.assign(cart, { subtotal, deliveryFee: restaurant.deliveryFee, tax, discount, total });
+  Object.assign(cart, pricing.computeTotals({ subtotal, deliveryFee: restaurant.deliveryFee, discount }));
 }
 
 async function finalize(cart) {
@@ -195,7 +188,11 @@ async function applyCoupon(userId, code) {
   const { coupon, discountAmount } = await couponService.validateCoupon(code, cart.subtotal);
   cart.couponCode = coupon.code;
   cart.discount = discountAmount;
-  cart.total = Math.max(cart.subtotal + cart.deliveryFee + cart.tax - discountAmount, 0);
+  cart.total = pricing.computeTotals({
+    subtotal: cart.subtotal,
+    deliveryFee: cart.deliveryFee,
+    discount: discountAmount,
+  }).total;
 
   return finalize(cart);
 }

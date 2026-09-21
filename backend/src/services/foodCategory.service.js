@@ -3,13 +3,14 @@ const FoodItem = require('../models/FoodItem');
 const Restaurant = require('../models/Restaurant');
 const ApiError = require('../utils/ApiError');
 const { assertOwnerOrAdmin } = require('../utils/ownership');
+const { PERMISSIONS, hasPermission } = require('../utils/permissions');
 const restaurantService = require('./restaurant.service');
 
 async function listByRestaurant(restaurantId, requester) {
   const restaurant = await restaurantService.getRestaurantById(restaurantId, requester);
   const isManager =
     requester &&
-    (requester.role === 'ADMIN' || restaurant.owner.toString() === requester._id.toString());
+    (hasPermission(requester, PERMISSIONS.RESTAURANTS_READ_ALL) || restaurant.owner.toString() === requester._id.toString());
 
   const filter = { restaurant: restaurant._id };
   if (!isManager) filter.isActive = true; // customers only see enabled categories
