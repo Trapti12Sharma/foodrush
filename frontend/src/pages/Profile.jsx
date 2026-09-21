@@ -53,7 +53,7 @@ function ProfileForm() {
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <h2 className="text-lg font-semibold text-gray-900">Your details</h2>
 
-      <ImageUploadField label="Profile photo" value={avatar} onChange={setAvatar} />
+      <ImageUploadField label="Profile photo" value={avatar} onChange={setAvatar} purpose="avatar" />
 
       <Field label="Full name" error={errors.name}>
         <input

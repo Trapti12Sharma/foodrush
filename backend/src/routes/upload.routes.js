@@ -1,6 +1,7 @@
 const express = require('express');
 const uploadController = require('../controllers/upload.controller');
-const { uploadSingleImage } = require('../middleware/upload.middleware');
+const { uploadSingleImage, authorizeUpload } = require('../middleware/upload.middleware');
+const { uploadLimiter } = require('../middleware/rateLimiter');
 const { authenticateUser } = require('../middleware/auth.middleware');
 
 const router = express.Router();
@@ -9,13 +10,19 @@ const router = express.Router();
  * @swagger
  * /uploads/image:
  *   post:
- *     summary: Upload an image, get back a URL to use as a restaurant/category/food `image` field
+ *     summary: Upload an image, get back a URL to use as an `image`/`avatar` field
  *     description: >
- *       Local disk storage today (served back from /uploads/<file>); the same
- *       {url} response shape is what a future Cloudinary/S3 swap would return,
- *       so no caller needs to change. Only jpeg/png/webp are accepted, up to
- *       MAX_UPLOAD_SIZE_MB (default 5MB).
+ *       Stored permanently on Cloudinary when CLOUDINARY_* is configured, otherwise on local disk
+ *       (development only — ephemeral on Render). Only real JPEG/PNG/WEBP files are accepted (the file's
+ *       bytes are checked, not just its extension), up to MAX_UPLOAD_SIZE_MB (default 5MB).
+ *       `purpose` decides who may upload: `avatar` (default) is open to any signed-in user;
+ *       `restaurant`, `food` and `category` require a restaurant owner or restaurant-management staff.
+ *       Rate-limited.
  *     tags: [Uploads]
+ *     parameters:
+ *       - in: query
+ *         name: purpose
+ *         schema: { type: string, enum: [avatar, restaurant, food, category], default: avatar }
  *     requestBody:
  *       required: true
  *       content:
@@ -30,10 +37,13 @@ const router = express.Router();
  *         description: Uploaded
  *         content:
  *           application/json:
- *             schema: { type: object, properties: { data: { type: object, properties: { url: { type: string, example: /uploads/1700000000000-a1b2c3.png } } } } }
- *       400: { description: 'No file, wrong file type, or file too large' }
+ *             schema: { type: object, properties: { data: { type: object, properties: { url: { type: string, example: 'https://res.cloudinary.com/<cloud>/image/upload/v1/foodrush/food/<userId>/<id>.jpg' } } } } }
+ *       400: { description: 'No file, not a real image, wrong purpose, or file too large' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       429: { description: Too many uploads }
+ *       502: { description: Image storage provider unavailable }
  */
-router.post('/image', authenticateUser, uploadSingleImage('image'), uploadController.uploadImage);
+router.post('/image', uploadLimiter, authenticateUser, authorizeUpload, uploadSingleImage('image'), uploadController.uploadImage);
 
 module.exports = router;

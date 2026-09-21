@@ -26,7 +26,7 @@ export default function CreateRestaurantForm({ onSubmit, submitting }) {
 
   return (
     <form onSubmit={handleSubmit(submit)} className="mx-auto max-w-lg space-y-4 rounded-xl border border-gray-200 bg-white p-6">
-      <ImageUploadField label="Restaurant image" value={image} onChange={setImage} />
+      <ImageUploadField label="Restaurant image" value={image} onChange={setImage} purpose="restaurant" />
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">Restaurant name</label>
         <input {...register('name', { required: true })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />

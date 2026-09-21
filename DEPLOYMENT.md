@@ -35,21 +35,17 @@ and let it read that file, or configure manually:
   | `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` | for `EMAIL_PROVIDER=smtp` |
   | `RESEND_API_KEY` | for `EMAIL_PROVIDER=resend` |
   | `APP_URL` | optional — public web-app URL used in emailed links (defaults to the first `CLIENT_URL`) |
+  | `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | permanent image storage — set **all three** (a partial set stops the server from starting). See [Images (Cloudinary)](#images-cloudinary) |
   | `UPLOAD_DIR` | `uploads` |
   | `MAX_UPLOAD_SIZE_MB` | `5` |
   | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | leave blank unless you have real Razorpay test-mode keys — see [Payments](#payments) below |
 
 Deploy, then note the URL (e.g. `https://foodrush-backend.onrender.com`).
 
-**Image uploads on Render's free tier do not persist.** Render's free
-instances use an ephemeral filesystem — anything written to `backend/uploads/`
-(every image uploaded through the app) is wiped on the next deploy or restart.
-Local disk storage (`storage.service.js`) is correct and sufficient for local
-development, but a real deployment needs Cloudinary or S3 configured instead.
-The abstraction is already in place for this (see `storage.service.js`'s
-`isCloudinaryConfigured()` guard) — the Cloudinary upload call itself is not
-implemented, since it can't be tested without a real Cloudinary account; see
-the comment in that file for exactly what to add.
+**Images need Cloudinary on Render.** Render's free instances use an ephemeral filesystem, so
+anything written to disk is wiped on the next deploy or restart. Set the three `CLOUDINARY_*`
+variables (see [Images (Cloudinary)](#images-cloudinary)) and every upload is stored permanently
+there; without them the app falls back to local disk, which is fine for development only.
 
 ## 3. Frontend — Vercel
 
@@ -108,6 +104,46 @@ most one email per minute per account. Changing or resetting a password signs ou
 session. If reset emails don't arrive, check the Render logs for `Password reset email failed:`
 (the provider's error, never the link).
 
+### Images (Cloudinary)
+
+1. Create a free account at [cloudinary.com](https://cloudinary.com) and copy the **cloud name**, **API key**
+   and **API secret** from the dashboard.
+2. Add them to Render as `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` and redeploy.
+   The API secret stays on the backend only — never put it in Vercel or in git.
+
+What happens once it's on:
+- Uploads are streamed straight to Cloudinary (nothing is written to Render's disk) as
+  `foodrush/<purpose>/<uploader-id>/<random>`; the database stores only the returned `https://` URL.
+- The site asks Cloudinary for right-sized, auto-format (`f_auto,q_auto`) versions, so phones don't download
+  full-size originals.
+- When an owner replaces or deletes an image, the old Cloudinary file is deleted too — only if it sits under that
+  owner's id on your own cloud, so nobody can delete another user's image by pasting its URL.
+- Who may upload: profile photos (`avatar`) — any signed-in user; `restaurant`, `food`, `category` images —
+  restaurant owners and restaurant-management staff. Files must really be JPEG/PNG/WEBP (checked by content, not
+  just the extension), up to `MAX_UPLOAD_SIZE_MB`.
+
+**Giving the seeded restaurants real pictures.** The demo catalog has no photos, and they can't be generated for
+you — supply your own (or properly licensed stock). Arrange them like this, named after the restaurant / dish:
+
+```
+my-photos/
+  restaurants/napoli-wood-fire-pizza.jpg        # card thumbnail
+  covers/napoli-wood-fire-pizza.jpg             # wide banner (optional)
+  logos/napoli-wood-fire-pizza.png              # logo (optional)
+  foods/napoli-wood-fire-pizza/margherita-pizza.jpg
+```
+
+Then, from `backend/` with `MONGODB_URI` and the `CLOUDINARY_*` variables set:
+
+```bash
+npm run import:images -- ../my-photos            # dry run: shows what would be uploaded, changes nothing
+npm run import:images -- ../my-photos --apply    # uploads and saves
+```
+
+It only fills images that are **empty** (it never overwrites), can be re-run safely, reports files that match no
+record, and refuses to run without Cloudinary configured. Until photos exist, cards show a designed placeholder
+(a cuisine emoji on a soft gradient) rather than an empty box.
+
 ## 4. Cross-origin auth cookie
 
 The frontend and backend are on different domains in this setup (unlike local
@@ -150,5 +186,7 @@ automatically (`GET /api/config`), rather than presenting a dead end.
 |---|---|
 | Frontend loads but every API call fails with a CORS error | `CLIENT_URL` on the backend doesn't match the frontend's actual origin |
 | Login succeeds but the session doesn't persist | `NODE_ENV` isn't set to `production` on the backend (cookie stays `SameSite=Lax`, which cross-site calls drop), or the frontend isn't served over HTTPS |
-| Uploaded images vanish after a while | Expected on Render's free tier (ephemeral disk) — configure Cloudinary |
+| Uploaded images vanish after a while | Cloudinary isn't configured, so uploads are on Render's ephemeral disk — set the three `CLOUDINARY_*` variables |
+| Server won't start: "Cloudinary is partially configured" | Only one or two of the three `CLOUDINARY_*` variables are set — set all three, or clear them |
+| Uploading a restaurant/food image returns 403 | Only restaurant owners and restaurant-management staff may upload those; customers can upload profile photos only |
 | `/api/auth/register` with `role: "ADMIN"` fails | Intentional — see `auth.validator.js`; provision admins via `npm run seed` or directly in the database |

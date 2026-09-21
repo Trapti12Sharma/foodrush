@@ -3,7 +3,7 @@ import { Star, Clock, Bike, Heart } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
-import { resolveImageUrl } from './ImageUploadField';
+import SmartImage from './SmartImage';
 
 export default function RestaurantCard({ restaurant }) {
   const { user } = useAuth();
@@ -31,16 +31,14 @@ export default function RestaurantCard({ restaurant }) {
       to={`/restaurants/${restaurant._id}`}
       className="group block overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition hover:shadow-md"
     >
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-gray-100">
-        {restaurant.image ? (
-          <img
-            src={resolveImageUrl(restaurant.image)}
-            alt={restaurant.name}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-gray-300">No image</div>
-        )}
+      <div className="relative w-full overflow-hidden bg-gray-100">
+        <SmartImage
+          src={restaurant.image}
+          alt={restaurant.name}
+          cuisine={restaurant.cuisine}
+          aspect={4 / 3}
+          className="w-full transition duration-300 group-hover:scale-105"
+        />
         <button
           type="button"
           onClick={handleHeartClick}

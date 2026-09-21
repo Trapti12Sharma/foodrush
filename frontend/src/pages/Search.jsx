@@ -6,7 +6,7 @@ import { foodService } from '../services/foodService';
 import RestaurantCard from '../components/RestaurantCard';
 import SkeletonCard from '../components/SkeletonCard';
 import EmptyState from '../components/EmptyState';
-import { resolveImageUrl } from '../components/ImageUploadField';
+import SmartImage from '../components/SmartImage';
 
 export default function Search() {
   const [params, setParams] = useSearchParams();
@@ -109,7 +109,7 @@ export default function Search() {
                     )}
                   </p>
                 </div>
-                {food.image && <img src={resolveImageUrl(food.image)} alt={food.name} className="h-16 w-16 rounded-lg object-cover" />}
+                <SmartImage src={food.image} alt={food.name} widths={[128, 192]} sizes="64px" className="h-16 w-16 shrink-0 rounded-lg" />
               </Link>
             ))}
           </div>

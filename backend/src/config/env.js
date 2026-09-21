@@ -69,8 +69,21 @@ function validateEnv(env = process.env) {
   }
 
   validateEmailConfig(env, isProd, errors, warnings);
+  validateStorageConfig(env, isProd, errors, warnings);
 
   return { errors, warnings };
+}
+
+// Cloudinary needs all three settings; a partial set is almost certainly a mistake and would
+// silently fall back to non-persistent local storage, so it is fatal. Names variables only.
+function validateStorageConfig(env, isProd, errors, warnings) {
+  const keys = ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'];
+  const missing = keys.filter((key) => !env[key]);
+  if (missing.length > 0 && missing.length < keys.length) {
+    errors.push(`Cloudinary is partially configured — also set: ${missing.join(', ')} (or clear the others).`);
+  } else if (missing.length === keys.length && isProd) {
+    warnings.push('Cloudinary is not configured — uploaded images will be lost on every restart or deploy.');
+  }
 }
 
 // Names the missing/invalid variable only — never a value.
