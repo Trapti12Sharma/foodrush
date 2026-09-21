@@ -40,4 +40,10 @@ const corsOptions = {
   },
 };
 
-module.exports = { corsOptions, parseOrigins, getAllowedOrigins, toOrigin };
+// The public URL of the web app, used to build links in emails (password reset).
+// APP_URL wins if set; otherwise the first configured frontend origin.
+function getAppUrl(env = process.env) {
+  return toOrigin(env.APP_URL || '') || getAllowedOrigins(env)[0];
+}
+
+module.exports = { corsOptions, parseOrigins, getAllowedOrigins, getAppUrl, toOrigin };

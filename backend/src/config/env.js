@@ -5,6 +5,7 @@
 // Messages name the variable and the rule only — never the value, so a secret
 // can't leak into logs through a validation error.
 const { parseOrigins } = require('./cors');
+const { PROVIDERS } = require('../services/email.service');
 
 const PLACEHOLDER_SECRETS = new Set(['replace_with_a_long_random_string', 'changeme', 'secret', 'your_jwt_secret']);
 const MIN_JWT_SECRET_LENGTH_PROD = 32;
@@ -67,7 +68,36 @@ function validateEnv(env = process.env) {
     }
   }
 
+  validateEmailConfig(env, isProd, errors, warnings);
+
   return { errors, warnings };
+}
+
+// Names the missing/invalid variable only — never a value.
+function validateEmailConfig(env, isProd, errors, warnings) {
+  const provider = String(env.EMAIL_PROVIDER || 'none').trim().toLowerCase();
+
+  if (!PROVIDERS.includes(provider)) {
+    errors.push(`EMAIL_PROVIDER must be one of: ${PROVIDERS.join(', ')}.`);
+    return;
+  }
+  if (provider === 'none') {
+    if (isProd) warnings.push('EMAIL_PROVIDER is not set — password-reset emails will not be delivered.');
+    return;
+  }
+  if (provider === 'log' && isProd) {
+    errors.push('EMAIL_PROVIDER=log is for development only and is not allowed in production.');
+    return;
+  }
+  if (provider === 'log') return;
+
+  if (!env.EMAIL_FROM) errors.push(`EMAIL_FROM is required when EMAIL_PROVIDER=${provider}.`);
+  if (provider === 'smtp') {
+    if (!env.SMTP_HOST) errors.push('SMTP_HOST is required when EMAIL_PROVIDER=smtp.');
+    if (env.SMTP_PORT && !(Number(env.SMTP_PORT) > 0)) errors.push('SMTP_PORT must be a positive number.');
+    if (env.SMTP_USER && !env.SMTP_PASS) errors.push('SMTP_PASS is required when SMTP_USER is set.');
+  }
+  if (provider === 'resend' && !env.RESEND_API_KEY) errors.push('RESEND_API_KEY is required when EMAIL_PROVIDER=resend.');
 }
 
 // Logs warnings, and exits the process with a readable list if anything is fatal.

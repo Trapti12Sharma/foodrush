@@ -42,6 +42,19 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    // Set whenever the password changes (change or reset). Any login token issued
+    // before this moment is rejected by the auth middleware, so a stolen or old
+    // session stops working the instant the password is changed.
+    passwordChangedAt: {
+      type: Date,
+      default: null,
+    },
+    // Password-reset state. Only the SHA-256 HASH of the emailed token is stored,
+    // so a database leak can't be used to reset anyone's password. select:false
+    // keeps all of it out of every normal query and API response.
+    passwordResetTokenHash: { type: String, select: false },
+    passwordResetExpires: { type: Date, select: false },
+    passwordResetRequestedAt: { type: Date, select: false },
   },
   { timestamps: true }
 );
@@ -77,6 +90,9 @@ userSchema.methods.comparePassword = function comparePassword(candidate) {
 userSchema.methods.toSafeObject = function toSafeObject() {
   const obj = this.toObject();
   delete obj.password;
+  delete obj.passwordResetTokenHash;
+  delete obj.passwordResetExpires;
+  delete obj.passwordResetRequestedAt;
   // Lets the frontend show/hide staff UI per permission. Display only — the
   // backend re-checks the permission on every request.
   obj.permissions = getPermissions(this.role);

@@ -30,6 +30,11 @@ and let it read that file, or configure manually:
   | `JWT_EXPIRES_IN` | `7d` |
   | `CLIENT_URL` | your Vercel URL — add this *after* step 3, then redeploy |
   | `CLIENT_URLS` | optional — extra allowed frontend origins, comma-separated (e.g. a custom domain). Exact match; `https://` required in production |
+  | `EMAIL_PROVIDER` | `smtp` or `resend` to enable password-reset emails (default `none` = disabled) — see [Email](#email-password-reset) |
+  | `EMAIL_FROM` | sender, e.g. `FoodRush <no-reply@yourdomain.com>` (required for `smtp`/`resend`) |
+  | `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` | for `EMAIL_PROVIDER=smtp` |
+  | `RESEND_API_KEY` | for `EMAIL_PROVIDER=resend` |
+  | `APP_URL` | optional — public web-app URL used in emailed links (defaults to the first `CLIENT_URL`) |
   | `UPLOAD_DIR` | `uploads` |
   | `MAX_UPLOAD_SIZE_MB` | `5` |
   | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | leave blank unless you have real Razorpay test-mode keys — see [Payments](#payments) below |
@@ -84,6 +89,24 @@ SUPER_ADMIN_EMAIL=you@yourdomain.com npm run bootstrap:admin -- --apply
 
 It modifies only that one user and records an audit-log entry. Only a `SUPER_ADMIN` can read
 `GET /api/admin/audit-logs` or change the status of staff accounts.
+
+### Email (password reset)
+
+Password reset and the "your password was changed" notice are sent through the provider named by
+`EMAIL_PROVIDER`; switching provider is a settings change, not a code change.
+
+| `EMAIL_PROVIDER` | Needs | Notes |
+|---|---|---|
+| `none` (default) | — | Email disabled. The forgot-password endpoint still answers normally but nothing is delivered, and the backend logs a warning at boot in production. |
+| `smtp` | `SMTP_HOST`, `EMAIL_FROM` (+ `SMTP_USER`/`SMTP_PASS` if the server needs a login) | Works with any SMTP service, including a Gmail app password (`smtp.gmail.com`, port 587). |
+| `resend` | `RESEND_API_KEY`, `EMAIL_FROM` | Resend's HTTP API; `EMAIL_FROM` must be on a domain you've verified with them. |
+| `log` | — | **Development only** — prints the email (including the reset link) to the console. Refused in production. |
+
+The reset link is valid for 30 minutes and works once; only a hash of the token is stored. The
+forgot-password endpoint gives the same reply whether or not an email is registered, and sends at
+most one email per minute per account. Changing or resetting a password signs out every other
+session. If reset emails don't arrive, check the Render logs for `Password reset email failed:`
+(the provider's error, never the link).
 
 ## 4. Cross-origin auth cookie
 
