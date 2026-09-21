@@ -3,6 +3,8 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { FavoritesProvider } from './context/FavoritesContext';
+import { LocationProvider } from './context/LocationContext';
+import LocationPicker from './components/LocationPicker';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ADMIN_PANEL_ROLES } from './constants/roles';
 import MainLayout from './layouts/MainLayout';
@@ -42,7 +44,9 @@ function App() {
     <AuthProvider>
       <CartProvider>
         <FavoritesProvider>
+          <LocationProvider>
           <Toaster position="top-center" toastOptions={{ duration: 3000 }} />
+          <LocationPicker />
           <Routes>
             <Route element={<MainLayout />}>
               <Route path="/" element={<Home />} />
@@ -138,6 +142,7 @@ function App() {
               <Route path="*" element={<NotFound />} />
             </Route>
           </Routes>
+          </LocationProvider>
         </FavoritesProvider>
       </CartProvider>
     </AuthProvider>

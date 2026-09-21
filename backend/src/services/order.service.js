@@ -6,6 +6,7 @@ const Address = require('../models/Address');
 const ApiError = require('../utils/ApiError');
 const paymentService = require('./payment.service');
 const couponService = require('./coupon.service');
+const restaurantGeoService = require('./restaurantGeo.service');
 const pricing = require('./pricing.service');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { ORDER_STATUS, ORDER_STATUS_TRANSITIONS, PAYMENT_METHODS, PAYMENT_STATUS, ROLES } = require('../utils/constants');
@@ -33,6 +34,9 @@ async function createOrder(user, { addressId, paymentMethod }) {
   if (!address || address.user.toString() !== user._id.toString()) {
     throw ApiError.badRequest('Please select a valid delivery address');
   }
+
+  // Refuse an address that is measurably outside the restaurant's delivery radius.
+  const deliveryDistanceKm = restaurantGeoService.assertDeliverable(restaurant, address);
 
   const foods = await FoodItem.find({ _id: { $in: cart.items.map((i) => i.food) } });
   const foodMap = new Map(foods.map((f) => [f._id.toString(), f]));
@@ -85,13 +89,18 @@ async function createOrder(user, { addressId, paymentMethod }) {
     items: orderItems,
     deliveryAddress: {
       label: address.label,
+      name: address.name,
+      phone: address.phone,
       addressLine: address.addressLine,
+      addressLine2: address.addressLine2,
+      landmark: address.landmark,
       city: address.city,
       state: address.state,
       pincode: address.pincode,
       latitude: address.latitude,
       longitude: address.longitude,
     },
+    deliveryDistanceKm,
     subtotal,
     deliveryFee: restaurant.deliveryFee,
     tax,

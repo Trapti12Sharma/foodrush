@@ -23,6 +23,7 @@ const CREATE_FIELDS = [
   'address',
   'city',
   'location',
+  'deliveryRadiusKm',
   'deliveryTime',
   'deliveryFee',
   'minimumOrder',

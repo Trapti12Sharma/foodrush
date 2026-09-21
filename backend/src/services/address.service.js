@@ -1,7 +1,7 @@
 const Address = require('../models/Address');
 const ApiError = require('../utils/ApiError');
 
-const FIELDS = ['label', 'addressLine', 'city', 'state', 'pincode', 'latitude', 'longitude'];
+const FIELDS = ['label', 'name', 'phone', 'addressLine', 'addressLine2', 'landmark', 'city', 'state', 'pincode', 'latitude', 'longitude'];
 
 function pickFields(source) {
   const result = {};

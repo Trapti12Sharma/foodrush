@@ -18,10 +18,20 @@ export default function AddressCard({ address, selectable, selected, onSelect, o
             </span>
           )}
         </div>
+        {(address.name || address.phone) && (
+          <p className="mt-0.5 text-xs text-gray-500">{[address.name, address.phone].filter(Boolean).join(' · ')}</p>
+        )}
         <p className="mt-1 text-sm text-gray-600">
-          {address.addressLine}, {address.city}
+          {address.addressLine}
+          {address.addressLine2 ? `, ${address.addressLine2}` : ''}, {address.city}
           {address.state ? `, ${address.state}` : ''} — {address.pincode}
         </p>
+        {address.landmark && <p className="text-xs text-gray-500">Landmark: {address.landmark}</p>}
+        {address.latitude == null || address.longitude == null ? (
+          <p className="mt-1 text-xs text-amber-600">Location not confirmed — edit this address and search for it to check delivery.</p>
+        ) : (
+          <p className="mt-1 text-xs text-green-700">Location confirmed</p>
+        )}
       </div>
       {(onEdit || onDelete) && (
         <div className="flex shrink-0 gap-2">

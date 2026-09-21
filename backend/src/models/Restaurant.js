@@ -1,5 +1,23 @@
 const mongoose = require('mongoose');
 
+// A restaurant's position. Deliberately a sub-schema with NO default: a restaurant that has
+// not been given a location simply has none, instead of silently sitting at [0, 0]
+// (the Atlantic Ocean) where it would corrupt every "near me" result. Documents that
+// already have a location are unaffected.
+const pointSchema = new mongoose.Schema(
+  {
+    type: { type: String, enum: ['Point'], default: 'Point' },
+    coordinates: {
+      type: [Number], // [longitude, latitude]
+      validate: {
+        validator: (c) => Array.isArray(c) && c.length === 2 && Math.abs(c[0]) <= 180 && Math.abs(c[1]) <= 90 && !(c[0] === 0 && c[1] === 0),
+        message: 'location.coordinates must be a real [longitude, latitude]',
+      },
+    },
+  },
+  { _id: false }
+);
+
 const restaurantSchema = new mongoose.Schema(
   {
     name: {
@@ -52,9 +70,13 @@ const restaurantSchema = new mongoose.Schema(
       index: true,
     },
     // GeoJSON point for "restaurants near me" queries (2dsphere index below).
-    location: {
-      type: { type: String, enum: ['Point'], default: 'Point' },
-      coordinates: { type: [Number], default: [0, 0] }, // [lng, lat]
+    location: { type: pointSchema, default: undefined },
+    // How far from `location` this restaurant will deliver, in km.
+    deliveryRadiusKm: {
+      type: Number,
+      default: 5,
+      min: 0.5,
+      max: 50,
     },
     rating: {
       type: Number,

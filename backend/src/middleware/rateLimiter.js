@@ -42,4 +42,19 @@ const uploadLimiter = rateLimit({
   },
 });
 
-module.exports = { apiLimiter, authLimiter, uploadLimiter };
+// Every call here spends real Google Maps quota, and the endpoints are public (guests pick
+// a location before logging in), so this per-IP ceiling is the abuse guard. The frontend
+// debounces typing well below it.
+const geoLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: isTest ? 100000 : 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many location requests. Please slow down.',
+    errors: [],
+  },
+});
+
+module.exports = { apiLimiter, authLimiter, uploadLimiter, geoLimiter };

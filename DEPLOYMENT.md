@@ -36,6 +36,8 @@ and let it read that file, or configure manually:
   | `RESEND_API_KEY` | for `EMAIL_PROVIDER=resend` |
   | `APP_URL` | optional — public web-app URL used in emailed links (defaults to the first `CLIENT_URL`) |
   | `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | permanent image storage — set **all three** (a partial set stops the server from starting). See [Images (Cloudinary)](#images-cloudinary) |
+  | `GOOGLE_MAPS_API_KEY` | optional — server-side key for address search and reverse geocoding. See [Location (Google Maps)](#location-google-maps) |
+  | `GEO_COUNTRY` | two-letter country that address suggestions are limited to (default `in`) |
   | `UPLOAD_DIR` | `uploads` |
   | `MAX_UPLOAD_SIZE_MB` | `5` |
   | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | leave blank unless you have real Razorpay test-mode keys — see [Payments](#payments) below |
@@ -144,6 +146,42 @@ It only fills images that are **empty** (it never overwrites), can be re-run saf
 record, and refuses to run without Cloudinary configured. Until photos exist, cards show a designed placeholder
 (a cuisine emoji on a soft gradient) rather than an empty box.
 
+### Location (Google Maps)
+
+Customers choose a "Deliver to" location using GPS, an address search, a saved address, or a list of popular
+cities. Only the **address search** and the **GPS-to-address lookup** need Google; without a key the app still
+works — GPS coordinates find nearby restaurants and the popular-cities list needs no key at all — and the search
+box simply says it's unavailable.
+
+**Design:** the key lives only on the backend. The browser calls FoodRush's own `/api/geo/*` endpoints and never
+sees a Google key (so there is no browser key to leak or restrict). Those endpoints are public — guests choose a
+location before logging in — and rate-limited per IP (60/min) to protect your quota; the site debounces typing.
+
+Setup:
+1. In [Google Cloud Console](https://console.cloud.google.com), create a project and **enable billing** (Maps
+   Platform requires it; there is a monthly free credit).
+2. Enable exactly two APIs: **Places API (New)** and **Geocoding API**.
+3. Create an API key and **restrict it to just those two APIs**. (Render's free tier has no fixed IP, so an IP
+   restriction isn't practical — the API restriction plus the steps below are your protection.)
+4. Under *Quotas*, set a **daily request cap**, and create a **budget alert** in Billing, so a bug or abuse can't
+   run up a bill.
+5. Set `GOOGLE_MAPS_API_KEY` on Render (optionally `GEO_COUNTRY`) and redeploy. `GET /api/config` then reports
+   `locationSearchEnabled: true`.
+
+What is (and isn't) stored: a customer's saved address keeps the coordinates they confirmed, as their own delivery
+data. FoodRush does not import, list or cache Google's place data, and only **partner restaurants** can take orders —
+Google is used purely to turn what someone types, or their GPS position, into an address.
+
+**Restaurants need a location to be found.** "Near me" results only include restaurants that have coordinates.
+Owners set theirs on the restaurant profile (address search, or "I'm at the restaurant — use my current location")
+together with a **delivery radius** (default 5 km). A restaurant with no location no longer defaults to `[0, 0]`;
+it simply doesn't appear in nearby results until one is set. Seeded demo restaurants already have coordinates.
+
+**Delivery range** is enforced when an order is placed: an address that has confirmed coordinates and is farther than
+the restaurant's radius is refused. Older addresses saved without coordinates aren't blocked (they can't be
+measured); customers are prompted to confirm them. Delivery-time figures are an estimate (the restaurant's own time
+plus about 3 minutes per km) until live routing arrives with the delivery milestone.
+
 ## 4. Cross-origin auth cookie
 
 The frontend and backend are on different domains in this setup (unlike local
@@ -188,5 +226,7 @@ automatically (`GET /api/config`), rather than presenting a dead end.
 | Login succeeds but the session doesn't persist | `NODE_ENV` isn't set to `production` on the backend (cookie stays `SameSite=Lax`, which cross-site calls drop), or the frontend isn't served over HTTPS |
 | Uploaded images vanish after a while | Cloudinary isn't configured, so uploads are on Render's ephemeral disk — set the three `CLOUDINARY_*` variables |
 | Server won't start: "Cloudinary is partially configured" | Only one or two of the three `CLOUDINARY_*` variables are set — set all three, or clear them |
+| "Address search isn't available right now" | `GOOGLE_MAPS_API_KEY` isn't set on Render (GPS and popular cities still work), or the key isn't restricted to/allowed for Places API (New) and Geocoding API — check the Render logs for `Google Places … failed: <STATUS>` |
+| A restaurant doesn't show up in "near me" | It has no location set, or the customer is farther away than the restaurant's delivery radius — owners set both on the restaurant profile |
 | Uploading a restaurant/food image returns 403 | Only restaurant owners and restaurant-management staff may upload those; customers can upload profile photos only |
 | `/api/auth/register` with `role: "ADMIN"` fails | Intentional — see `auth.validator.js`; provision admins via `npm run seed` or directly in the database |

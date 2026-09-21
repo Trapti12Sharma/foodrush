@@ -5,6 +5,7 @@ import { Plus, Tag, X } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { addressService } from '../services/addressService';
 import { orderService } from '../services/orderService';
+import { restaurantService } from '../services/restaurantService';
 import { configService } from '../services/configService';
 import AddressCard from '../components/AddressCard';
 import AddressForm from '../components/AddressForm';
@@ -61,6 +62,28 @@ export default function Checkout() {
       navigate('/cart', { replace: true });
     }
   }, [cartLoading, cart.items.length, navigate]);
+
+  // Ask the server whether this restaurant delivers to the selected address. (The server enforces the
+  // same rule when the order is placed; this just tells the customer up front.)
+  const selectedAddress = addresses.find((a) => a._id === selectedAddressId);
+  const [delivery, setDelivery] = useState(null);
+  const restaurantId = cart.restaurant?._id;
+  const addressLat = selectedAddress?.latitude;
+  const addressLng = selectedAddress?.longitude;
+  useEffect(() => {
+    if (!restaurantId || addressLat == null || addressLng == null) {
+      setDelivery(null);
+      return undefined;
+    }
+    let cancelled = false;
+    restaurantService
+      .deliveryCheck(restaurantId, addressLat, addressLng)
+      .then((result) => !cancelled && setDelivery(result))
+      .catch(() => !cancelled && setDelivery(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [restaurantId, addressLat, addressLng]);
 
   async function handleAddAddress(values) {
     setAddressSubmitting(true);
@@ -131,7 +154,8 @@ export default function Checkout() {
 
   const belowMinimum = cart.restaurant && cart.subtotal < cart.restaurant.minimumOrder;
   const restaurantClosed = cart.restaurant && !cart.restaurant.isOpen;
-  const canPlaceOrder = !belowMinimum && !restaurantClosed && !!selectedAddressId && !placing;
+  const outOfRange = delivery?.deliverable === false;
+  const canPlaceOrder = !belowMinimum && !restaurantClosed && !outOfRange && !!selectedAddressId && !placing;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
@@ -172,6 +196,18 @@ export default function Checkout() {
           </button>
         )}
       </section>
+
+      {outOfRange && (
+        <p className="mt-3 rounded-lg bg-red-50 px-4 py-2.5 text-sm font-medium text-red-700">
+          {cart.restaurant?.name} doesn&apos;t deliver to this address — it&apos;s {delivery.distanceKm} km away and they deliver within {delivery.radiusKm} km.
+          Choose a different address or another restaurant.
+        </p>
+      )}
+      {selectedAddress && selectedAddress.latitude == null && (
+        <p className="mt-3 rounded-lg bg-amber-50 px-4 py-2.5 text-sm text-amber-700">
+          This address&apos;s location isn&apos;t confirmed, so we can&apos;t check the delivery distance. Edit it in your addresses to confirm.
+        </p>
+      )}
 
       {/* Step 2: Review order */}
       <section className="mt-8">

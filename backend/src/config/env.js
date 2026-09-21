@@ -70,8 +70,20 @@ function validateEnv(env = process.env) {
 
   validateEmailConfig(env, isProd, errors, warnings);
   validateStorageConfig(env, isProd, errors, warnings);
+  validateLocationConfig(env, isProd, errors, warnings);
 
   return { errors, warnings };
+}
+
+// Google Maps is optional: without a key the app still works (GPS + popular cities), address
+// search is simply off. GEO_COUNTRY must be a two-letter country code. Names variables only.
+function validateLocationConfig(env, isProd, errors, warnings) {
+  if (env.GEO_COUNTRY && !/^[A-Za-z]{2}$/.test(env.GEO_COUNTRY.trim())) {
+    errors.push('GEO_COUNTRY must be a two-letter country code, e.g. in.');
+  }
+  if (!env.GOOGLE_MAPS_API_KEY && isProd) {
+    warnings.push('GOOGLE_MAPS_API_KEY is not set — address search is disabled (GPS and popular cities still work).');
+  }
 }
 
 // Cloudinary needs all three settings; a partial set is almost certainly a mistake and would

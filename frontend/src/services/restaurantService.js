@@ -2,6 +2,12 @@ import api from './api';
 
 export const restaurantService = {
   list: (params) => api.get('/restaurants', { params }).then((r) => r.data),
+  // Restaurants around a point with distance, ETA estimate and filters (see the API docs).
+  nearby: (params) => api.get('/restaurants/nearby', { params }).then((r) => r.data),
+  // Cities that currently have live restaurants — a location picker that needs no Google key.
+  cities: () => api.get('/restaurants/cities').then((r) => r.data.cities),
+  // { deliverable: true | false | null, distanceKm, radiusKm } — null means it can't be measured.
+  deliveryCheck: (id, latitude, longitude) => api.post(`/restaurants/${id}/delivery-check`, { latitude, longitude }).then((r) => r.data),
   getById: (id) => api.get(`/restaurants/${id}`).then((r) => r.data.restaurant),
   listMine: () => api.get('/restaurants/mine').then((r) => r.data.restaurants),
   create: (payload) => api.post('/restaurants', payload).then((r) => r.data.restaurant),
