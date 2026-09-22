@@ -7,6 +7,7 @@ const ApiError = require('../utils/ApiError');
 const paymentService = require('./payment.service');
 const couponService = require('./coupon.service');
 const restaurantGeoService = require('./restaurantGeo.service');
+const { isOpenNow } = require('../utils/openingHours');
 const pricing = require('./pricing.service');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { ORDER_STATUS, ORDER_STATUS_TRANSITIONS, PAYMENT_METHODS, PAYMENT_STATUS, ROLES } = require('../utils/constants');
@@ -26,7 +27,7 @@ async function createOrder(user, { addressId, paymentMethod }) {
   if (!restaurant || !restaurant.isApproved || !restaurant.isActive) {
     throw ApiError.badRequest('This restaurant is no longer available');
   }
-  if (!restaurant.isOpen) {
+  if (!isOpenNow(restaurant)) {
     throw ApiError.badRequest('This restaurant is currently closed and not accepting orders');
   }
 
@@ -48,7 +49,19 @@ async function createOrder(user, { addressId, paymentMethod }) {
         food ? `"${food.name}" is no longer available. Please update your cart.` : 'An item in your cart is no longer available. Please update your cart.'
       );
     }
-    return { food: food._id, name: food.name, price: food.effectivePrice(), quantity: item.quantity, addons: item.addons };
+    const hasVariants = food.variants && food.variants.length > 0;
+    if (Boolean(item.variantId) !== hasVariants) {
+      throw ApiError.conflict(`"${food.name}" has changed since you added it. Please update your cart.`);
+    }
+    const price = pricing.unitPriceFor(food, item.variantId);
+    if (price == null) {
+      throw ApiError.conflict(`The selected option for "${food.name}" is no longer available. Please update your cart.`);
+    }
+    const variant = item.variantId ? food.variants.id(item.variantId) : null;
+    return {
+      food: food._id, name: food.name, price, quantity: item.quantity, addons: item.addons,
+      variantName: variant ? variant.name : null, note: item.note || '',
+    };
   });
 
   const subtotal = pricing.subtotalOf(orderItems);

@@ -30,4 +30,16 @@ function computeTotals({ subtotal, deliveryFee = 0, discount = 0 }) {
   return { subtotal, deliveryFee, tax, discount, total };
 }
 
-module.exports = { TAX_RATE, round2, lineTotal, subtotalOf, taxOn, computeTotals };
+// The price a line is actually charged at: the chosen variant's price if the food has
+// variants (a variant is REQUIRED once any exist — see cart.service.js), otherwise the
+// food's own effective price. Never trusts a client-sent price.
+function unitPriceFor(food, variantId) {
+  if (food.variants && food.variants.length > 0) {
+    const variant = food.variants.id ? food.variants.id(variantId) : food.variants.find((v) => String(v._id) === String(variantId));
+    if (!variant || !variant.isAvailable) return null;
+    return variant.discountPrice != null ? variant.discountPrice : variant.price;
+  }
+  return food.effectivePrice();
+}
+
+module.exports = { TAX_RATE, round2, lineTotal, subtotalOf, taxOn, computeTotals, unitPriceFor };

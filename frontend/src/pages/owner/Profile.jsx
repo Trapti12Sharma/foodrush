@@ -5,6 +5,7 @@ import { useRestaurantOwner } from '../../context/RestaurantOwnerContext';
 import { restaurantService } from '../../services/restaurantService';
 import { CheckCircle2, LocateFixed } from 'lucide-react';
 import ImageUploadField from '../../components/ImageUploadField';
+import OpeningHoursEditor from '../../components/OpeningHoursEditor';
 import PlaceSearch from '../../components/PlaceSearch';
 import { useDeliveryLocation } from '../../context/LocationContext';
 import { geoService } from '../../services/geoService';
@@ -18,12 +19,24 @@ export default function Profile() {
   const { locationSearchEnabled } = useDeliveryLocation();
   // Only set when the owner picks a new position; otherwise the stored one is left untouched.
   const [newLocation, setNewLocation] = useState(null);
+  // The API returns slots as {day, open, close} with open/close in minutes since midnight;
+  // <input type="time"> needs "HH:MM" strings, which OpeningHoursEditor converts on display —
+  // but the values sent back to the API should be HH:MM strings too (what it accepts), so
+  // this state always holds strings once edited.
+  const [hoursSlots, setHoursSlots] = useState([]);
 
   useEffect(() => {
     setImage(selectedRestaurant?.image || '');
     setCoverImage(selectedRestaurant?.coverImage || '');
     setLogo(selectedRestaurant?.logo || '');
     setNewLocation(null);
+    setHoursSlots(
+      (selectedRestaurant?.openingHours || []).map((slot) => ({
+        day: slot.day,
+        open: typeof slot.open === 'number' ? `${String(Math.floor(slot.open / 60)).padStart(2, '0')}:${String(slot.open % 60).padStart(2, '0')}` : slot.open,
+        close: typeof slot.close === 'number' ? `${String(Math.floor(slot.close / 60)).padStart(2, '0')}:${String(slot.close % 60).padStart(2, '0')}` : slot.close,
+      }))
+    );
   }, [selectedRestaurant]);
 
   const hasLocation = Boolean(newLocation || selectedRestaurant?.location?.coordinates);
@@ -95,6 +108,7 @@ export default function Profile() {
         deliveryFee: Number(values.deliveryFee),
         minimumOrder: Number(values.minimumOrder),
         isOpen: values.isOpen,
+        openingHours: hoursSlots,
       });
       toast.success('Restaurant profile updated');
       refresh();
@@ -119,6 +133,15 @@ export default function Profile() {
         <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
           <input type="checkbox" {...register('isOpen')} /> Open for orders right now
         </label>
+        <p className="text-xs text-gray-500">
+          Currently: <span className={selectedRestaurant.isOpenNow ? 'font-medium text-green-700' : 'font-medium text-red-600'}>{selectedRestaurant.isOpenNow ? 'Open' : 'Closed'}</span>
+          {' '}(based on the switch above and the schedule below)
+        </p>
+
+        <div className="rounded-lg bg-gray-50 p-3">
+          <p className="mb-2 text-sm font-medium text-gray-700">Opening hours</p>
+          <OpeningHoursEditor slots={hoursSlots} onChange={setHoursSlots} />
+        </div>
 
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Name</label>

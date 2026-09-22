@@ -12,6 +12,7 @@ const {
   haversineKm,
   roundTo,
 } = require('../utils/geo');
+const { openNowExpression } = require('../utils/openingHours');
 
 const DEFAULT_SEARCH_RADIUS_KM = 10;
 
@@ -28,7 +29,7 @@ const SORTS = {
 // Only fields safe for the public — never the owner, approval flags or internal timestamps.
 const PUBLIC_FIELDS = [
   'name', 'description', 'image', 'coverImage', 'logo', 'cuisine', 'address', 'city', 'location',
-  'rating', 'totalReviews', 'deliveryTime', 'deliveryFee', 'minimumOrder', 'isOpen', 'radiusKm',
+  'rating', 'totalReviews', 'deliveryTime', 'deliveryFee', 'minimumOrder', 'isOpen', 'isOpenNow', 'radiusKm',
   'distanceKm', 'estimatedDeliveryMinutes', 'deliverable', 'hasOffer', 'isPureVeg', 'servesNonVeg', 'avgPrice',
 ];
 
@@ -56,8 +57,11 @@ async function findNearby(query) {
   }
   if (query.cuisine) geoQuery.cuisine = new RegExp(`^${escapeRegex(query.cuisine)}$`, 'i');
   if (query.minRating) geoQuery.rating = { $gte: Number(query.minRating) };
-  if (flag('openNow')) geoQuery.isOpen = true;
 
+  // `isOpenNow` combines the manual pause flag with the weekly schedule (utils/openingHours.js)
+  // and can't be expressed inside $geoNear's plain `query`, so openNow is applied as a $match
+  // once it has been computed below, not folded into geoQuery like the other simple filters.
+  const now = new Date();
   const afterDistance = {};
   if (query.maxDeliveryTime) afterDistance.estimatedDeliveryMinutes = { $lte: Number(query.maxDeliveryTime) };
 
@@ -81,10 +85,12 @@ async function findNearby(query) {
       $addFields: {
         distanceKm: { $round: [{ $divide: ['$distanceMeters', 1000] }, 1] },
         radiusKm: { $ifNull: ['$deliveryRadiusKm', DEFAULT_DELIVERY_RADIUS_KM] },
+        isOpenNow: openNowExpression(now),
       },
     },
     { $addFields: { deliverable: { $lte: [{ $divide: ['$distanceMeters', 1000] }, '$radiusKm'] } } },
     ...(flag('includeOutOfRange') ? [] : [{ $match: { deliverable: true } }]),
+    ...(flag('openNow') ? [{ $match: { isOpenNow: true } }] : []),
     {
       $addFields: {
         estimatedDeliveryMinutes: { $round: [{ $add: ['$deliveryTime', { $multiply: ['$distanceKm', MINUTES_PER_KM] }] }, 0] },

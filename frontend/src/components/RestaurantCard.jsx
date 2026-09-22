@@ -14,7 +14,8 @@ export default function RestaurantCard({ restaurant }) {
   // Present only on results from the location-aware search; plain listings simply omit them.
   const hasDistance = typeof restaurant.distanceKm === 'number';
   const eta = restaurant.estimatedDeliveryMinutes ?? restaurant.deliveryTime;
-  const closed = restaurant.isOpen === false;
+  // isOpenNow (real schedule + manual pause) when present; falls back to the raw isOpen flag.
+  const closed = (restaurant.isOpenNow ?? restaurant.isOpen) === false;
 
   async function handleHeartClick(e) {
     e.preventDefault();

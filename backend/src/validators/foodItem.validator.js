@@ -1,6 +1,17 @@
 const { body } = require('express-validator');
 const { isSafeImageUrl } = require('../utils/imageUrl');
 
+const MAX_VARIANTS = 20;
+const variantAndFlagRules = [
+  body('variants').optional().isArray({ max: MAX_VARIANTS }).withMessage(`At most ${MAX_VARIANTS} variants`),
+  body('variants.*.name').optional().isString().trim().notEmpty().isLength({ max: 40 }),
+  body('variants.*.price').optional().isFloat({ min: 0 }),
+  body('variants.*.discountPrice').optional({ nullable: true }).isFloat({ min: 0 }),
+  body('variants.*.isAvailable').optional().isBoolean(),
+  body('isRecommended').optional().isBoolean(),
+  body('isBestseller').optional().isBoolean(),
+];
+
 const createFoodValidator = [
   body('restaurant').isMongoId().withMessage('A valid restaurant id is required'),
   body('category').isMongoId().withMessage('A valid category id is required'),
@@ -13,6 +24,7 @@ const createFoodValidator = [
   body('addons').optional().isArray(),
   body('addons.*.name').optional().isString().trim().notEmpty(),
   body('addons.*.price').optional().isFloat({ min: 0 }),
+  ...variantAndFlagRules,
   body('image').optional({ nullable: true }).custom(isSafeImageUrl).withMessage('image must be an uploaded image or an https:// URL'),
 ];
 
@@ -28,6 +40,7 @@ const updateFoodValidator = [
   body('addons').optional().isArray(),
   body('addons.*.name').optional().isString().trim().notEmpty(),
   body('addons.*.price').optional().isFloat({ min: 0 }),
+  ...variantAndFlagRules,
   body('image').optional({ nullable: true }).custom(isSafeImageUrl).withMessage('image must be an uploaded image or an https:// URL'),
 ];
 
