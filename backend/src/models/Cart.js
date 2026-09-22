@@ -32,6 +32,22 @@ const cartItemSchema = new mongoose.Schema(
       type: [cartAddonSchema],
       default: [],
     },
+    // Which variant this line is for (e.g. "Large"), when the food has variants — required
+    // in that case, see cart.service.js. Null for a food with no variants.
+    variantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+    variantName: {
+      type: String,
+      default: null,
+    },
+    note: {
+      type: String,
+      trim: true,
+      maxlength: 140,
+      default: '',
+    },
   },
   { _id: true }
 );

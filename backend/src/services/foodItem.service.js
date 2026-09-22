@@ -25,6 +25,9 @@ const CREATE_FIELDS = [
   'isVeg',
   'preparationTime',
   'addons',
+  'variants',
+  'isRecommended',
+  'isBestseller',
 ];
 const UPDATE_FIELDS = [...CREATE_FIELDS, 'isAvailable', 'category'];
 

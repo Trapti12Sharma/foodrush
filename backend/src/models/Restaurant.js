@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { isOpenNow } = require('../utils/openingHours');
 
 // A restaurant's position. Deliberately a sub-schema with NO default: a restaurant that has
 // not been given a location simply has none, instead of silently sitting at [0, 0]
@@ -104,9 +105,27 @@ const restaurantSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    // Manual pause switch — false always means closed, regardless of openingHours.
     isOpen: {
       type: Boolean,
       default: true,
+    },
+    // Weekly schedule; see utils/openingHours.js. Empty = no schedule set = always open
+    // (unaffected by isOpen), which is how every restaurant behaved before this existed.
+    openingHours: {
+      type: [
+        {
+          _id: false,
+          day: { type: Number, min: 0, max: 6, required: true }, // 0 = Sunday
+          open: { type: Number, min: 0, max: 1439, required: true }, // minutes since midnight
+          close: { type: Number, min: 0, max: 1439, required: true },
+        },
+      ],
+      default: [],
+    },
+    timezone: {
+      type: String,
+      default: 'Asia/Kolkata',
     },
     // Admin approval gate — a new restaurant is inactive/unapproved until an admin
     // reviews it (section 12: "Approve restaurants"), separate from isActive which
@@ -125,5 +144,14 @@ const restaurantSchema = new mongoose.Schema(
 
 restaurantSchema.index({ location: '2dsphere' });
 restaurantSchema.index({ name: 'text', cuisine: 'text' });
+
+// Computed, not stored: whether the restaurant is actually taking orders right now
+// (the manual `isOpen` pause AND the `openingHours` schedule). Included on every JSON
+// response so the frontend never has to reimplement the opening-hours rule itself.
+restaurantSchema.virtual('isOpenNow').get(function getIsOpenNow() {
+  return isOpenNow(this);
+});
+restaurantSchema.set('toJSON', { virtuals: true });
+restaurantSchema.set('toObject', { virtuals: true });
 
 module.exports = mongoose.model('Restaurant', restaurantSchema);

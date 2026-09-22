@@ -1,6 +1,17 @@
 const { body } = require('express-validator');
 const { isSafeImageUrl } = require('../utils/imageUrl');
 const { isValidPointCoordinates } = require('../utils/geo');
+const { MAX_SLOTS, isValidTimezone } = require('../utils/openingHours');
+
+const TIME_RULE = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+const scheduleRules = [
+  body('openingHours').optional().isArray({ max: MAX_SLOTS }).withMessage(`At most ${MAX_SLOTS} opening-hour slots are allowed`),
+  body('openingHours.*.day').optional().isInt({ min: 0, max: 6 }).withMessage('day must be 0 (Sunday) to 6 (Saturday)'),
+  body('openingHours.*.open').optional().matches(TIME_RULE).withMessage('open must be 24-hour HH:MM'),
+  body('openingHours.*.close').optional().matches(TIME_RULE).withMessage('close must be 24-hour HH:MM'),
+  body('timezone').optional().isString().trim().custom(isValidTimezone).withMessage('Unknown timezone'),
+];
 
 const locationRules = [
   body('location.coordinates')
@@ -28,6 +39,7 @@ const createRestaurantValidator = [
   body('minimumOrder').optional().isFloat({ min: 0 }),
   ...locationRules,
   ...imageRules,
+  ...scheduleRules,
 ];
 
 const updateRestaurantValidator = [
@@ -43,6 +55,7 @@ const updateRestaurantValidator = [
   body('isOpen').optional().isBoolean(),
   ...locationRules,
   ...imageRules,
+  ...scheduleRules,
 ];
 
 module.exports = { createRestaurantValidator, updateRestaurantValidator };

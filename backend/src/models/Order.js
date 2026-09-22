@@ -15,6 +15,8 @@ const orderItemSchema = new mongoose.Schema(
     price: { type: Number, required: true, min: 0 },
     quantity: { type: Number, required: true, min: 1 },
     addons: { type: [orderAddonSchema], default: [] },
+    variantName: { type: String, default: null },
+    note: { type: String, default: '' },
   },
   { _id: false }
 );

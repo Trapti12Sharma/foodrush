@@ -146,7 +146,16 @@ const options = {
             deliveryTime: { type: 'number', description: 'Estimated minutes' },
             deliveryFee: { type: 'number' },
             minimumOrder: { type: 'number' },
-            isOpen: { type: 'boolean' },
+            deliveryRadiusKm: { type: 'number', description: 'How far from `location` this restaurant delivers, in km (default 5)' },
+            isOpen: { type: 'boolean', description: 'Manual pause switch — false always means closed, regardless of openingHours' },
+            openingHours: {
+              type: 'array',
+              description:
+                'Weekly schedule. On create/update, send day (0=Sunday..6=Saturday) with open/close as "HH:MM" strings; a response echoes them back as minutes since midnight (open/close: 0-1439). close <= open means an overnight slot (e.g. 18:00 -> 02:00). An empty array means no schedule set — always open (subject to isOpen).',
+              items: { type: 'object', properties: { day: { type: 'integer' }, open: { oneOf: [{ type: 'string' }, { type: 'integer' }] }, close: { oneOf: [{ type: 'string' }, { type: 'integer' }] } } },
+            },
+            timezone: { type: 'string', description: 'IANA timezone openingHours is evaluated in (default Asia/Kolkata)' },
+            isOpenNow: { type: 'boolean', readOnly: true, description: 'Computed: isOpen AND within openingHours right now. Not settable directly.' },
             isApproved: { type: 'boolean', description: 'Admin approval gate — invisible to the public until true' },
             isActive: { type: 'boolean', description: "Admin's separate disable/enable switch" },
           },
@@ -177,6 +186,17 @@ const options = {
             isAvailable: { type: 'boolean' },
             preparationTime: { type: 'number' },
             addons: { type: 'array', items: { $ref: '#/components/schemas/Addon' } },
+            variants: {
+              type: 'array',
+              description: 'e.g. Small/Medium/Large. When present, ordering this item requires choosing one (see POST /cart/items) — price/discountPrice above then only feed displayPrice.',
+              items: {
+                type: 'object',
+                properties: { _id: { type: 'string' }, name: { type: 'string' }, price: { type: 'number' }, discountPrice: { type: 'number', nullable: true }, isAvailable: { type: 'boolean' } },
+              },
+            },
+            displayPrice: { type: 'number', readOnly: true, description: 'Computed: price to show before a variant is chosen — the cheapest available variant, or the usual discount/base price if there are no variants. Never what a line is actually charged.' },
+            isRecommended: { type: 'boolean', description: 'Owner-curated, shown in the menu\'s Recommended section' },
+            isBestseller: { type: 'boolean' },
           },
         },
         CartItem: {
@@ -187,6 +207,9 @@ const options = {
             quantity: { type: 'integer' },
             price: { type: 'number', description: 'Server-computed at add/recalculate time, never trusted from the client' },
             addons: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, price: { type: 'number' } } } },
+            variantId: { type: 'string', nullable: true },
+            variantName: { type: 'string', nullable: true },
+            note: { type: 'string', description: 'Free-text instruction, e.g. "less spicy" (max 140 chars)' },
           },
         },
         Cart: {

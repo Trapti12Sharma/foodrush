@@ -153,7 +153,7 @@ export default function Checkout() {
   }
 
   const belowMinimum = cart.restaurant && cart.subtotal < cart.restaurant.minimumOrder;
-  const restaurantClosed = cart.restaurant && !cart.restaurant.isOpen;
+  const restaurantClosed = cart.restaurant && !(cart.restaurant.isOpenNow ?? cart.restaurant.isOpen);
   const outOfRange = delivery?.deliverable === false;
   const canPlaceOrder = !belowMinimum && !restaurantClosed && !outOfRange && !!selectedAddressId && !placing;
 
@@ -219,8 +219,10 @@ export default function Checkout() {
               <div>
                 <p className="font-medium text-gray-900">
                   {item.quantity} × {item.food?.name}
+                  {item.variantName && <span className="font-normal text-gray-500"> ({item.variantName})</span>}
                 </p>
                 {item.addons.length > 0 && <p className="text-xs text-gray-400">{item.addons.map((a) => a.name).join(', ')}</p>}
+                {item.note && <p className="text-xs italic text-gray-400">Note: {item.note}</p>}
               </div>
               <p className="text-gray-700">₹{((item.price + item.addons.reduce((a, x) => a + x.price, 0)) * item.quantity).toFixed(2)}</p>
             </div>

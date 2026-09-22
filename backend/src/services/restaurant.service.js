@@ -5,6 +5,7 @@ const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { assertOwnerOrAdmin } = require('../utils/ownership');
 const { PERMISSIONS, hasPermission } = require('../utils/permissions');
 const storageService = require('./storage.service');
+const { normalizeSlots } = require('../utils/openingHours');
 
 const SORT_MAP = {
   rating: '-rating',
@@ -27,6 +28,8 @@ const CREATE_FIELDS = [
   'deliveryTime',
   'deliveryFee',
   'minimumOrder',
+  'openingHours',
+  'timezone',
 ];
 
 const UPDATE_FIELDS = [...CREATE_FIELDS, 'isOpen'];
@@ -117,8 +120,17 @@ function pickFields(source, fields) {
   return result;
 }
 
+// Deep-validates and converts the "HH:MM" schedule the API accepts into the stored minutes
+// form (see utils/openingHours.js) — the single place this happens, for both create and update.
+function applyOpeningHours(data) {
+  if (data.openingHours === undefined) return data;
+  const { slots, error } = normalizeSlots(data.openingHours);
+  if (error) throw ApiError.badRequest(error);
+  return { ...data, openingHours: slots };
+}
+
 async function createRestaurant(owner, payload) {
-  const data = pickFields(payload, CREATE_FIELDS);
+  const data = applyOpeningHours(pickFields(payload, CREATE_FIELDS));
   return Restaurant.create({
     ...data,
     owner: owner._id,
@@ -132,7 +144,7 @@ async function updateRestaurant(id, requester, payload) {
   if (!restaurant) throw ApiError.notFound('Restaurant not found');
   assertOwnerOrAdmin(restaurant.owner, requester, 'You can only modify your own restaurant');
 
-  const data = pickFields(payload, UPDATE_FIELDS);
+  const data = applyOpeningHours(pickFields(payload, UPDATE_FIELDS));
   const previous = { image: restaurant.image, coverImage: restaurant.coverImage, logo: restaurant.logo };
   Object.assign(restaurant, data);
   await restaurant.save();
