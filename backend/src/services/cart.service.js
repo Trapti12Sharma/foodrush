@@ -85,7 +85,8 @@ async function applyCatalogPricing(cart, restaurant) {
 
   let discount = 0;
   if (cart.couponCode) {
-    const result = await couponService.validateCoupon(cart.couponCode, subtotal).catch(() => null);
+    const context = { restaurantId: restaurant._id, city: restaurant.city, userId: cart.user };
+    const result = await couponService.validateCoupon(cart.couponCode, subtotal, context).catch(() => null);
     if (result) discount = result.discountAmount;
     else cart.couponCode = null; // coupon no longer valid for this cart — drop it rather than show a stale discount
   }
@@ -216,7 +217,10 @@ async function applyCoupon(userId, code) {
   cart.couponCode = null;
   await recalculate(cart);
 
-  const { coupon, discountAmount } = await couponService.validateCoupon(code, cart.subtotal);
+  const restaurant = await Restaurant.findById(cart.restaurant);
+  if (!restaurant) throw ApiError.badRequest('Your cart has no restaurant selected');
+  const context = { restaurantId: restaurant._id, city: restaurant.city, userId: cart.user };
+  const { coupon, discountAmount } = await couponService.validateCoupon(code, cart.subtotal, context);
   cart.couponCode = coupon.code;
   cart.discount = discountAmount;
   cart.total = pricing.computeTotals({

@@ -6,14 +6,16 @@ import OrderStatusBadge from '../../components/OrderStatusBadge';
 
 const STATUS_FILTERS = [
   { value: '', label: 'All' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'confirmed', label: 'Confirmed' },
-  { value: 'preparing', label: 'Preparing' },
-  { value: 'ready_for_pickup', label: 'Ready for pickup' },
-  { value: 'out_for_delivery', label: 'Out for delivery' },
-  { value: 'delivered', label: 'Delivered' },
-  { value: 'cancelled', label: 'Cancelled' },
-  { value: 'rejected', label: 'Rejected' },
+  { value: 'PLACED', label: 'Placed' },
+  { value: 'CONFIRMED', label: 'Confirmed' },
+  { value: 'PREPARING', label: 'Preparing' },
+  { value: 'READY_FOR_PICKUP', label: 'Ready for pickup' },
+  { value: 'OUT_FOR_DELIVERY', label: 'Out for delivery' },
+  { value: 'DELIVERED', label: 'Delivered' },
+  { value: 'CANCELLED', label: 'Cancelled' },
+  { value: 'REJECTED', label: 'Rejected' },
+  { value: 'REFUND_PENDING', label: 'Refund pending' },
+  { value: 'REFUNDED', label: 'Refunded' },
 ];
 
 export default function Orders() {

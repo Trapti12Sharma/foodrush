@@ -28,7 +28,7 @@ describe('Admin APIs', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.last7Days).toHaveLength(7);
     expect(res.body.data.statusBreakdown.map((s) => s.status)).toEqual(
-      expect.arrayContaining(['pending', 'delivered', 'cancelled'])
+      expect.arrayContaining(['PLACED', 'DELIVERED', 'CANCELLED'])
     );
     expect(typeof res.body.data.totalUsers).toBe('number');
   });

@@ -20,7 +20,7 @@ async function getDashboardStats() {
       User.countDocuments({}),
       Restaurant.countDocuments({}),
       Order.countDocuments({}),
-      Order.countDocuments({ orderStatus: ORDER_STATUS.PENDING }),
+      Order.countDocuments({ orderStatus: ORDER_STATUS.PLACED }),
       Order.aggregate([
         { $match: { orderStatus: ORDER_STATUS.DELIVERED } },
         { $group: { _id: null, revenue: { $sum: '$totalAmount' } } },

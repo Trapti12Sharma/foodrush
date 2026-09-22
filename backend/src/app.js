@@ -31,6 +31,13 @@ app.set('trust proxy', 1);
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 // Allow-list built from CLIENT_URL / CLIENT_URLS (config/cors.js).
 app.use(cors(corsOptions));
+
+// Mounted here, BEFORE the body parsers below: Razorpay's webhook signature is
+// computed over the exact raw bytes of the request body, and express.json() /
+// mongoSanitize() further down would parse and mutate it before the route ever saw
+// it. See controllers/payment.controller.js for the verification itself.
+app.use('/api/payments', express.raw({ type: '*/*' }), require('./routes/payment.routes'));
+
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());

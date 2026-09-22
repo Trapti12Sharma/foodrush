@@ -51,6 +51,21 @@ const statusHistorySchema = new mongoose.Schema(
 
 const orderSchema = new mongoose.Schema(
   {
+    // Short, human-readable id (FR00000001...) — see utils/orderNumber.js. Kept
+    // separate from _id so support conversations and receipts have something a
+    // customer can actually read out. `required` only binds new saves going
+    // forward — pre-existing production orders predate this field entirely, so
+    // the index MUST be sparse: a plain unique index treats a missing field as
+    // null and would refuse to let more than one such legacy order exist,
+    // breaking index creation against real data before migrate-order-statuses.js
+    // ever gets a chance to backfill it.
+    orderNumber: {
+      type: String,
+      required: true,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -103,15 +118,26 @@ const orderSchema = new mongoose.Schema(
     orderStatus: {
       type: String,
       enum: Object.values(ORDER_STATUS),
-      default: ORDER_STATUS.PENDING,
+      default: ORDER_STATUS.PLACED,
       index: true,
     },
     statusHistory: {
       type: [statusHistorySchema],
       default: [],
     },
+    // Mirrors the latest ONLINE payment attempt (see models/Payment.js for the full
+    // attempt history). Left untouched for COD orders.
     transactionId: {
       type: String,
+      default: null,
+    },
+    razorpayOrderId: {
+      type: String,
+      default: null,
+    },
+    latestPayment: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Payment',
       default: null,
     },
     estimatedDeliveryTime: {

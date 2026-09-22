@@ -3,16 +3,36 @@ const Cart = require('../models/Cart');
 const FoodItem = require('../models/FoodItem');
 const Restaurant = require('../models/Restaurant');
 const Address = require('../models/Address');
+const Payment = require('../models/Payment');
 const ApiError = require('../utils/ApiError');
 const paymentService = require('./payment.service');
 const couponService = require('./coupon.service');
+const refundService = require('./refund.service');
 const restaurantGeoService = require('./restaurantGeo.service');
 const { isOpenNow } = require('../utils/openingHours');
+const { nextOrderNumber } = require('../utils/orderNumber');
 const pricing = require('./pricing.service');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
-const { ORDER_STATUS, ORDER_STATUS_TRANSITIONS, PAYMENT_METHODS, PAYMENT_STATUS, ROLES } = require('../utils/constants');
+const {
+  ORDER_STATUS, ORDER_STATUS_TRANSITIONS, PAYMENT_METHODS, PAYMENT_STATUS, PAYMENT_ATTEMPT_STATUS, ROLES,
+} = require('../utils/constants');
 const { PERMISSIONS, hasPermission } = require('../utils/permissions');
 
+function razorpayPublicConfig(razorpayOrderId, amount) {
+  return { orderId: razorpayOrderId, amount, currency: 'INR', keyId: process.env.RAZORPAY_KEY_ID };
+}
+
+// A cancellation/rejection of a paid online order should refund it automatically.
+// Never lets a refund failure undo or block the status change that triggered it —
+// refund.service.js already logs and records the failure for an admin to retry.
+async function autoRefundIfPaid(order, actor, reason) {
+  if (order.paymentMethod !== PAYMENT_METHODS.ONLINE || order.paymentStatus !== PAYMENT_STATUS.PAID) return;
+  try {
+    await refundService.initiateRefund(order, { reason, actor });
+  } catch (err) {
+    console.error(`Auto-refund failed for order ${order.orderNumber}:`, err.message);
+  }
+}
 
 // Unlike the cart's browsing view (which silently drops changed/unavailable
 // items so the customer can keep shopping), order placement fails loudly: if
@@ -77,7 +97,8 @@ async function createOrder(user, { addressId, paymentMethod }) {
   let discount = 0;
   if (cart.couponCode) {
     try {
-      const result = await couponService.validateCoupon(cart.couponCode, subtotal);
+      const context = { restaurantId: restaurant._id, city: restaurant.city, userId: user._id };
+      const result = await couponService.validateCoupon(cart.couponCode, subtotal, context);
       coupon = result.coupon;
       discount = result.discountAmount;
     } catch (err) {
@@ -90,13 +111,21 @@ async function createOrder(user, { addressId, paymentMethod }) {
   if (!Object.values(PAYMENT_METHODS).includes(paymentMethod)) {
     throw ApiError.badRequest('Invalid payment method');
   }
-  const { paymentStatus, transactionId } = await paymentService.initiatePayment({
-    method: paymentMethod,
-    amount: totalAmount,
-    orderRef: null,
-  });
+  const { paymentStatus, transactionId } = await paymentService.initiatePayment({ method: paymentMethod });
+
+  const orderNumber = await nextOrderNumber();
+
+  // For ONLINE, the Razorpay order is created BEFORE our own order — a network call
+  // that can fail, and failing here means nothing has been written yet (no order, no
+  // claimed coupon), so there is nothing to roll back.
+  let razorpayOrderId = null;
+  if (paymentMethod === PAYMENT_METHODS.ONLINE) {
+    const razorpayOrder = await paymentService.createRazorpayOrder(totalAmount, orderNumber);
+    razorpayOrderId = razorpayOrder.razorpayOrderId;
+  }
 
   const orderData = {
+    orderNumber,
     user: user._id,
     restaurant: restaurant._id,
     items: orderItems,
@@ -123,8 +152,9 @@ async function createOrder(user, { addressId, paymentMethod }) {
     paymentMethod,
     paymentStatus,
     transactionId,
-    orderStatus: ORDER_STATUS.PENDING,
-    statusHistory: [{ status: ORDER_STATUS.PENDING, changedBy: user._id }],
+    razorpayOrderId,
+    orderStatus: ORDER_STATUS.PLACED,
+    statusHistory: [{ status: ORDER_STATUS.PLACED, changedBy: user._id }],
     estimatedDeliveryTime: new Date(Date.now() + restaurant.deliveryTime * 60 * 1000),
   };
 
@@ -143,6 +173,16 @@ async function createOrder(user, { addressId, paymentMethod }) {
     throw err;
   }
 
+  if (coupon) await couponService.recordUsage({ couponId: coupon._id, userId: user._id, orderId: order._id, discountAmount: discount });
+
+  let razorpay = null;
+  if (paymentMethod === PAYMENT_METHODS.ONLINE) {
+    const payment = await Payment.create({ order: order._id, user: user._id, razorpayOrderId, amount: totalAmount });
+    order.latestPayment = payment._id;
+    await order.save();
+    razorpay = razorpayPublicConfig(razorpayOrderId, totalAmount);
+  }
+
   cart.items = [];
   cart.restaurant = null;
   cart.couponCode = null;
@@ -153,7 +193,32 @@ async function createOrder(user, { addressId, paymentMethod }) {
   cart.total = 0;
   await cart.save();
 
-  return order;
+  return { order, razorpay };
+}
+
+// For an ONLINE order whose payment is still unpaid (the customer closed Checkout.js,
+// their bank declined, etc.) — creates a fresh Razorpay order for the SAME FoodRush
+// order, without re-touching the cart, coupon or item pricing. Each attempt is its
+// own Payment row (see models/Payment.js).
+async function retryPayment(user, orderId) {
+  const order = await Order.findById(orderId);
+  if (!order) throw ApiError.notFound('Order not found');
+  if (order.user.toString() !== user._id.toString()) throw ApiError.forbidden('You cannot retry payment for this order');
+  if (order.paymentMethod !== PAYMENT_METHODS.ONLINE) throw ApiError.badRequest('This order is not an online payment');
+  if (order.paymentStatus === PAYMENT_STATUS.PAID) throw ApiError.badRequest('This order has already been paid');
+  if (![ORDER_STATUS.PLACED, ORDER_STATUS.CONFIRMED].includes(order.orderStatus)) {
+    throw ApiError.badRequest(`This order can no longer be paid for (current status: "${order.orderStatus}")`);
+  }
+
+  const razorpayOrder = await paymentService.createRazorpayOrder(order.totalAmount, `${order.orderNumber}-${Date.now()}`);
+  const payment = await Payment.create({ order: order._id, user: user._id, razorpayOrderId: razorpayOrder.razorpayOrderId, amount: order.totalAmount });
+
+  order.razorpayOrderId = razorpayOrder.razorpayOrderId;
+  order.latestPayment = payment._id;
+  order.paymentStatus = PAYMENT_STATUS.PENDING;
+  await order.save();
+
+  return { order, razorpay: razorpayPublicConfig(razorpayOrder.razorpayOrderId, order.totalAmount) };
 }
 
 async function listOrdersForUser(user, query) {
@@ -217,6 +282,9 @@ async function updateOrderStatus(user, orderId, nextStatus) {
   order.orderStatus = nextStatus;
   order.statusHistory.push({ status: nextStatus, changedBy: user._id });
   await order.save();
+
+  if (nextStatus === ORDER_STATUS.REJECTED) await autoRefundIfPaid(order, user, 'restaurant_rejection');
+
   return order;
 }
 
@@ -245,15 +313,18 @@ async function cancelOrder(user, orderId, reason) {
   order.cancellationReason = reason || null;
   order.statusHistory.push({ status: ORDER_STATUS.CANCELLED, changedBy: user._id });
   await order.save();
+
+  const refundReason = isCustomer && !isOwner && !isAdmin ? 'customer_cancellation' : 'restaurant_unavailable';
+  await autoRefundIfPaid(order, user, refundReason);
+
   return order;
 }
 
 // Called by the frontend once Razorpay's Checkout.js hands back a payment
-// confirmation, to prove that confirmation actually came from Razorpay rather
-// than being forged client-side. Only reachable today via ONLINE orders
-// inserted directly (createOrder itself always rejects ONLINE in this
-// unconfigured deployment — see payment.service.js) — kept as a complete,
-// independently-tested piece of the payment abstraction regardless.
+// confirmation, to prove that confirmation actually came from Razorpay rather than
+// being forged client-side. Verified against THIS order's current razorpayOrderId —
+// a valid signature from a genuinely different (the caller's own) payment must not
+// be replayable onto an unrelated order.
 async function verifyOnlinePayment(user, orderId, { razorpayOrderId, razorpayPaymentId, signature }) {
   const order = await Order.findById(orderId);
   if (!order) throw ApiError.notFound('Order not found');
@@ -262,17 +333,34 @@ async function verifyOnlinePayment(user, orderId, { razorpayOrderId, razorpayPay
 
   if (order.paymentStatus === PAYMENT_STATUS.PAID) return order; // idempotent — already verified
 
+  if (order.razorpayOrderId !== razorpayOrderId) {
+    throw ApiError.badRequest('This payment does not match the current payment attempt for this order');
+  }
+
   const isValid = paymentService.verifyPaymentSignature({ razorpayOrderId, razorpayPaymentId, signature });
+  const payment = await Payment.findOne({ order: order._id, razorpayOrderId });
+
   if (!isValid) {
     order.paymentStatus = PAYMENT_STATUS.FAILED;
     await order.save();
+    if (payment) {
+      payment.status = PAYMENT_ATTEMPT_STATUS.FAILED;
+      payment.failureReason = 'Signature verification failed';
+      await payment.save();
+    }
     throw ApiError.badRequest('Payment verification failed');
   }
 
   order.paymentStatus = PAYMENT_STATUS.PAID;
   order.transactionId = razorpayPaymentId;
   await order.save();
+  if (payment) {
+    payment.status = PAYMENT_ATTEMPT_STATUS.PAID;
+    payment.razorpayPaymentId = razorpayPaymentId;
+    payment.confirmedVia = 'verify_endpoint';
+    await payment.save();
+  }
   return order;
 }
 
-module.exports = { createOrder, listOrdersForUser, getOrderById, updateOrderStatus, cancelOrder, verifyOnlinePayment };
+module.exports = { createOrder, retryPayment, listOrdersForUser, getOrderById, updateOrderStatus, cancelOrder, verifyOnlinePayment };

@@ -1,8 +1,11 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiResponse = require('../utils/ApiResponse');
+const ApiError = require('../utils/ApiError');
 const adminService = require('../services/admin.service');
 const orderService = require('../services/order.service');
 const auditService = require('../services/audit.service');
+const refundService = require('../services/refund.service');
+const Order = require('../models/Order');
 
 const getDashboard = asyncHandler(async (req, res) => {
   const stats = await adminService.getDashboardStats();
@@ -67,6 +70,30 @@ const listAuditLogs = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, 'Audit logs fetched', { logs: items, pagination }));
 });
 
+const refundOrder = asyncHandler(async (req, res) => {
+  const order = await Order.findById(req.params.id);
+  if (!order) throw ApiError.notFound('Order not found');
+
+  const refund = await refundService.initiateRefund(order, {
+    reason: req.body.reason || 'admin_initiated',
+    actor: req.user,
+    amount: req.body.amount,
+  });
+  await auditService.record({
+    req,
+    action: 'order.refund',
+    entityType: 'Order',
+    entityId: order._id,
+    metadata: { orderNumber: order.orderNumber, amount: refund.amount, status: refund.status, refundId: refund._id },
+  });
+  res.json(new ApiResponse(200, 'Refund initiated', { refund }));
+});
+
+const listRefunds = asyncHandler(async (req, res) => {
+  const { items, pagination } = await refundService.listRefunds(req.query);
+  res.json(new ApiResponse(200, 'Refunds fetched', { refunds: items, pagination }));
+});
+
 module.exports = {
   getDashboard,
   listUsers,
@@ -76,4 +103,6 @@ module.exports = {
   setRestaurantActive,
   listOrders,
   listAuditLogs,
+  refundOrder,
+  listRefunds,
 };

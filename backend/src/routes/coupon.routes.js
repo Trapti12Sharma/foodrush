@@ -25,6 +25,8 @@ const router = express.Router();
  *             properties:
  *               code: { type: string }
  *               subtotal: { type: number, minimum: 0 }
+ *               restaurantId: { type: string, description: 'Required to validate a restaurant-scoped coupon' }
+ *               city: { type: string, description: 'Required to validate a city-scoped coupon (ignored if restaurantId is set)' }
  *     responses:
  *       200:
  *         description: The coupon and the discount it would apply
@@ -47,7 +49,12 @@ const router = express.Router();
 router.post(
   '/validate',
   authenticateUser,
-  [body('code').trim().notEmpty().withMessage('Coupon code is required'), body('subtotal').isFloat({ min: 0 })],
+  [
+    body('code').trim().notEmpty().withMessage('Coupon code is required'),
+    body('subtotal').isFloat({ min: 0 }),
+    body('restaurantId').optional().isMongoId(),
+    body('city').optional().isString().trim(),
+  ],
   validate,
   couponController.validateCoupon
 );
@@ -75,7 +82,11 @@ router.use(authenticateUser, requirePermission(PERMISSIONS.COUPONS_MANAGE));
  *               minimumOrder: { type: number, minimum: 0 }
  *               maximumDiscount: { type: number, nullable: true, description: 'Caps a PERCENTAGE discount' }
  *               expiryDate: { type: string, format: date-time }
- *               usageLimit: { type: integer, nullable: true, description: 'Omit for unlimited' }
+ *               usageLimit: { type: integer, nullable: true, description: 'Omit for unlimited across all customers' }
+ *               perUserLimit: { type: integer, nullable: true, description: 'Omit for unlimited uses per customer' }
+ *               restaurant: { type: string, nullable: true, description: 'Scope to one restaurant (mutually exclusive with city)' }
+ *               city: { type: string, nullable: true, description: 'Scope to every restaurant in a city' }
+ *               fundedBy: { type: string, enum: [PLATFORM, RESTAURANT, SHARED], default: PLATFORM }
  *     responses:
  *       201:
  *         description: Created
@@ -104,6 +115,9 @@ router.post('/', createCouponValidator, validate, couponController.createCoupon)
  *       - in: query
  *         name: isActive
  *         schema: { type: boolean }
+ *       - in: query
+ *         name: restaurant
+ *         schema: { type: string }
  *       - in: query
  *         name: page
  *         schema: { type: integer, default: 1 }
@@ -152,6 +166,10 @@ router.get('/', couponController.listCoupons);
  *               maximumDiscount: { type: number, nullable: true }
  *               expiryDate: { type: string, format: date-time }
  *               usageLimit: { type: integer, nullable: true }
+ *               perUserLimit: { type: integer, nullable: true }
+ *               restaurant: { type: string, nullable: true }
+ *               city: { type: string, nullable: true }
+ *               fundedBy: { type: string, enum: [PLATFORM, RESTAURANT, SHARED] }
  *               isActive: { type: boolean }
  *     responses:
  *       200:

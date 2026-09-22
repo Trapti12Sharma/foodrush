@@ -5,6 +5,12 @@ const validate = require('../middleware/validate');
 const { authenticateUser, requirePermission } = require('../middleware/auth.middleware');
 const { PERMISSIONS } = require('../utils/permissions');
 
+const REFUND_REASONS = ['customer_cancellation', 'restaurant_rejection', 'restaurant_unavailable', 'operational_issue', 'admin_initiated'];
+const refundOrderValidator = [
+  body('amount').optional().isFloat({ min: 0.01 }).withMessage('amount must be a positive number'),
+  body('reason').optional().isIn(REFUND_REASONS).withMessage(`reason must be one of: ${REFUND_REASONS.join(', ')}`),
+];
+
 const router = express.Router();
 
 router.use(authenticateUser);
@@ -226,7 +232,7 @@ router.patch(
  *     parameters:
  *       - in: query
  *         name: status
- *         schema: { type: string, enum: [pending, confirmed, preparing, ready_for_pickup, out_for_delivery, delivered, cancelled, rejected] }
+ *         schema: { type: string, enum: [PLACED, CONFIRMED, PREPARING, READY_FOR_PICKUP, OUT_FOR_DELIVERY, DELIVERED, CANCELLED, REJECTED, REFUND_PENDING, REFUNDED] }
  *       - in: query
  *         name: page
  *         schema: { type: integer, default: 1 }
@@ -250,6 +256,62 @@ router.patch(
  *       403: { $ref: '#/components/responses/Forbidden' }
  */
 router.get('/orders', requirePermission(PERMISSIONS.ORDERS_READ_ALL), adminController.listOrders);
+
+/**
+ * @swagger
+ * /admin/orders/{id}/refund:
+ *   post:
+ *     summary: Manually refund a paid online order (requires the refunds:manage permission)
+ *     description: >
+ *       Calls Razorpay's refund API for real. Only a paid ONLINE order in CANCELLED, REJECTED or DELIVERED
+ *       status can be refunded. Idempotent — calling this again while a refund is already in flight or done
+ *       returns that same refund rather than issuing a second one. A gateway failure is recorded as a FAILED
+ *       Refund row (200 response) rather than a 5xx, so an admin can see and retry it.
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               amount: { type: number, description: 'Omit for a full refund of the order total' }
+ *               reason: { type: string, enum: [customer_cancellation, restaurant_rejection, restaurant_unavailable, operational_issue, admin_initiated], default: admin_initiated }
+ *     responses:
+ *       200: { description: The Refund record (status PENDING/PROCESSING/COMPLETED/FAILED) }
+ *       400: { description: Order is not a refundable paid online order }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       422: { $ref: '#/components/responses/ValidationError' }
+ */
+router.post(
+  '/orders/:id/refund',
+  requirePermission(PERMISSIONS.REFUNDS_MANAGE),
+  refundOrderValidator,
+  validate,
+  adminController.refundOrder
+);
+
+/**
+ * @swagger
+ * /admin/refunds:
+ *   get:
+ *     summary: List refunds (requires the refunds:manage permission)
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: query, name: status, schema: { type: string, enum: [PENDING, PROCESSING, COMPLETED, FAILED] } }
+ *       - { in: query, name: order, schema: { type: string } }
+ *     responses:
+ *       200: { description: A page of refunds }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+router.get('/refunds', requirePermission(PERMISSIONS.REFUNDS_MANAGE), adminController.listRefunds);
 
 /**
  * @swagger

@@ -8,5 +8,9 @@ module.exports = {
   Order: require('./Order'),
   Review: require('./Review'),
   Coupon: require('./Coupon'),
+  CouponUsage: require('./CouponUsage'),
   Favorite: require('./Favorite'),
+  Payment: require('./Payment'),
+  Refund: require('./Refund'),
+  Counter: require('./Counter'),
 };

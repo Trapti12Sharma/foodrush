@@ -7,8 +7,9 @@ const auditService = require('../services/audit.service');
 // for this subtotal, and what would it save". Cart.service.applyCoupon (see
 // /api/cart/coupon) is what actually attaches it to a cart.
 const validateCoupon = asyncHandler(async (req, res) => {
-  const { code, subtotal } = req.body;
-  const { coupon, discountAmount } = await couponService.validateCoupon(code, Number(subtotal) || 0);
+  const { code, subtotal, restaurantId, city } = req.body;
+  const context = { restaurantId, city, userId: req.user._id };
+  const { coupon, discountAmount } = await couponService.validateCoupon(code, Number(subtotal) || 0, context);
   res.json(
     new ApiResponse(200, 'Coupon is valid', {
       code: coupon.code,

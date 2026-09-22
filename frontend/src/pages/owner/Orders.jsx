@@ -11,22 +11,22 @@ import { ClipboardList } from 'lucide-react';
 // (Phase 2/7), just surfaced as one obvious next step instead of every technically
 // allowed transition.
 const NEXT_ACTION = {
-  pending: { label: 'Accept', status: 'confirmed' },
-  confirmed: { label: 'Start preparing', status: 'preparing' },
-  preparing: { label: 'Mark ready for pickup', status: 'ready_for_pickup' },
-  ready_for_pickup: { label: 'Out for delivery', status: 'out_for_delivery' },
-  out_for_delivery: { label: 'Mark delivered', status: 'delivered' },
+  PLACED: { label: 'Accept', status: 'CONFIRMED' },
+  CONFIRMED: { label: 'Start preparing', status: 'PREPARING' },
+  PREPARING: { label: 'Mark ready for pickup', status: 'READY_FOR_PICKUP' },
+  READY_FOR_PICKUP: { label: 'Out for delivery', status: 'OUT_FOR_DELIVERY' },
+  OUT_FOR_DELIVERY: { label: 'Mark delivered', status: 'DELIVERED' },
 };
-const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'preparing'];
+const CANCELLABLE_STATUSES = ['PLACED', 'CONFIRMED', 'PREPARING'];
 
 const STATUS_FILTERS = [
   { value: '', label: 'All' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'confirmed', label: 'Confirmed' },
-  { value: 'preparing', label: 'Preparing' },
-  { value: 'out_for_delivery', label: 'Out for delivery' },
-  { value: 'delivered', label: 'Delivered' },
-  { value: 'cancelled', label: 'Cancelled' },
+  { value: 'PLACED', label: 'Placed' },
+  { value: 'CONFIRMED', label: 'Confirmed' },
+  { value: 'PREPARING', label: 'Preparing' },
+  { value: 'OUT_FOR_DELIVERY', label: 'Out for delivery' },
+  { value: 'DELIVERED', label: 'Delivered' },
+  { value: 'CANCELLED', label: 'Cancelled' },
 ];
 
 export default function Orders() {
@@ -68,7 +68,7 @@ export default function Orders() {
     setRejecting(null);
     setBusyId(orderId);
     try {
-      await orderService.updateStatus(orderId, 'rejected');
+      await orderService.updateStatus(orderId, 'REJECTED');
       toast.success('Order rejected');
       load();
     } catch (err) {
@@ -137,7 +137,7 @@ export default function Orders() {
                 </div>
 
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {order.orderStatus === 'pending' && (
+                  {order.orderStatus === 'PLACED' && (
                     <button
                       type="button"
                       disabled={busy}
@@ -157,7 +157,7 @@ export default function Orders() {
                       {next.label}
                     </button>
                   )}
-                  {canCancel && order.orderStatus !== 'pending' && (
+                  {canCancel && order.orderStatus !== 'PLACED' && (
                     <button
                       type="button"
                       disabled={busy}

@@ -67,7 +67,7 @@ export default function ReviewsSection({ restaurantId, onReviewChange }) {
       return;
     }
     orderService
-      .list({ restaurant: restaurantId, status: 'delivered', limit: 50 })
+      .list({ restaurant: restaurantId, status: 'DELIVERED', limit: 50 })
       .then((res) => {
         const reviewedOrderIds = new Set(reviews.map((r) => r.order));
         setEligibleOrders(res.orders.filter((o) => !reviewedOrderIds.has(o._id)));

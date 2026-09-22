@@ -82,6 +82,7 @@ export default function Coupons() {
                 <th className="px-4 py-2">Code</th>
                 <th className="px-4 py-2">Discount</th>
                 <th className="px-4 py-2">Min order</th>
+                <th className="px-4 py-2">Scope</th>
                 <th className="px-4 py-2">Usage</th>
                 <th className="px-4 py-2">Expires</th>
                 <th className="px-4 py-2">Status</th>
@@ -96,6 +97,10 @@ export default function Coupons() {
                     {coupon.discountType === 'PERCENTAGE' ? `${coupon.discountValue}%` : `₹${coupon.discountValue}`}
                   </td>
                   <td className="px-4 py-2.5 text-gray-600">₹{coupon.minimumOrder}</td>
+                  <td className="px-4 py-2.5 text-gray-500">
+                    {coupon.restaurant ? 'One restaurant' : coupon.city ? coupon.city : 'All'}
+                    {coupon.perUserLimit ? ` · ${coupon.perUserLimit}/user` : ''}
+                  </td>
                   <td className="px-4 py-2.5 text-gray-600">
                     {coupon.usedCount}{coupon.usageLimit ? ` / ${coupon.usageLimit}` : ''}
                   </td>

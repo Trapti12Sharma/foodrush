@@ -40,10 +40,23 @@ router.use(authenticateUser);
  *               paymentMethod: { type: string, enum: [COD, ONLINE] }
  *     responses:
  *       201:
- *         description: Order placed
+ *         description: >
+ *           Order placed. For paymentMethod=ONLINE, `data.razorpay` also carries what the frontend needs to
+ *           open Razorpay Checkout.js (`{orderId, amount, currency, keyId}` — keyId is the PUBLIC key, safe to
+ *           expose); null for COD.
  *         content:
  *           application/json:
- *             schema: { type: object, properties: { data: { type: object, properties: { order: { $ref: '#/components/schemas/Order' } } } } }
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     order: { $ref: '#/components/schemas/Order' }
+ *                     razorpay:
+ *                       type: object
+ *                       nullable: true
+ *                       properties: { orderId: { type: string }, amount: { type: number }, currency: { type: string }, keyId: { type: string } }
  *       400:
  *         description: Empty cart, no restaurant selected, invalid address, below minimum order, restaurant closed/unavailable, or online payment unconfigured
  *         content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
@@ -52,9 +65,7 @@ router.use(authenticateUser);
  *         description: An item in the cart is no longer available
  *         content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
  *       422: { $ref: '#/components/responses/ValidationError' }
- *       501:
- *         description: 'paymentMethod=ONLINE is configured but the Razorpay order-creation call is not implemented'
- *         content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+ *       502: { description: 'paymentMethod=ONLINE and the Razorpay gateway rejected the order-creation request' }
  */
 router.post('/', createOrderValidator, validate, orderController.createOrder);
 
@@ -73,7 +84,7 @@ router.post('/', createOrderValidator, validate, orderController.createOrder);
  *     parameters:
  *       - in: query
  *         name: status
- *         schema: { type: string, enum: [pending, confirmed, preparing, ready_for_pickup, out_for_delivery, delivered, cancelled, rejected] }
+ *         schema: { type: string, enum: [PLACED, CONFIRMED, PREPARING, READY_FOR_PICKUP, OUT_FOR_DELIVERY, DELIVERED, CANCELLED, REJECTED, REFUND_PENDING, REFUNDED] }
  *       - in: query
  *         name: restaurant
  *         schema: { type: string }
@@ -131,7 +142,11 @@ router.get('/:id', orderController.getOrder);
  * /orders/{id}/status:
  *   patch:
  *     summary: Advance an order's status (the restaurant that owns it, or admin)
- *     description: Only the transitions in the fixed state machine are allowed (e.g. pending→confirmed, confirmed→preparing) — any other requested status is rejected with 400.
+ *     description: >
+ *       Only the transitions in the fixed state machine are allowed (e.g. PLACED->CONFIRMED, CONFIRMED->PREPARING) —
+ *       any other requested status is rejected with 400. REFUND_PENDING/REFUNDED are not reachable here; they
+ *       happen automatically (see /cancel) or through the admin refund endpoint. Rejecting a paid online order
+ *       automatically triggers a refund.
  *     tags: [Orders]
  *     parameters:
  *       - in: path
@@ -146,7 +161,7 @@ router.get('/:id', orderController.getOrder);
  *             type: object
  *             required: [status]
  *             properties:
- *               status: { type: string, enum: [confirmed, preparing, ready_for_pickup, out_for_delivery, delivered, cancelled, rejected] }
+ *               status: { type: string, enum: [CONFIRMED, PREPARING, READY_FOR_PICKUP, OUT_FOR_DELIVERY, DELIVERED, CANCELLED, REJECTED] }
  *     responses:
  *       200:
  *         description: Updated order
@@ -177,7 +192,8 @@ router.patch(
  *       not once the restaurant starts preparing it (403 — contact the
  *       restaurant instead). The restaurant that owns it, or an admin, can
  *       still cancel through "preparing". Always rejected once the order has
- *       reached a terminal state (delivered/cancelled/rejected).
+ *       reached a terminal state (delivered/cancelled/rejected). Cancelling a paid online order automatically
+ *       triggers a refund.
  *     tags: [Orders]
  *     parameters:
  *       - in: path
@@ -243,5 +259,41 @@ router.post('/:id/cancel', cancelOrderValidator, validate, orderController.cance
  *       422: { $ref: '#/components/responses/ValidationError' }
  */
 router.post('/:id/verify-payment', verifyPaymentValidator, validate, orderController.verifyPayment);
+
+/**
+ * @swagger
+ * /orders/{id}/retry-payment:
+ *   post:
+ *     summary: Retry payment for an ONLINE order that hasn't been paid yet
+ *     description: >
+ *       Creates a fresh Razorpay order for the SAME FoodRush order — for when the customer closed Checkout.js,
+ *       their bank declined, etc. Does not re-touch the cart, coupon or item pricing. Only the customer who
+ *       placed the order may call this, and only while it is PLACED or CONFIRMED and not yet paid.
+ *     tags: [Orders]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: A new Razorpay order to open Checkout.js with
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     order: { $ref: '#/components/schemas/Order' }
+ *                     razorpay: { type: object, properties: { orderId: { type: string }, amount: { type: number }, currency: { type: string }, keyId: { type: string } } }
+ *       400: { description: 'Not an ONLINE order, already paid, or past the point where it can still be paid for' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       502: { description: The payment gateway rejected the request }
+ */
+router.post('/:id/retry-payment', orderController.retryPayment);
 
 module.exports = router;

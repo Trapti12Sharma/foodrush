@@ -18,7 +18,7 @@ async function getRestaurantDashboard(requester, restaurantId) {
 
   const [totalOrders, pendingOrders, todayOrders, deliveredAgg] = await Promise.all([
     Order.countDocuments({ restaurant: restaurant._id }),
-    Order.countDocuments({ restaurant: restaurant._id, orderStatus: ORDER_STATUS.PENDING }),
+    Order.countDocuments({ restaurant: restaurant._id, orderStatus: ORDER_STATUS.PLACED }),
     Order.countDocuments({ restaurant: restaurant._id, createdAt: { $gte: startOfToday } }),
     Order.aggregate([
       { $match: { restaurant: restaurant._id, orderStatus: ORDER_STATUS.DELIVERED } },

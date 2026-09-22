@@ -19,7 +19,7 @@ async function setupDeliveredOrder(owner, customer) {
   const orderRes = await customer.post('/api/orders').send({ addressId: addrRes.body.data.address._id, paymentMethod: 'COD' });
   const order = orderRes.body.data.order;
 
-  for (const status of ['confirmed', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered']) {
+  for (const status of ['CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP', 'OUT_FOR_DELIVERY', 'DELIVERED']) {
     await owner.patch(`/api/orders/${order._id}/status`).send({ status });
   }
 

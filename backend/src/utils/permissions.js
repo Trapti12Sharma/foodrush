@@ -21,6 +21,7 @@ const PERMISSIONS = Object.freeze({
   AUDIT_READ: 'audit:read',
   ADMINS_MANAGE: 'admins:manage', // change status of staff accounts
   SETTINGS_MANAGE: 'settings:manage',
+  REFUNDS_MANAGE: 'refunds:manage',
 });
 
 const P = PERMISSIONS;
@@ -38,6 +39,7 @@ const ADMIN_PERMISSIONS = [
   P.ORDERS_MANAGE,
   P.COUPONS_MANAGE,
   P.REVIEWS_MODERATE,
+  P.REFUNDS_MANAGE,
 ];
 
 const ROLE_PERMISSIONS = Object.freeze({

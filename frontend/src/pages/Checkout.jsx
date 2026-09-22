@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Plus, Tag, X } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import { addressService } from '../services/addressService';
 import { orderService } from '../services/orderService';
 import { restaurantService } from '../services/restaurantService';
@@ -10,6 +11,7 @@ import { configService } from '../services/configService';
 import AddressCard from '../components/AddressCard';
 import AddressForm from '../components/AddressForm';
 import EmptyState from '../components/EmptyState';
+import { loadRazorpayScript, openRazorpayCheckout } from '../utils/razorpay';
 
 function Row({ label, value, emphasis }) {
   return (
@@ -22,6 +24,7 @@ function Row({ label, value, emphasis }) {
 
 export default function Checkout() {
   const { cart, loading: cartLoading, applyCoupon, removeCoupon, refresh } = useCart();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [addresses, setAddresses] = useState([]);
@@ -125,6 +128,47 @@ export default function Checkout() {
     }
   }
 
+  // Navigate away first, THEN refresh the (now-empty) cart in the background.
+  // Awaiting refresh() before navigating let this component re-render with an
+  // empty cart while still mounted, which fires its own "cart is empty ->
+  // redirect to /cart" effect — a race that could overwrite this navigation
+  // to the order confirmation page with a bounce back to /cart.
+  function goToOrder(orderId) {
+    navigate(`/orders/${orderId}`);
+    refresh();
+  }
+
+  // Opens Razorpay Checkout for a just-created ONLINE order. Whatever happens —
+  // success, the customer closes the modal, or Razorpay reports a failure — the
+  // order already exists (created before this point) so we always land on the
+  // order page, where a "Retry payment" action is available for anything short
+  // of a verified success.
+  async function payOnline(order, razorpay) {
+    const scriptLoaded = await loadRazorpayScript();
+    if (!scriptLoaded) {
+      toast.error('Could not load the payment gateway. Your order was placed — retry payment from the order page.');
+      goToOrder(order._id);
+      return;
+    }
+    try {
+      const result = await openRazorpayCheckout({ razorpay, order, user });
+      await orderService.verifyPayment(order._id, {
+        razorpayOrderId: result.razorpay_order_id,
+        razorpayPaymentId: result.razorpay_payment_id,
+        signature: result.razorpay_signature,
+      });
+      toast.success('Payment successful — order placed!');
+    } catch (err) {
+      toast.error(
+        err.message === 'Payment window closed'
+          ? 'Payment cancelled — you can retry from your order page.'
+          : err.message || 'Payment failed — you can retry from your order page.'
+      );
+    } finally {
+      goToOrder(order._id);
+    }
+  }
+
   async function handlePlaceOrder() {
     if (!selectedAddressId) {
       toast.error('Please select a delivery address');
@@ -132,15 +176,13 @@ export default function Checkout() {
     }
     setPlacing(true);
     try {
-      const order = await orderService.create({ addressId: selectedAddressId, paymentMethod });
-      toast.success('Order placed successfully');
-      // Navigate away first, THEN refresh the (now-empty) cart in the background.
-      // Awaiting refresh() before navigating let this component re-render with an
-      // empty cart while still mounted, which fires its own "cart is empty ->
-      // redirect to /cart" effect — a race that could overwrite this navigation
-      // to the order confirmation page with a bounce back to /cart.
-      navigate(`/orders/${order._id}`);
-      refresh();
+      const { order, razorpay } = await orderService.create({ addressId: selectedAddressId, paymentMethod });
+      if (paymentMethod === 'ONLINE' && razorpay) {
+        await payOnline(order, razorpay);
+      } else {
+        toast.success('Order placed successfully');
+        goToOrder(order._id);
+      }
     } catch (err) {
       toast.error(err.message || 'Could not place your order');
     } finally {

@@ -123,15 +123,15 @@ describe('Checkout & Orders', () => {
       const owner = await registerAndLogin({ name: 'Owner', email: uniqueEmail('stat-owner'), role: 'RESTAURANT_OWNER' });
       const customer = await registerAndLogin({ name: 'Cust', email: uniqueEmail('stat-cust'), role: 'CUSTOMER' });
       const { order } = await placeOrder(owner, customer);
-      const res = await customer.patch(`/api/orders/${order._id}/status`).send({ status: 'confirmed' });
+      const res = await customer.patch(`/api/orders/${order._id}/status`).send({ status: 'CONFIRMED' });
       expect(res.status).toBe(403);
     });
 
-    it('rejects an invalid status transition (pending -> delivered)', async () => {
+    it('rejects an invalid status transition (PLACED -> DELIVERED)', async () => {
       const owner = await registerAndLogin({ name: 'Owner', email: uniqueEmail('stat-owner2'), role: 'RESTAURANT_OWNER' });
       const customer = await registerAndLogin({ name: 'Cust', email: uniqueEmail('stat-cust2'), role: 'CUSTOMER' });
       const { order } = await placeOrder(owner, customer);
-      const res = await owner.patch(`/api/orders/${order._id}/status`).send({ status: 'delivered' });
+      const res = await owner.patch(`/api/orders/${order._id}/status`).send({ status: 'DELIVERED' });
       expect(res.status).toBe(400);
     });
 
@@ -139,10 +139,10 @@ describe('Checkout & Orders', () => {
       const owner = await registerAndLogin({ name: 'Owner', email: uniqueEmail('stat-owner3'), role: 'RESTAURANT_OWNER' });
       const customer = await registerAndLogin({ name: 'Cust', email: uniqueEmail('stat-cust3'), role: 'CUSTOMER' });
       const { order } = await placeOrder(owner, customer);
-      const res = await owner.patch(`/api/orders/${order._id}/status`).send({ status: 'confirmed' });
+      const res = await owner.patch(`/api/orders/${order._id}/status`).send({ status: 'CONFIRMED' });
       expect(res.status).toBe(200);
-      expect(res.body.data.order.orderStatus).toBe('confirmed');
-      expect(res.body.data.order.statusHistory.map((h) => h.status)).toEqual(['pending', 'confirmed']);
+      expect(res.body.data.order.orderStatus).toBe('CONFIRMED');
+      expect(res.body.data.order.statusHistory.map((h) => h.status)).toEqual(['PLACED', 'CONFIRMED']);
     });
 
     it('lets a customer cancel while pending, but not once preparing', async () => {
@@ -151,11 +151,11 @@ describe('Checkout & Orders', () => {
       const { order: order1 } = await placeOrder(owner, customer);
       const cancelWhilePending = await customer.post(`/api/orders/${order1._id}/cancel`);
       expect(cancelWhilePending.status).toBe(200);
-      expect(cancelWhilePending.body.data.order.orderStatus).toBe('cancelled');
+      expect(cancelWhilePending.body.data.order.orderStatus).toBe('CANCELLED');
 
       const { order: order2 } = await placeOrder(owner, customer);
-      await owner.patch(`/api/orders/${order2._id}/status`).send({ status: 'confirmed' });
-      await owner.patch(`/api/orders/${order2._id}/status`).send({ status: 'preparing' });
+      await owner.patch(`/api/orders/${order2._id}/status`).send({ status: 'CONFIRMED' });
+      await owner.patch(`/api/orders/${order2._id}/status`).send({ status: 'PREPARING' });
       const cancelWhilePreparing = await customer.post(`/api/orders/${order2._id}/cancel`);
       expect(cancelWhilePreparing.status).toBe(403);
 
@@ -193,16 +193,6 @@ describe('Checkout & Orders', () => {
       return crypto.createHmac('sha256', secret).update(`${orderId}|${paymentId}`).digest('hex');
     }
 
-    it('still refuses to create an ONLINE order even with fake credentials configured (order creation is honestly not implemented)', async () => {
-      const owner = await registerAndLogin({ name: 'Owner', email: uniqueEmail('pay-owner'), role: 'RESTAURANT_OWNER' });
-      const customer = await registerAndLogin({ name: 'Cust', email: uniqueEmail('pay-cust'), role: 'CUSTOMER' });
-      const { food } = await setupOrderable(owner);
-      const addrRes = await customer.post('/api/addresses').send({ addressLine: '1 Rd', city: 'Pune', pincode: '411001' });
-      await customer.post('/api/cart/items').send({ foodId: food._id, quantity: 1 });
-      const res = await customer.post('/api/orders').send({ addressId: addrRes.body.data.address._id, paymentMethod: 'ONLINE' });
-      expect(res.status).toBe(501);
-    });
-
     it('verifies a correct signature and rejects a tampered one', async () => {
       const owner = await registerAndLogin({ name: 'Owner', email: uniqueEmail('pay-owner2'), role: 'RESTAURANT_OWNER' });
       const customer = await registerAndLogin({ name: 'Cust', email: uniqueEmail('pay-cust2'), role: 'CUSTOMER' });
@@ -212,16 +202,16 @@ describe('Checkout & Orders', () => {
       const meRes = await customer.get('/api/auth/me');
       const userId = meRes.body.data.user._id;
 
+      const razorpayOrderId = 'order_TEST1';
       const order = await Order.create({
-        user: userId, restaurant: restaurant._id,
+        orderNumber: 'FR00000001', user: userId, restaurant: restaurant._id,
         items: [{ food: food._id, name: 'Order Item', price: 100, quantity: 1, addons: [] }],
         deliveryAddress: { addressLine: address.addressLine, city: address.city, pincode: address.pincode },
         subtotal: 100, deliveryFee: 10, tax: 5, discount: 0, totalAmount: 115,
-        paymentMethod: 'ONLINE', paymentStatus: 'pending',
-        orderStatus: 'pending', statusHistory: [{ status: 'pending', changedBy: userId }],
+        paymentMethod: 'ONLINE', paymentStatus: 'pending', razorpayOrderId,
+        orderStatus: 'PLACED', statusHistory: [{ status: 'PLACED', changedBy: userId }],
       });
 
-      const razorpayOrderId = 'order_TEST1';
       const razorpayPaymentId = 'pay_TEST1';
       const badRes = await customer.post(`/api/orders/${order._id}/verify-payment`).send({
         razorpayOrderId, razorpayPaymentId, signature: 'a'.repeat(64),

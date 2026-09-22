@@ -10,6 +10,7 @@
     "seed": "node seeds/seed.js",
     "bootstrap:admin": "node scripts/bootstrap-super-admin.js",
     "import:images": "node scripts/import-images.js",
+    "migrate:order-statuses": "node scripts/migrate-order-statuses.js",
     "test": "jest --runInBand --forceExit"
   },
   "dependencies": {

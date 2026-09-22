@@ -15,21 +15,36 @@ const ROLES = Object.freeze({
   SUPPORT_AGENT: 'SUPPORT_AGENT',
 });
 
+// Uppercase, matching the platform-wide convention (roles, permissions, payment
+// methods). PLACED replaces the original PENDING — clearer once orders also have a
+// separate, lowercase paymentStatus of their own ("pending" no longer means two
+// different things in the same object). REFUND_PENDING/REFUNDED are new: an order
+// being refunded is a fact about the ORDER, not just its payment, so it needs its
+// own status customers and admins can see and filter on.
+//
+// Delivery-partner-specific statuses (ASSIGNED, PICKED_UP, ARRIVED) are deliberately
+// not added yet — they have no meaning without the assignment system, which arrives
+// in a later milestone.
 const ORDER_STATUS = Object.freeze({
-  PENDING: 'pending',
-  CONFIRMED: 'confirmed',
-  PREPARING: 'preparing',
-  READY_FOR_PICKUP: 'ready_for_pickup',
-  OUT_FOR_DELIVERY: 'out_for_delivery',
-  DELIVERED: 'delivered',
-  CANCELLED: 'cancelled',
-  REJECTED: 'rejected',
+  PLACED: 'PLACED',
+  CONFIRMED: 'CONFIRMED',
+  PREPARING: 'PREPARING',
+  READY_FOR_PICKUP: 'READY_FOR_PICKUP',
+  OUT_FOR_DELIVERY: 'OUT_FOR_DELIVERY',
+  DELIVERED: 'DELIVERED',
+  CANCELLED: 'CANCELLED',
+  REJECTED: 'REJECTED',
+  REFUND_PENDING: 'REFUND_PENDING',
+  REFUNDED: 'REFUNDED',
 });
 
-// Explicit allow-list of forward transitions. Anything not listed here is invalid —
-// enforced in the order service (Phase 8), not just the UI.
+// Explicit allow-list of forward transitions, enforced in the order service, not just
+// the UI. REFUND_PENDING/REFUNDED are reached only through the refund service (see
+// refund.service.js), triggered automatically by a cancellation/rejection of a paid
+// online order, or by an admin's manual refund — never through the generic
+// PATCH /orders/:id/status endpoint restaurants and admins use day to day.
 const ORDER_STATUS_TRANSITIONS = Object.freeze({
-  [ORDER_STATUS.PENDING]: [ORDER_STATUS.CONFIRMED, ORDER_STATUS.REJECTED, ORDER_STATUS.CANCELLED],
+  [ORDER_STATUS.PLACED]: [ORDER_STATUS.CONFIRMED, ORDER_STATUS.REJECTED, ORDER_STATUS.CANCELLED],
   [ORDER_STATUS.CONFIRMED]: [ORDER_STATUS.PREPARING, ORDER_STATUS.CANCELLED],
   [ORDER_STATUS.PREPARING]: [ORDER_STATUS.READY_FOR_PICKUP, ORDER_STATUS.CANCELLED],
   [ORDER_STATUS.READY_FOR_PICKUP]: [ORDER_STATUS.OUT_FOR_DELIVERY],
@@ -37,7 +52,13 @@ const ORDER_STATUS_TRANSITIONS = Object.freeze({
   [ORDER_STATUS.DELIVERED]: [],
   [ORDER_STATUS.CANCELLED]: [],
   [ORDER_STATUS.REJECTED]: [],
+  [ORDER_STATUS.REFUND_PENDING]: [ORDER_STATUS.REFUNDED],
+  [ORDER_STATUS.REFUNDED]: [],
 });
+
+// Separate from ORDER_STATUS_TRANSITIONS: which order statuses a refund may be
+// initiated from (refund.service.js), independent of the day-to-day status flow above.
+const REFUNDABLE_FROM_STATUSES = Object.freeze([ORDER_STATUS.CANCELLED, ORDER_STATUS.REJECTED, ORDER_STATUS.DELIVERED]);
 
 const PAYMENT_METHODS = Object.freeze({
   COD: 'COD',
@@ -56,11 +77,36 @@ const DISCOUNT_TYPES = Object.freeze({
   FLAT: 'FLAT',
 });
 
+// Who pays for a coupon's discount — recorded for later settlement reporting
+// (Phase 38); does not change the discount calculation itself.
+const COUPON_FUNDED_BY = Object.freeze({
+  PLATFORM: 'PLATFORM',
+  RESTAURANT: 'RESTAURANT',
+  SHARED: 'SHARED',
+});
+
+const REFUND_STATUS = Object.freeze({
+  PENDING: 'PENDING',
+  PROCESSING: 'PROCESSING',
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED',
+});
+
+const PAYMENT_ATTEMPT_STATUS = Object.freeze({
+  CREATED: 'CREATED', // a Razorpay order exists; the customer has not paid yet
+  PAID: 'PAID',
+  FAILED: 'FAILED',
+});
+
 module.exports = {
   ROLES,
   ORDER_STATUS,
   ORDER_STATUS_TRANSITIONS,
+  REFUNDABLE_FROM_STATUSES,
   PAYMENT_METHODS,
   PAYMENT_STATUS,
   DISCOUNT_TYPES,
+  COUPON_FUNDED_BY,
+  REFUND_STATUS,
+  PAYMENT_ATTEMPT_STATUS,
 };

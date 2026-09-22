@@ -7,8 +7,10 @@ import { useAuth } from '../context/AuthContext';
 import OrderStatusBadge from '../components/OrderStatusBadge';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EmptyState from '../components/EmptyState';
+import { loadRazorpayScript, openRazorpayCheckout } from '../utils/razorpay';
 
-const CUSTOMER_CANCELLABLE_STATUSES = ['pending', 'confirmed'];
+const CUSTOMER_CANCELLABLE_STATUSES = ['PLACED', 'CONFIRMED'];
+const RETRYABLE_STATUSES = ['PLACED', 'CONFIRMED'];
 
 export default function OrderDetail() {
   const { id } = useParams();
@@ -18,6 +20,7 @@ export default function OrderDetail() {
   const [error, setError] = useState(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [payingAgain, setPayingAgain] = useState(false);
 
   function load() {
     setLoading(true);
@@ -44,6 +47,32 @@ export default function OrderDetail() {
     }
   }
 
+  async function handleRetryPayment() {
+    setPayingAgain(true);
+    try {
+      const { order: refreshed, razorpay } = await orderService.retryPayment(id);
+      setOrder(refreshed);
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        toast.error('Could not load the payment gateway. Please try again.');
+        return;
+      }
+      const result = await openRazorpayCheckout({ razorpay, order: refreshed, user });
+      const verified = await orderService.verifyPayment(id, {
+        razorpayOrderId: result.razorpay_order_id,
+        razorpayPaymentId: result.razorpay_payment_id,
+        signature: result.razorpay_signature,
+      });
+      setOrder(verified);
+      toast.success('Payment successful!');
+    } catch (err) {
+      toast.error(err.message === 'Payment window closed' ? 'Payment cancelled' : err.message || 'Payment failed');
+      load();
+    } finally {
+      setPayingAgain(false);
+    }
+  }
+
   if (loading) return <div className="py-24 text-center text-gray-400">Loading order…</div>;
 
   if (error || !order) {
@@ -64,6 +93,11 @@ export default function OrderDetail() {
 
   const isOwnOrder = order.user === user?._id;
   const canCancel = isOwnOrder && CUSTOMER_CANCELLABLE_STATUSES.includes(order.orderStatus);
+  const canRetryPayment =
+    isOwnOrder &&
+    order.paymentMethod === 'ONLINE' &&
+    order.paymentStatus !== 'paid' &&
+    RETRYABLE_STATUSES.includes(order.orderStatus);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
@@ -79,7 +113,7 @@ export default function OrderDetail() {
         <OrderStatusBadge status={order.orderStatus} />
       </div>
 
-      {order.orderStatus === 'cancelled' && order.cancellationReason && (
+      {order.orderStatus === 'CANCELLED' && order.cancellationReason && (
         <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">Reason: {order.cancellationReason}</p>
       )}
 
@@ -140,7 +174,23 @@ export default function OrderDetail() {
         <p className="mt-1 text-gray-600">
           {order.paymentMethod === 'COD' ? 'Cash on Delivery' : 'Online Payment'} · {order.paymentStatus}
         </p>
+        {(order.orderStatus === 'REFUND_PENDING' || order.orderStatus === 'REFUNDED') && (
+          <p className="mt-1 text-xs text-gray-500">
+            {order.orderStatus === 'REFUNDED' ? 'Your refund has been completed.' : 'Your refund is being processed by the payment gateway.'}
+          </p>
+        )}
       </div>
+
+      {canRetryPayment && (
+        <button
+          type="button"
+          onClick={handleRetryPayment}
+          disabled={payingAgain}
+          className="mt-6 w-full rounded-lg bg-brand-600 py-2.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+        >
+          {payingAgain ? 'Opening payment…' : 'Retry payment'}
+        </button>
+      )}
 
       {canCancel && (
         <button

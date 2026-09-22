@@ -71,6 +71,7 @@ function validateEnv(env = process.env) {
   validateEmailConfig(env, isProd, errors, warnings);
   validateStorageConfig(env, isProd, errors, warnings);
   validateLocationConfig(env, isProd, errors, warnings);
+  validatePaymentConfig(env, isProd, errors, warnings);
 
   return { errors, warnings };
 }
@@ -95,6 +96,23 @@ function validateStorageConfig(env, isProd, errors, warnings) {
     errors.push(`Cloudinary is partially configured — also set: ${missing.join(', ')} (or clear the others).`);
   } else if (missing.length === keys.length && isProd) {
     warnings.push('Cloudinary is not configured — uploaded images will be lost on every restart or deploy.');
+  }
+}
+
+// Razorpay is optional (COD still works without it) but a PARTIAL key pair is almost
+// certainly a mistake and would otherwise fail confusingly on the first checkout —
+// fatal, like Cloudinary's partial-config check. The webhook secret is checked
+// separately: online payments still work without it (the synchronous verify-payment
+// call is enough), it just loses the safety net for a customer who never calls back.
+function validatePaymentConfig(env, isProd, errors, warnings) {
+  const hasId = Boolean(env.RAZORPAY_KEY_ID);
+  const hasSecret = Boolean(env.RAZORPAY_KEY_SECRET);
+  if (hasId !== hasSecret) {
+    errors.push('Razorpay is partially configured — set both RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET (or clear both).');
+    return;
+  }
+  if (hasId && hasSecret && !env.RAZORPAY_WEBHOOK_SECRET && isProd) {
+    warnings.push('RAZORPAY_WEBHOOK_SECRET is not set — payment/refund confirmation relies only on the customer\'s browser calling back.');
   }
 }
 

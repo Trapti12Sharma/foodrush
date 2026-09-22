@@ -17,7 +17,7 @@ describe('Restaurant owner dashboard', () => {
     const addrRes = await customer.post('/api/addresses').send({ addressLine: '1 Rd', city: 'Pune', pincode: '411001' });
     await customer.post('/api/cart/items').send({ foodId: foodRes.body.data.food._id, quantity: 1 });
     const orderRes = await customer.post('/api/orders').send({ addressId: addrRes.body.data.address._id, paymentMethod: 'COD' });
-    for (const status of ['confirmed', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered']) {
+    for (const status of ['CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP', 'OUT_FOR_DELIVERY', 'DELIVERED']) {
       await owner.patch(`/api/orders/${orderRes.body.data.order._id}/status`).send({ status });
     }
     return restaurant;
