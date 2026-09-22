@@ -16,13 +16,13 @@ const router = express.Router();
  *       (development only — ephemeral on Render). Only real JPEG/PNG/WEBP files are accepted (the file's
  *       bytes are checked, not just its extension), up to MAX_UPLOAD_SIZE_MB (default 5MB).
  *       `purpose` decides who may upload: `avatar` (default) is open to any signed-in user;
- *       `restaurant`, `food` and `category` require a restaurant owner or restaurant-management staff.
- *       Rate-limited.
+ *       `restaurant`, `food` and `category` require a restaurant owner or restaurant-management staff;
+ *       `kyc` requires a delivery partner account. Rate-limited.
  *     tags: [Uploads]
  *     parameters:
  *       - in: query
  *         name: purpose
- *         schema: { type: string, enum: [avatar, restaurant, food, category], default: avatar }
+ *         schema: { type: string, enum: [avatar, restaurant, food, category, kyc], default: avatar }
  *     requestBody:
  *       required: true
  *       content:

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, MapPin, User, ShoppingCart, Menu, X, LogOut, ClipboardList, Heart, MapPinned, Store, LayoutDashboard } from 'lucide-react';
+import { Search, MapPin, User, ShoppingCart, Menu, X, LogOut, ClipboardList, Heart, MapPinned, Store, LayoutDashboard, Bike } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useDeliveryLocation } from '../context/LocationContext';
@@ -86,6 +86,15 @@ export default function Navbar() {
                       className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50"
                     >
                       <Store size={14} /> Restaurant dashboard
+                    </Link>
+                  )}
+                  {user.role === 'DELIVERY_PARTNER' && (
+                    <Link
+                      to="/delivery/dashboard"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50"
+                    >
+                      <Bike size={14} /> Delivery dashboard
                     </Link>
                   )}
                   {isAdminPanelUser(user) && (
@@ -198,6 +207,15 @@ export default function Navbar() {
                     className="rounded px-2 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50"
                   >
                     Restaurant dashboard
+                  </Link>
+                )}
+                {user.role === 'DELIVERY_PARTNER' && (
+                  <Link
+                    to="/delivery/dashboard"
+                    onClick={() => setMobileOpen(false)}
+                    className="rounded px-2 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50"
+                  >
+                    Delivery dashboard
                   </Link>
                 )}
                 {isAdminPanelUser(user) && (

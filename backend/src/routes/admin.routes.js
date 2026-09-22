@@ -11,6 +11,9 @@ const refundOrderValidator = [
   body('reason').optional().isIn(REFUND_REASONS).withMessage(`reason must be one of: ${REFUND_REASONS.join(', ')}`),
 ];
 
+const rejectKycValidator = [body('reason').trim().notEmpty().withMessage('A rejection reason is required').isLength({ max: 500 })];
+const suspendDeliveryPartnerValidator = [body('reason').optional({ checkFalsy: true }).trim().isLength({ max: 500 })];
+
 const router = express.Router();
 
 router.use(authenticateUser);
@@ -333,5 +336,145 @@ router.get('/refunds', requirePermission(PERMISSIONS.REFUNDS_MANAGE), adminContr
  *       403: { $ref: '#/components/responses/Forbidden' }
  */
 router.get('/audit-logs', requirePermission(PERMISSIONS.AUDIT_READ), adminController.listAuditLogs);
+
+/**
+ * @swagger
+ * /admin/delivery-partners:
+ *   get:
+ *     summary: List delivery partners (requires the delivery_partners:manage permission)
+ *     description: Documents, driving licence number, date of birth and emergency contact are omitted from this list view — only GET /admin/delivery-partners/{id} returns them.
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: query, name: search, schema: { type: string }, description: Matches fullName, phone or vehicleNumber }
+ *       - { in: query, name: kycStatus, schema: { type: string, enum: [PENDING, SUBMITTED, VERIFIED, REJECTED] } }
+ *       - { in: query, name: accountStatus, schema: { type: string, enum: [PENDING, ACTIVE, SUSPENDED, REJECTED] } }
+ *       - { in: query, name: city, schema: { type: string } }
+ *       - { in: query, name: page, schema: { type: integer, default: 1 } }
+ *       - { in: query, name: limit, schema: { type: integer, default: 12 } }
+ *     responses:
+ *       200: { description: A page of delivery partners }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+router.get('/delivery-partners', requirePermission(PERMISSIONS.DELIVERY_PARTNERS_MANAGE), adminController.listDeliveryPartners);
+
+/**
+ * @swagger
+ * /admin/delivery-partners/{id}:
+ *   get:
+ *     summary: Full delivery partner detail, including KYC documents (requires the delivery_partners:manage permission)
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Delivery partner detail }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+router.get('/delivery-partners/:id', requirePermission(PERMISSIONS.DELIVERY_PARTNERS_MANAGE), adminController.getDeliveryPartner);
+
+/**
+ * @swagger
+ * /admin/delivery-partners/{id}/approve-kyc:
+ *   patch:
+ *     summary: Approve KYC — also activates the account (requires the delivery_partners:manage permission)
+ *     description: Only valid from kycStatus=SUBMITTED.
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: KYC approved, account now ACTIVE }
+ *       400: { description: 'Not currently SUBMITTED' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+router.patch(
+  '/delivery-partners/:id/approve-kyc',
+  requirePermission(PERMISSIONS.DELIVERY_PARTNERS_MANAGE),
+  adminController.approveDeliveryPartnerKyc
+);
+
+/**
+ * @swagger
+ * /admin/delivery-partners/{id}/reject-kyc:
+ *   patch:
+ *     summary: Reject KYC — also rejects the account (requires the delivery_partners:manage permission)
+ *     description: Only valid from kycStatus=SUBMITTED. A reason is required and shown back to the partner.
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object, required: [reason], properties: { reason: { type: string } } }
+ *     responses:
+ *       200: { description: KYC rejected }
+ *       400: { description: 'Not currently SUBMITTED' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       422: { $ref: '#/components/responses/ValidationError' }
+ */
+router.patch(
+  '/delivery-partners/:id/reject-kyc',
+  requirePermission(PERMISSIONS.DELIVERY_PARTNERS_MANAGE),
+  rejectKycValidator,
+  validate,
+  adminController.rejectDeliveryPartnerKyc
+);
+
+/**
+ * @swagger
+ * /admin/delivery-partners/{id}/suspend:
+ *   patch:
+ *     summary: Suspend an active delivery partner (requires the delivery_partners:manage permission)
+ *     description: Only valid from accountStatus=ACTIVE. Also forces the partner OFFLINE immediately.
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema: { type: object, properties: { reason: { type: string } } }
+ *     responses:
+ *       200: { description: Suspended }
+ *       400: { description: 'Not currently ACTIVE' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       422: { $ref: '#/components/responses/ValidationError' }
+ */
+router.patch(
+  '/delivery-partners/:id/suspend',
+  requirePermission(PERMISSIONS.DELIVERY_PARTNERS_MANAGE),
+  suspendDeliveryPartnerValidator,
+  validate,
+  adminController.suspendDeliveryPartner
+);
+
+/**
+ * @swagger
+ * /admin/delivery-partners/{id}/reactivate:
+ *   patch:
+ *     summary: Reactivate a suspended delivery partner (requires the delivery_partners:manage permission)
+ *     description: Only valid from accountStatus=SUSPENDED, and only while KYC is still VERIFIED.
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Reactivated }
+ *       400: { description: 'Not currently SUSPENDED, or KYC no longer VERIFIED' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+router.patch(
+  '/delivery-partners/:id/reactivate',
+  requirePermission(PERMISSIONS.DELIVERY_PARTNERS_MANAGE),
+  adminController.reactivateDeliveryPartner
+);
 
 module.exports = router;

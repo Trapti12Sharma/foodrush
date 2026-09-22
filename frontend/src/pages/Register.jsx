@@ -66,6 +66,7 @@ export default function Register() {
           >
             <option value="CUSTOMER">Order food</option>
             <option value="RESTAURANT_OWNER">List my restaurant</option>
+            <option value="DELIVERY_PARTNER">Deliver for FoodRush</option>
           </select>
         </div>
 

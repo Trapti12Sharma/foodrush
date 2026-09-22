@@ -13,4 +13,5 @@ module.exports = {
   Payment: require('./Payment'),
   Refund: require('./Refund'),
   Counter: require('./Counter'),
+  DeliveryPartner: require('./DeliveryPartner'),
 };

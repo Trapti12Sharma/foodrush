@@ -5,6 +5,7 @@ const adminService = require('../services/admin.service');
 const orderService = require('../services/order.service');
 const auditService = require('../services/audit.service');
 const refundService = require('../services/refund.service');
+const deliveryPartnerService = require('../services/deliveryPartner.service');
 const Order = require('../models/Order');
 
 const getDashboard = asyncHandler(async (req, res) => {
@@ -94,6 +95,62 @@ const listRefunds = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, 'Refunds fetched', { refunds: items, pagination }));
 });
 
+const listDeliveryPartners = asyncHandler(async (req, res) => {
+  const { items, pagination } = await deliveryPartnerService.listForAdmin(req.query);
+  res.json(new ApiResponse(200, 'Delivery partners fetched', { deliveryPartners: items, pagination }));
+});
+
+const getDeliveryPartner = asyncHandler(async (req, res) => {
+  const partner = await deliveryPartnerService.getByIdForAdmin(req.params.id);
+  res.json(new ApiResponse(200, 'Delivery partner fetched', { deliveryPartner: partner }));
+});
+
+const approveDeliveryPartnerKyc = asyncHandler(async (req, res) => {
+  const partner = await deliveryPartnerService.approveKyc(req.params.id, req.user);
+  await auditService.record({
+    req,
+    action: 'delivery_partner.kyc_approve',
+    entityType: 'DeliveryPartner',
+    entityId: partner._id,
+  });
+  res.json(new ApiResponse(200, 'KYC approved — account activated', { deliveryPartner: partner }));
+});
+
+const rejectDeliveryPartnerKyc = asyncHandler(async (req, res) => {
+  const partner = await deliveryPartnerService.rejectKyc(req.params.id, req.user, req.body.reason);
+  await auditService.record({
+    req,
+    action: 'delivery_partner.kyc_reject',
+    entityType: 'DeliveryPartner',
+    entityId: partner._id,
+    metadata: { reason: req.body.reason },
+  });
+  res.json(new ApiResponse(200, 'KYC rejected', { deliveryPartner: partner }));
+});
+
+const suspendDeliveryPartner = asyncHandler(async (req, res) => {
+  const partner = await deliveryPartnerService.suspend(req.params.id, req.body.reason);
+  await auditService.record({
+    req,
+    action: 'delivery_partner.suspend',
+    entityType: 'DeliveryPartner',
+    entityId: partner._id,
+    metadata: { reason: req.body.reason || null },
+  });
+  res.json(new ApiResponse(200, 'Delivery partner suspended', { deliveryPartner: partner }));
+});
+
+const reactivateDeliveryPartner = asyncHandler(async (req, res) => {
+  const partner = await deliveryPartnerService.reactivate(req.params.id);
+  await auditService.record({
+    req,
+    action: 'delivery_partner.reactivate',
+    entityType: 'DeliveryPartner',
+    entityId: partner._id,
+  });
+  res.json(new ApiResponse(200, 'Delivery partner reactivated', { deliveryPartner: partner }));
+});
+
 module.exports = {
   getDashboard,
   listUsers,
@@ -105,4 +162,10 @@ module.exports = {
   listAuditLogs,
   refundOrder,
   listRefunds,
+  listDeliveryPartners,
+  getDeliveryPartner,
+  approveDeliveryPartnerKyc,
+  rejectDeliveryPartnerKyc,
+  suspendDeliveryPartner,
+  reactivateDeliveryPartner,
 };

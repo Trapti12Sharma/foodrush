@@ -98,6 +98,35 @@ const PAYMENT_ATTEMPT_STATUS = Object.freeze({
   FAILED: 'FAILED',
 });
 
+// M6 — Delivery Partner Foundation. Two separate, deliberately-coupled state
+// machines (see deliveryPartner.service.js for the exact transitions):
+// KYC is "did their documents check out"; account status is "may they actually
+// work right now" (a verified partner can still be suspended later for
+// unrelated reasons, which must not silently re-open their KYC review).
+const DELIVERY_KYC_STATUS = Object.freeze({
+  PENDING: 'PENDING', // profile exists but documents not yet submitted (not reachable via the current create flow, reserved for a future "save as draft")
+  SUBMITTED: 'SUBMITTED', // documents submitted, awaiting admin review
+  VERIFIED: 'VERIFIED',
+  REJECTED: 'REJECTED',
+});
+
+const DELIVERY_ACCOUNT_STATUS = Object.freeze({
+  PENDING: 'PENDING', // awaiting KYC review
+  ACTIVE: 'ACTIVE',
+  SUSPENDED: 'SUSPENDED',
+  REJECTED: 'REJECTED',
+});
+
+// Server-authoritative — never trust a client-supplied availability value beyond
+// this enum, and never let a partner go ONLINE without re-checking the two
+// statuses above at the moment of the request (see deliveryPartner.service.js).
+const DELIVERY_AVAILABILITY = Object.freeze({
+  OFFLINE: 'OFFLINE',
+  ONLINE: 'ONLINE',
+});
+
+const DELIVERY_VEHICLE_TYPES = Object.freeze(['BICYCLE', 'SCOOTER', 'MOTORCYCLE', 'CAR']);
+
 module.exports = {
   ROLES,
   ORDER_STATUS,
@@ -109,4 +138,8 @@ module.exports = {
   COUPON_FUNDED_BY,
   REFUND_STATUS,
   PAYMENT_ATTEMPT_STATUS,
+  DELIVERY_KYC_STATUS,
+  DELIVERY_ACCOUNT_STATUS,
+  DELIVERY_AVAILABILITY,
+  DELIVERY_VEHICLE_TYPES,
 };

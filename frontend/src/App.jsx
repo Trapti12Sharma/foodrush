@@ -9,6 +9,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import { ADMIN_PANEL_ROLES } from './constants/roles';
 import MainLayout from './layouts/MainLayout';
 import RestaurantOwnerLayout from './layouts/RestaurantOwnerLayout';
+import DeliveryPartnerLayout from './layouts/DeliveryPartnerLayout';
 import AdminLayout from './layouts/AdminLayout';
 
 import Home from './pages/Home';
@@ -29,11 +30,14 @@ import OwnerMenu from './pages/owner/Menu';
 import OwnerCategories from './pages/owner/Categories';
 import OwnerProfile from './pages/owner/Profile';
 import OwnerReviews from './pages/owner/Reviews';
+import DeliveryDashboard from './pages/delivery/Dashboard';
+import DeliveryProfile from './pages/delivery/Profile';
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminUsers from './pages/admin/Users';
 import AdminRestaurants from './pages/admin/Restaurants';
 import AdminOrders from './pages/admin/Orders';
 import AdminCoupons from './pages/admin/Coupons';
+import AdminDeliveryPartners from './pages/admin/DeliveryPartners';
 import Profile from './pages/Profile';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
@@ -125,6 +129,18 @@ function App() {
               </Route>
 
               <Route
+                path="/delivery"
+                element={
+                  <ProtectedRoute roles={['DELIVERY_PARTNER']}>
+                    <DeliveryPartnerLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route path="dashboard" element={<DeliveryDashboard />} />
+                <Route path="profile" element={<DeliveryProfile />} />
+              </Route>
+
+              <Route
                 path="/admin"
                 element={
                   <ProtectedRoute roles={ADMIN_PANEL_ROLES}>
@@ -137,6 +153,7 @@ function App() {
                 <Route path="restaurants" element={<AdminRestaurants />} />
                 <Route path="orders" element={<AdminOrders />} />
                 <Route path="coupons" element={<AdminCoupons />} />
+                <Route path="delivery-partners" element={<AdminDeliveryPartners />} />
               </Route>
 
               <Route path="*" element={<NotFound />} />

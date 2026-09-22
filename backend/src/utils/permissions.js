@@ -22,6 +22,7 @@ const PERMISSIONS = Object.freeze({
   ADMINS_MANAGE: 'admins:manage', // change status of staff accounts
   SETTINGS_MANAGE: 'settings:manage',
   REFUNDS_MANAGE: 'refunds:manage',
+  DELIVERY_PARTNERS_MANAGE: 'delivery_partners:manage', // view KYC details, approve/reject KYC, suspend/reactivate
 });
 
 const P = PERMISSIONS;
@@ -40,6 +41,7 @@ const ADMIN_PERMISSIONS = [
   P.COUPONS_MANAGE,
   P.REVIEWS_MODERATE,
   P.REFUNDS_MANAGE,
+  P.DELIVERY_PARTNERS_MANAGE,
 ];
 
 const ROLE_PERMISSIONS = Object.freeze({
@@ -53,8 +55,7 @@ const ROLE_PERMISSIONS = Object.freeze({
     P.RESTAURANTS_MANAGE,
     P.REVIEWS_MODERATE,
   ],
-  // Delivery-specific permissions arrive with the delivery milestone.
-  [ROLES.DELIVERY_MANAGER]: [P.DASHBOARD_VIEW, P.ORDERS_READ_ALL],
+  [ROLES.DELIVERY_MANAGER]: [P.DASHBOARD_VIEW, P.ORDERS_READ_ALL, P.DELIVERY_PARTNERS_MANAGE],
   [ROLES.SUPPORT_AGENT]: [P.DASHBOARD_VIEW, P.USERS_READ, P.ORDERS_READ_ALL],
   [ROLES.RESTAURANT_OWNER]: [],
   [ROLES.DELIVERY_PARTNER]: [],

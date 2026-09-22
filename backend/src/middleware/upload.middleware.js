@@ -8,8 +8,9 @@ const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 // What an upload is FOR decides who may do it. Profile photos are open to any signed-in
 // user; catalog images (restaurant, food, category) only to restaurant owners and the
-// staff who manage restaurants — so a customer account can't be used as free image hosting.
-const PURPOSES = Object.freeze(['avatar', 'restaurant', 'food', 'category']);
+// staff who manage restaurants; kyc documents only to delivery partners — so a customer
+// account can't be used as free image hosting.
+const PURPOSES = Object.freeze(['avatar', 'restaurant', 'food', 'category', 'kyc']);
 const DEFAULT_PURPOSE = 'avatar';
 
 // Checked BEFORE multer runs, so an unauthorised request never gets its file buffered.
@@ -19,7 +20,10 @@ function authorizeUpload(req, res, next) {
     return next(ApiError.badRequest(`purpose must be one of: ${PURPOSES.join(', ')}`));
   }
   const mayUploadCatalogImages = req.user.role === ROLES.RESTAURANT_OWNER || hasPermission(req.user, PERMISSIONS.RESTAURANTS_MANAGE);
-  if (purpose !== 'avatar' && !mayUploadCatalogImages) {
+  if (purpose === 'kyc' && req.user.role !== ROLES.DELIVERY_PARTNER) {
+    return next(ApiError.forbidden('You do not have permission to upload this kind of image'));
+  }
+  if (purpose !== 'avatar' && purpose !== 'kyc' && !mayUploadCatalogImages) {
     return next(ApiError.forbidden('You do not have permission to upload this kind of image'));
   }
   req.uploadPurpose = purpose;

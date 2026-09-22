@@ -140,6 +140,14 @@ const orderSchema = new mongoose.Schema(
       ref: 'Payment',
       default: null,
     },
+    // Foundation only (M6) — never set by any code yet. Reserved so a later
+    // dispatch/assignment milestone can populate it without another schema change.
+    deliveryPartner: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'DeliveryPartner',
+      default: null,
+      index: true,
+    },
     estimatedDeliveryTime: {
       type: Date,
       default: null,
