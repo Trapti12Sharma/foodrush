@@ -2,6 +2,9 @@
 
 const DEFAULT_DELIVERY_RADIUS_KM = 5;
 const MAX_SEARCH_RADIUS_KM = 50;
+// How far from the restaurant (pickup point) dispatch looks for an available rider (M7).
+// A separate knob from restaurant search radius even though it starts at the same value.
+const DEFAULT_RIDER_SEARCH_RADIUS_KM = 10;
 
 // Rough delivery-time model until real routing (Google Routes / rider ETA) lands with
 // the delivery milestone: the restaurant's own preparation+base time, plus travel at
@@ -46,6 +49,7 @@ const roundTo = (n, decimals = 1) => Math.round(n * 10 ** decimals) / 10 ** deci
 module.exports = {
   DEFAULT_DELIVERY_RADIUS_KM,
   MAX_SEARCH_RADIUS_KM,
+  DEFAULT_RIDER_SEARCH_RADIUS_KM,
   MINUTES_PER_KM,
   isValidLatitude,
   isValidLongitude,

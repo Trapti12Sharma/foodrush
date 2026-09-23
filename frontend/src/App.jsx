@@ -38,6 +38,7 @@ import AdminRestaurants from './pages/admin/Restaurants';
 import AdminOrders from './pages/admin/Orders';
 import AdminCoupons from './pages/admin/Coupons';
 import AdminDeliveryPartners from './pages/admin/DeliveryPartners';
+import AdminDeliveryAssignments from './pages/admin/DeliveryAssignments';
 import Profile from './pages/Profile';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
@@ -154,6 +155,7 @@ function App() {
                 <Route path="orders" element={<AdminOrders />} />
                 <Route path="coupons" element={<AdminCoupons />} />
                 <Route path="delivery-partners" element={<AdminDeliveryPartners />} />
+                <Route path="delivery-assignments" element={<AdminDeliveryAssignments />} />
               </Route>
 
               <Route path="*" element={<NotFound />} />

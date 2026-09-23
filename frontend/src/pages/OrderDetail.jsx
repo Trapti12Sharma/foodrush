@@ -174,6 +174,16 @@ export default function OrderDetail() {
         <p className="mt-1 text-gray-600">
           {order.paymentMethod === 'COD' ? 'Cash on Delivery' : 'Online Payment'} · {order.paymentStatus}
         </p>
+        {order.deliveryPartner && (
+          <>
+            <p className="mt-3 font-semibold text-gray-700">Delivery partner</p>
+            <p className="mt-1 text-gray-600">
+              {order.deliveryPartner.fullName} · {order.deliveryPartner.vehicleType}
+              {order.deliveryPartner.vehicleNumber ? ` (${order.deliveryPartner.vehicleNumber})` : ''}
+              {order.deliveryPartner.phone ? ` · ${order.deliveryPartner.phone}` : ''}
+            </p>
+          </>
+        )}
         {(order.orderStatus === 'REFUND_PENDING' || order.orderStatus === 'REFUNDED') && (
           <p className="mt-1 text-xs text-gray-500">
             {order.orderStatus === 'REFUNDED' ? 'Your refund has been completed.' : 'Your refund is being processed by the payment gateway.'}

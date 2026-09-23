@@ -17,6 +17,7 @@ router.use('/favorites', require('./favorite.routes'));
 router.use('/uploads', require('./upload.routes'));
 router.use('/geo', require('./geo.routes'));
 router.use('/delivery-partners', require('./deliveryPartner.routes'));
+router.use('/delivery-assignments', require('./deliveryAssignment.routes'));
 
 router.get('/', (req, res) => {
   res.json({ success: true, message: 'FoodRush API root', data: { version: '1.0.0' } });

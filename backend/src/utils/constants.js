@@ -127,6 +127,44 @@ const DELIVERY_AVAILABILITY = Object.freeze({
 
 const DELIVERY_VEHICLE_TYPES = Object.freeze(['BICYCLE', 'SCOOTER', 'MOTORCYCLE', 'CAR']);
 
+// M7 — Delivery Assignment & Dispatch. A single order can accumulate several
+// DeliveryAssignment rows over time (one per rider it was offered to); at most one
+// of them may ever be "active" (OFFERED/ACCEPTED/ASSIGNED) at once — enforced by a
+// partial unique index on `order` in the model, not just here.
+//
+// OFFERED   -> sent to one rider, awaiting their response, has an expiresAt.
+// ACCEPTED  -> the rider said yes (acceptedAt recorded). Immediately followed, in
+//              the same request, by an atomic attempt to claim the order itself.
+// ASSIGNED  -> that claim succeeded (assignedAt recorded) — this is now THE
+//              confirmed rider for the order. Kept distinct from ACCEPTED because
+//              the claim is a separate atomic step that can, in principle, lose a
+//              race (see deliveryAssignment.service.js) — an assignment that loses
+//              that race is CANCELLED instead, never left stuck at ACCEPTED.
+// REJECTED  -> the rider declined (rejectedAt + optional rejectionReason).
+// EXPIRED   -> nobody responded before expiresAt. Detected lazily (via the
+//              expiresAt check baked into every relevant query), never by a
+//              background timer — see deliveryAssignment.service.js.
+// CANCELLED -> the offer/assignment was called off before completion (order
+//              cancelled/rejected, an admin cancelled it, or it lost the claim race).
+// COMPLETED -> the order it belongs to reached DELIVERED.
+const DELIVERY_ASSIGNMENT_STATUS = Object.freeze({
+  OFFERED: 'OFFERED',
+  ACCEPTED: 'ACCEPTED',
+  ASSIGNED: 'ASSIGNED',
+  REJECTED: 'REJECTED',
+  EXPIRED: 'EXPIRED',
+  CANCELLED: 'CANCELLED',
+  COMPLETED: 'COMPLETED',
+});
+
+// "Active" = still occupying the one-active-assignment-per-order slot, and (for
+// ACCEPTED/ASSIGNED) still occupying the rider's one-active-delivery slot.
+const ACTIVE_ASSIGNMENT_STATUSES = Object.freeze([
+  DELIVERY_ASSIGNMENT_STATUS.OFFERED,
+  DELIVERY_ASSIGNMENT_STATUS.ACCEPTED,
+  DELIVERY_ASSIGNMENT_STATUS.ASSIGNED,
+]);
+
 module.exports = {
   ROLES,
   ORDER_STATUS,
@@ -142,4 +180,6 @@ module.exports = {
   DELIVERY_ACCOUNT_STATUS,
   DELIVERY_AVAILABILITY,
   DELIVERY_VEHICLE_TYPES,
+  DELIVERY_ASSIGNMENT_STATUS,
+  ACTIVE_ASSIGNMENT_STATUSES,
 };

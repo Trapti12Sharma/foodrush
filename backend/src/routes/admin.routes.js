@@ -13,6 +13,8 @@ const refundOrderValidator = [
 
 const rejectKycValidator = [body('reason').trim().notEmpty().withMessage('A rejection reason is required').isLength({ max: 500 })];
 const suspendDeliveryPartnerValidator = [body('reason').optional({ checkFalsy: true }).trim().isLength({ max: 500 })];
+const assignOrderValidator = [body('deliveryPartnerId').optional({ checkFalsy: true }).isMongoId().withMessage('deliveryPartnerId must be a valid id')];
+const cancelAssignmentValidator = [body('reason').optional({ checkFalsy: true }).trim().isLength({ max: 500 })];
 
 const router = express.Router();
 
@@ -475,6 +477,106 @@ router.patch(
   '/delivery-partners/:id/reactivate',
   requirePermission(PERMISSIONS.DELIVERY_PARTNERS_MANAGE),
   adminController.reactivateDeliveryPartner
+);
+
+/**
+ * @swagger
+ * /admin/delivery-assignments:
+ *   get:
+ *     summary: List/filter delivery assignments (requires the delivery_assignments:manage permission)
+ *     description: One row per rider an order was offered to — an order can have several over its dispatch history. Filter by order to see one order's full attempt history.
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: query, name: status, schema: { type: string, enum: [OFFERED, ACCEPTED, ASSIGNED, REJECTED, EXPIRED, CANCELLED, COMPLETED] } }
+ *       - { in: query, name: order, schema: { type: string } }
+ *       - { in: query, name: deliveryPartner, schema: { type: string } }
+ *       - { in: query, name: page, schema: { type: integer, default: 1 } }
+ *       - { in: query, name: limit, schema: { type: integer, default: 12 } }
+ *     responses:
+ *       200: { description: A page of delivery assignments }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+router.get('/delivery-assignments', requirePermission(PERMISSIONS.DELIVERY_ASSIGNMENTS_MANAGE), adminController.listDeliveryAssignments);
+
+/**
+ * @swagger
+ * /admin/orders/{id}/eligible-riders:
+ *   get:
+ *     summary: Eligible nearby ONLINE delivery partners for an order (requires the delivery_assignments:manage permission)
+ *     description: Same real-geography ACTIVE+VERIFIED+ONLINE+not-busy eligibility rule dispatch itself uses — never a random or insertion-order list.
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Eligible riders, nearest first }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+router.get('/orders/:id/eligible-riders', requirePermission(PERMISSIONS.DELIVERY_ASSIGNMENTS_MANAGE), adminController.listEligibleRiders);
+
+/**
+ * @swagger
+ * /admin/orders/{id}/assign:
+ *   post:
+ *     summary: Assign a delivery partner to a READY_FOR_PICKUP order (requires the delivery_assignments:manage permission)
+ *     description: >
+ *       With deliveryPartnerId, offers that specific eligible rider. Without it, runs the same automatic
+ *       nearest-eligible-candidate dispatch the system uses on its own — useful to retry after an offer expired.
+ *       Creating a second active offer for an order that already has one fails with 409 (a DB-level guarantee,
+ *       not just an application check).
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema: { type: object, properties: { deliveryPartnerId: { type: string } } }
+ *     responses:
+ *       201: { description: Delivery offer created }
+ *       400: { description: 'Order not READY_FOR_PICKUP, already assigned, or the chosen rider is not eligible' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       409: { description: This order already has an active delivery assignment }
+ *       422: { $ref: '#/components/responses/ValidationError' }
+ */
+router.post(
+  '/orders/:id/assign',
+  requirePermission(PERMISSIONS.DELIVERY_ASSIGNMENTS_MANAGE),
+  assignOrderValidator,
+  validate,
+  adminController.assignOrder
+);
+
+/**
+ * @swagger
+ * /admin/delivery-assignments/{id}/cancel:
+ *   patch:
+ *     summary: Cancel an active delivery assignment (requires the delivery_assignments:manage permission)
+ *     description: Only valid while OFFERED/ACCEPTED/ASSIGNED. If the assignment had already claimed the order, the order's deliveryPartner is cleared (its orderStatus is left untouched) so it can be redispatched.
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema: { type: object, properties: { reason: { type: string } } }
+ *     responses:
+ *       200: { description: Cancelled }
+ *       400: { description: Not currently active }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       422: { $ref: '#/components/responses/ValidationError' }
+ */
+router.patch(
+  '/delivery-assignments/:id/cancel',
+  requirePermission(PERMISSIONS.DELIVERY_ASSIGNMENTS_MANAGE),
+  cancelAssignmentValidator,
+  validate,
+  adminController.cancelDeliveryAssignment
 );
 
 module.exports = router;

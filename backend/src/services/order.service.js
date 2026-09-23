@@ -8,6 +8,7 @@ const ApiError = require('../utils/ApiError');
 const paymentService = require('./payment.service');
 const couponService = require('./coupon.service');
 const refundService = require('./refund.service');
+const deliveryAssignmentService = require('./deliveryAssignment.service');
 const restaurantGeoService = require('./restaurantGeo.service');
 const { isOpenNow } = require('../utils/openingHours');
 const { nextOrderNumber } = require('../utils/orderNumber');
@@ -255,7 +256,9 @@ async function listOrdersForUser(user, query) {
 }
 
 async function getOrderById(user, orderId) {
-  const order = await Order.findById(orderId).populate('restaurant', 'name image owner');
+  const order = await Order.findById(orderId)
+    .populate('restaurant', 'name image owner')
+    .populate('deliveryPartner', deliveryAssignmentService.PUBLIC_RIDER_FIELDS);
   if (!order) throw ApiError.notFound('Order not found');
 
   const isCustomer = order.user.toString() === user._id.toString();
@@ -283,7 +286,27 @@ async function updateOrderStatus(user, orderId, nextStatus) {
   order.statusHistory.push({ status: nextStatus, changedBy: user._id });
   await order.save();
 
-  if (nextStatus === ORDER_STATUS.REJECTED) await autoRefundIfPaid(order, user, 'restaurant_rejection');
+  if (nextStatus === ORDER_STATUS.REJECTED) {
+    await autoRefundIfPaid(order, user, 'restaurant_rejection');
+    await deliveryAssignmentService.onOrderStatusChanged(order, user);
+  }
+
+  // The restaurant marking food ready is the dispatch trigger (M7) — find an
+  // eligible nearby ONLINE rider and offer them the delivery. Best-effort: no
+  // rider being available right now must never block the restaurant's own status
+  // change; the order simply stays READY_FOR_PICKUP (manually deliverable, or
+  // retryable by an admin) until someone accepts.
+  if (nextStatus === ORDER_STATUS.READY_FOR_PICKUP) {
+    await deliveryAssignmentService.dispatchOrder(order).catch((err) => {
+      console.error(`Dispatch failed for order ${order.orderNumber}:`, err.message);
+    });
+  }
+  // Any order that reaches DELIVERED closes out its assignment as COMPLETED; this
+  // also covers the restaurant's own manual OUT_FOR_DELIVERY->DELIVERED path when
+  // no rider was ever assigned (a no-op in that case).
+  if (nextStatus === ORDER_STATUS.DELIVERED) {
+    await deliveryAssignmentService.onOrderStatusChanged(order, user);
+  }
 
   return order;
 }
@@ -316,6 +339,7 @@ async function cancelOrder(user, orderId, reason) {
 
   const refundReason = isCustomer && !isOwner && !isAdmin ? 'customer_cancellation' : 'restaurant_unavailable';
   await autoRefundIfPaid(order, user, refundReason);
+  await deliveryAssignmentService.onOrderStatusChanged(order, user);
 
   return order;
 }

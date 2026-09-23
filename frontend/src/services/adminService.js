@@ -20,4 +20,9 @@ export const adminService = {
   suspendDeliveryPartner: (id, reason) =>
     api.patch(`/admin/delivery-partners/${id}/suspend`, { reason }).then((r) => r.data.deliveryPartner),
   reactivateDeliveryPartner: (id) => api.patch(`/admin/delivery-partners/${id}/reactivate`).then((r) => r.data.deliveryPartner),
+  listDeliveryAssignments: (params) => api.get('/admin/delivery-assignments', { params }).then((r) => r.data),
+  listEligibleRiders: (orderId) => api.get(`/admin/orders/${orderId}/eligible-riders`).then((r) => r.data.riders),
+  assignOrder: (orderId, deliveryPartnerId) =>
+    api.post(`/admin/orders/${orderId}/assign`, deliveryPartnerId ? { deliveryPartnerId } : {}).then((r) => r.data.assignment),
+  cancelDeliveryAssignment: (id, reason) => api.patch(`/admin/delivery-assignments/${id}/cancel`, { reason }).then((r) => r.data.assignment),
 };

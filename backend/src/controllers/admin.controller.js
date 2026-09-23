@@ -6,6 +6,7 @@ const orderService = require('../services/order.service');
 const auditService = require('../services/audit.service');
 const refundService = require('../services/refund.service');
 const deliveryPartnerService = require('../services/deliveryPartner.service');
+const deliveryAssignmentService = require('../services/deliveryAssignment.service');
 const Order = require('../models/Order');
 
 const getDashboard = asyncHandler(async (req, res) => {
@@ -151,6 +152,40 @@ const reactivateDeliveryPartner = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, 'Delivery partner reactivated', { deliveryPartner: partner }));
 });
 
+const listDeliveryAssignments = asyncHandler(async (req, res) => {
+  const { items, pagination } = await deliveryAssignmentService.listForAdmin(req.query);
+  res.json(new ApiResponse(200, 'Delivery assignments fetched', { assignments: items, pagination }));
+});
+
+const listEligibleRiders = asyncHandler(async (req, res) => {
+  const riders = await deliveryAssignmentService.listEligibleRidersForOrder(req.params.id);
+  res.json(new ApiResponse(200, 'Eligible delivery partners fetched', { riders }));
+});
+
+const assignOrder = asyncHandler(async (req, res) => {
+  const assignment = await deliveryAssignmentService.adminAssign(req.params.id, req.body.deliveryPartnerId, req.user);
+  await auditService.record({
+    req,
+    action: 'order.assign_delivery_partner',
+    entityType: 'Order',
+    entityId: req.params.id,
+    metadata: { deliveryPartner: assignment.deliveryPartner.toString(), manual: Boolean(req.body.deliveryPartnerId) },
+  });
+  res.status(201).json(new ApiResponse(201, 'Delivery offer created', { assignment }));
+});
+
+const cancelDeliveryAssignment = asyncHandler(async (req, res) => {
+  const assignment = await deliveryAssignmentService.cancelAssignment(req.params.id, req.user, req.body.reason);
+  await auditService.record({
+    req,
+    action: 'delivery_assignment.cancel',
+    entityType: 'DeliveryAssignment',
+    entityId: assignment._id,
+    metadata: { reason: req.body.reason || null },
+  });
+  res.json(new ApiResponse(200, 'Delivery assignment cancelled', { assignment }));
+});
+
 module.exports = {
   getDashboard,
   listUsers,
@@ -168,4 +203,8 @@ module.exports = {
   rejectDeliveryPartnerKyc,
   suspendDeliveryPartner,
   reactivateDeliveryPartner,
+  listDeliveryAssignments,
+  listEligibleRiders,
+  assignOrder,
+  cancelDeliveryAssignment,
 };
