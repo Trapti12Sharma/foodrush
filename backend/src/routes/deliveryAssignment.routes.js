@@ -3,6 +3,7 @@ const { body } = require('express-validator');
 const deliveryAssignmentController = require('../controllers/deliveryAssignment.controller');
 const validate = require('../middleware/validate');
 const { authenticateUser, authorizeRoles } = require('../middleware/auth.middleware');
+const { otpLimiter } = require('../middleware/rateLimiter');
 const { ROLES } = require('../utils/constants');
 
 const router = express.Router();
@@ -97,5 +98,49 @@ router.patch('/:id/accept', deliveryAssignmentController.accept);
  *       404: { $ref: '#/components/responses/NotFound' }
  */
 router.patch('/:id/reject', [body('reason').optional({ checkFalsy: true }).trim().isLength({ max: 300 })], validate, deliveryAssignmentController.reject);
+
+/**
+ * @swagger
+ * /delivery-assignments/{id}/verify-otp:
+ *   post:
+ *     summary: Verify the delivery OTP and complete this delivery (M9)
+ *     description: >
+ *       The ONLY way a rider (as opposed to the restaurant/admin's separate, unchanged manual
+ *       status-update endpoint) may mark their own assigned delivery DELIVERED. Requires the
+ *       assignment to be ASSIGNED, the caller to be its rider, and to still be ACTIVE + KYC
+ *       VERIFIED. Every attempt — right or wrong — counts against the OTP's limited attempt
+ *       budget; exceeding it permanently locks that OTP (no self-service unlock in this
+ *       milestone). Safe under concurrent requests — see deliveryAssignment.service.js.
+ *       On success: order -> DELIVERED, this assignment -> COMPLETED, the existing M8
+ *       tracking:ended event fires, and a "your order was delivered" email is sent (best-effort).
+ *     tags: [Delivery Assignments]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [otp]
+ *             properties:
+ *               otp: { type: string, example: '482913', description: 'Exactly 6 digits' }
+ *     responses:
+ *       200: { description: Delivery completed }
+ *       400: { description: 'Wrong/expired/locked OTP, wrong assignment state, or rider no longer eligible (not active/verified)' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { description: This assignment does not belong to you }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       409: { description: This order has already been marked delivered (lost a concurrent race) }
+ *       422: { $ref: '#/components/responses/ValidationError' }
+ *       429: { description: Too many requests }
+ */
+router.post(
+  '/:id/verify-otp',
+  otpLimiter,
+  [body('otp').isString().trim().matches(/^\d{6}$/).withMessage('otp must be exactly 6 digits')],
+  validate,
+  deliveryAssignmentController.verifyOtp
+);
 
 module.exports = router;

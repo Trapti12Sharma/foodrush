@@ -39,8 +39,8 @@ function apiOrigin() {
 // Shown on the customer/owner order-detail page once an order is OUT_FOR_DELIVERY
 // with an assigned rider. Renders nothing fake: no map, no coordinates, and no
 // "Live" claim until a real one has actually arrived.
-export default function DeliveryTracker({ orderId }) {
-  const { status, location, rider } = useOrderTracking(orderId, true);
+export default function DeliveryTracker({ orderId, onDelivered }) {
+  const { status, location, rider } = useOrderTracking(orderId, true, onDelivered);
   const [mapsEnabled, setMapsEnabled] = useState(false);
   const secondsAgo = useSecondsAgo(location?.updatedAt);
 

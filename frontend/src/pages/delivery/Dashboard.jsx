@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Bike, Wallet, MapPin, Store, Clock, Navigation, Radio } from 'lucide-react';
+import { Bike, Wallet, MapPin, Store, Clock, Navigation, Radio, ShieldCheck } from 'lucide-react';
 import { useDeliveryPartner } from '../../context/DeliveryPartnerContext';
 import { deliveryPartnerService } from '../../services/deliveryPartnerService';
 import { deliveryAssignmentService } from '../../services/deliveryAssignmentService';
@@ -112,7 +112,62 @@ function LocationSharingControl({ assignmentId }) {
   );
 }
 
-function CurrentDeliveryCard({ assignment }) {
+function OtpVerifyForm({ assignmentId, onDelivered }) {
+  const [otp, setOtp] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+  const isValidFormat = /^\d{6}$/.test(otp);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!isValidFormat || submitting) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const { order } = await deliveryAssignmentService.verifyOtp(assignmentId, otp);
+      toast.success('Delivery completed!');
+      onDelivered(order);
+    } catch (err) {
+      setError(err.message || 'Could not verify this OTP');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-3 rounded-lg bg-white p-3">
+      <p className="flex items-center gap-1.5 text-xs font-semibold text-gray-700">
+        <ShieldCheck size={14} /> Enter delivery OTP
+      </p>
+      <p className="mt-1 text-xs text-gray-500">Ask the customer for the 6-digit code shown on their order page.</p>
+      <div className="mt-2 flex gap-2">
+        <input
+          type="text"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={6}
+          value={otp}
+          onChange={(e) => {
+            setOtp(e.target.value.replace(/\D/g, '').slice(0, 6));
+            setError(null);
+          }}
+          placeholder="123456"
+          className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-center text-lg tracking-[0.3em] outline-none focus:border-brand-400"
+        />
+        <button
+          type="submit"
+          disabled={!isValidFormat || submitting}
+          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {submitting ? 'Verifying…' : 'Complete Delivery'}
+        </button>
+      </div>
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+    </form>
+  );
+}
+
+function CurrentDeliveryCard({ assignment, onDelivered }) {
   const order = assignment.order;
   return (
     <div className="rounded-xl border border-brand-200 bg-brand-50 p-4">
@@ -133,6 +188,7 @@ function CurrentDeliveryCard({ assignment }) {
         Order {order?.orderNumber} · {order?.paymentMethod === 'COD' ? `Collect ₹${order?.totalAmount?.toFixed(2)}` : 'Prepaid'}
       </p>
       <LocationSharingControl assignmentId={assignment._id} />
+      <OtpVerifyForm assignmentId={assignment._id} onDelivered={onDelivered} />
     </div>
   );
 }
@@ -224,11 +280,20 @@ export default function Dashboard() {
     }
   }
 
+  // Refreshing from the server (rather than just clearing local state) is what
+  // actually stops location sharing too: currentDelivery becomes null, so
+  // CurrentDeliveryCard (and the LocationSharingControl/useLocationSharing hook
+  // inside it) unmounts, which already stops navigator.geolocation.watchPosition
+  // and disconnects its socket on cleanup — no separate "stop tracking" call needed.
+  function handleDelivered() {
+    load();
+  }
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
 
-      {currentDelivery && <CurrentDeliveryCard assignment={currentDelivery} />}
+      {currentDelivery && <CurrentDeliveryCard assignment={currentDelivery} onDelivered={handleDelivered} />}
 
       {isOnline && !currentDelivery && (
         <div className="mt-4">

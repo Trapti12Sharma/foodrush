@@ -57,4 +57,19 @@ const getTracking = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, 'Tracking snapshot fetched', snapshot));
 });
 
-module.exports = { createOrder, retryPayment, listOrders, getOrder, updateStatus, cancelOrder, verifyPayment, getTracking };
+const getDeliveryOtp = asyncHandler(async (req, res) => {
+  const result = await orderService.getDeliveryOtp(req.user, req.params.id);
+  res.json(new ApiResponse(200, 'Delivery OTP status fetched', result));
+});
+
+module.exports = {
+  createOrder,
+  retryPayment,
+  listOrders,
+  getOrder,
+  updateStatus,
+  cancelOrder,
+  verifyPayment,
+  getTracking,
+  getDeliveryOtp,
+};

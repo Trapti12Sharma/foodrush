@@ -162,6 +162,45 @@ router.get('/:id/tracking', orderController.getTracking);
 
 /**
  * @swagger
+ * /orders/{id}/delivery-otp:
+ *   get:
+ *     summary: The delivery-completion OTP for this order (M9) — the owning customer only
+ *     description: >
+ *       Deliberately narrower than every other order endpoint: only the customer who placed the
+ *       order — never the restaurant owner, the assigned rider, or an admin (there is no
+ *       operational OTP-viewing override in this milestone). `available: false` whenever there is
+ *       nothing to show (not yet OUT_FOR_DELIVERY, already delivered/expired/locked) — this is a
+ *       normal state, not an error, exactly like /tracking's own `tracking: false`.
+ *     tags: [Orders]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: OTP status (and the code itself, only while available)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     available: { type: boolean }
+ *                     orderStatus: { type: string }
+ *                     otp: { type: string, example: '482913', description: 'Present only when available is true' }
+ *                     expiresAt: { type: string, format: date-time }
+ *                     attemptsRemaining: { type: integer }
+ *                     locked: { type: boolean }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+router.get('/:id/delivery-otp', orderController.getDeliveryOtp);
+
+/**
+ * @swagger
  * /orders/{id}/status:
  *   patch:
  *     summary: Advance an order's status (the restaurant that owns it, or admin)

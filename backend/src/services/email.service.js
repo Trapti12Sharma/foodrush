@@ -93,4 +93,24 @@ function passwordChangedEmail({ name }) {
   };
 }
 
-module.exports = { PROVIDERS, getProvider, isEmailConfigured, sendMail, passwordResetEmail, passwordChangedEmail, escapeHtml };
+function orderDeliveredEmail({ name, orderNumber }) {
+  return {
+    subject: `Your FoodRush order ${orderNumber} has been delivered`,
+    text: `Hi ${name},\n\nYour FoodRush order ${orderNumber} has been delivered. We hope you enjoy it!\n\nYou can rate your order and the restaurant from your order history.`,
+    html:
+      `<p>Hi ${escapeHtml(name)},</p>` +
+      `<p>Your FoodRush order <strong>${escapeHtml(orderNumber)}</strong> has been delivered. We hope you enjoy it!</p>` +
+      '<p>You can rate your order and the restaurant from your order history.</p>',
+  };
+}
+
+module.exports = {
+  PROVIDERS,
+  getProvider,
+  isEmailConfigured,
+  sendMail,
+  passwordResetEmail,
+  passwordChangedEmail,
+  orderDeliveredEmail,
+  escapeHtml,
+};

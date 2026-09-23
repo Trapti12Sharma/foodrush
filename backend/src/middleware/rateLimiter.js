@@ -57,4 +57,19 @@ const geoLimiter = rateLimit({
   },
 });
 
-module.exports = { apiLimiter, authLimiter, uploadLimiter, geoLimiter };
+// Defense in depth alongside the per-order deliveryOtpAttempts counter (the real
+// brute-force protection — see deliveryOtp.service.js): this just stops one IP
+// from hammering the endpoint across many different assignment ids.
+const otpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isTest ? 100000 : 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many attempts. Please try again later.',
+    errors: [],
+  },
+});
+
+module.exports = { apiLimiter, authLimiter, uploadLimiter, geoLimiter, otpLimiter };

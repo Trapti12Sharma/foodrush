@@ -11,4 +11,6 @@ export const orderService = {
   // Checkout, etc.) — same { order, razorpay } shape as create().
   retryPayment: (id) => api.post(`/orders/${id}/retry-payment`).then((r) => r.data),
   verifyPayment: (id, payload) => api.post(`/orders/${id}/verify-payment`, payload).then((r) => r.data.order),
+  // { available, otp?, expiresAt?, attemptsRemaining?, locked? } — otp is present only while available.
+  getDeliveryOtp: (id) => api.get(`/orders/${id}/delivery-otp`).then((r) => r.data),
 };

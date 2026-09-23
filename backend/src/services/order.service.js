@@ -10,6 +10,7 @@ const paymentService = require('./payment.service');
 const couponService = require('./coupon.service');
 const refundService = require('./refund.service');
 const deliveryAssignmentService = require('./deliveryAssignment.service');
+const deliveryOtpService = require('./deliveryOtp.service');
 const restaurantGeoService = require('./restaurantGeo.service');
 const { isOpenNow } = require('../utils/openingHours');
 const { nextOrderNumber } = require('../utils/orderNumber');
@@ -316,6 +317,43 @@ async function getOrderTrackingSnapshot(user, orderId) {
   };
 }
 
+// GET /orders/:id/delivery-otp — deliberately NARROWER than canAccessOrder: only
+// the customer who placed the order, full stop. The restaurant owner, the
+// assigned rider, and admins all use canAccessOrder elsewhere in this file, but
+// none of them may ever see the plaintext OTP — that is the entire point of this
+// milestone, so this check does not delegate to the shared helper at all. A
+// wrong owner (or a non-existent order) gets an identical 404, never confirming
+// whether the order exists or has an OTP.
+async function getDeliveryOtp(user, orderId) {
+  const order = await Order.findById(orderId).select(
+    '+deliveryOtpCipher +deliveryOtpExpiresAt +deliveryOtpAttempts +deliveryOtpVerifiedAt user orderStatus'
+  );
+  if (!order || order.user.toString() !== user._id.toString()) throw ApiError.notFound('Order not found');
+
+  const now = new Date();
+  const notEligible =
+    order.orderStatus !== ORDER_STATUS.OUT_FOR_DELIVERY ||
+    !order.deliveryOtpCipher ||
+    order.deliveryOtpVerifiedAt || // already used — never re-served, even if the state above were somehow still OUT_FOR_DELIVERY
+    order.deliveryOtpExpiresAt <= now;
+  if (notEligible) {
+    return { available: false, orderStatus: order.orderStatus };
+  }
+  if (order.deliveryOtpAttempts >= deliveryOtpService.MAX_ATTEMPTS) {
+    return { available: false, orderStatus: order.orderStatus, locked: true };
+  }
+
+  const otp = deliveryOtpService.decryptOtp(order.deliveryOtpCipher);
+  if (!otp) return { available: false, orderStatus: order.orderStatus }; // corrupt/tampered ciphertext — never surfaced as a crash
+
+  return {
+    available: true,
+    otp,
+    expiresAt: order.deliveryOtpExpiresAt,
+    attemptsRemaining: deliveryOtpService.MAX_ATTEMPTS - order.deliveryOtpAttempts,
+  };
+}
+
 async function updateOrderStatus(user, orderId, nextStatus) {
   const order = await Order.findById(orderId).populate('restaurant', 'owner');
   if (!order) throw ApiError.notFound('Order not found');
@@ -444,4 +482,5 @@ module.exports = {
   verifyOnlinePayment,
   canAccessOrder,
   getOrderTrackingSnapshot,
+  getDeliveryOtp,
 };

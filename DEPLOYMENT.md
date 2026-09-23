@@ -232,6 +232,50 @@ removes this specific issue. Horizontal scaling to multiple instances would addi
 (e.g. Redis) plus sticky sessions at the load balancer — not required at a single free-tier instance, and not
 implemented here.
 
+## 7. Delivery lifecycle and the delivery-completion OTP (M9)
+
+Full order lifecycle:
+
+```
+PLACED -> CONFIRMED -> PREPARING -> READY_FOR_PICKUP -> OUT_FOR_DELIVERY -> DELIVERED
+                  \-> CANCELLED               \-> CANCELLED (REFUND_PENDING -> REFUNDED if paid)
+       \-> REJECTED (REFUND_PENDING -> REFUNDED if paid)
+```
+
+Delivery assignment lifecycle (one order can accumulate several of these — one per
+rider it was offered to — but at most one is ever active at a time):
+
+```
+OFFERED -> ACCEPTED -> ASSIGNED -> COMPLETED
+   \-> REJECTED          \-> CANCELLED
+   \-> EXPIRED
+```
+
+`READY_FOR_PICKUP -> OUT_FOR_DELIVERY` happens automatically the moment a rider
+accepts an offer (M7); a 6-digit delivery OTP is generated in that exact same
+instant, never earlier. `OUT_FOR_DELIVERY -> DELIVERED` (and `ASSIGNED ->
+COMPLETED`) now happens the moment that rider correctly verifies the OTP — the
+**only** way a rider can complete their own assigned delivery. The pre-existing
+restaurant/admin manual `PATCH /orders/:id/status` transition to `DELIVERED` is
+**unchanged and still works** (e.g. for self-delivery, or if an OTP has expired
+with no self-service resend built yet) — M9 did not restrict it, so the
+established manual fallback remains available exactly as before.
+
+**OTP security design.** The OTP is AES-256-GCM **encrypted**, not hashed —
+deliberately: the customer must be able to re-view the exact code on demand from
+`GET /orders/:id/delivery-otp`, which a one-way hash cannot support (nothing can
+turn a hash back into what produced it). The encryption key is derived from the
+existing `JWT_SECRET` (no new secret to provision, nothing new that can leak), so
+a raw database dump alone still cannot recover any OTP — the app's own secret
+would also have to leak, exactly the same guarantee a hash would give. The
+comparison itself uses a constant-time check. Every verification attempt — right
+or wrong — counts against a configurable limit (`DELIVERY_OTP_MAX_ATTEMPTS`,
+default 5); exceeding it permanently locks that OTP (no self-service resend in
+this milestone — the restaurant/admin manual completion path is the intended
+fallback). The OTP expires after `DELIVERY_OTP_EXPIRY_MINUTES` (default 30). Only
+the customer who placed the order can ever retrieve it — never the restaurant
+owner, the assigned rider, or an admin.
+
 ## Payments
 
 Real online payments require a Razorpay account. Set `RAZORPAY_KEY_ID` and

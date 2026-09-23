@@ -8,6 +8,7 @@ import OrderStatusBadge from '../components/OrderStatusBadge';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EmptyState from '../components/EmptyState';
 import DeliveryTracker from '../components/DeliveryTracker';
+import DeliveryOtpCard from '../components/DeliveryOtpCard';
 import { loadRazorpayScript, openRazorpayCheckout } from '../utils/razorpay';
 
 const CUSTOMER_CANCELLABLE_STATUSES = ['PLACED', 'CONFIRMED'];
@@ -30,6 +31,14 @@ export default function OrderDetail() {
       .then(setOrder)
       .catch((err) => setError(err.message || 'Order not found'))
       .finally(() => setLoading(false));
+  }
+
+  // Re-fetches without showing the full-page loading state — used when the M8
+  // tracking:ended event fires (delivery just completed), so the page flips
+  // from OUT_FOR_DELIVERY+OTP straight to "Delivered" without a manual refresh
+  // and without flashing a spinner over an already-rendered page.
+  function refreshSilently() {
+    orderService.getById(id).then(setOrder).catch(() => {});
   }
 
   useEffect(load, [id]);
@@ -192,7 +201,12 @@ export default function OrderDetail() {
         )}
       </div>
 
-      {order.orderStatus === 'OUT_FOR_DELIVERY' && order.deliveryPartner && <DeliveryTracker orderId={order._id} />}
+      {order.orderStatus === 'OUT_FOR_DELIVERY' && order.deliveryPartner && (
+        <>
+          <DeliveryOtpCard orderId={order._id} />
+          <DeliveryTracker orderId={order._id} onDelivered={refreshSilently} />
+        </>
+      )}
 
       {canRetryPayment && (
         <button

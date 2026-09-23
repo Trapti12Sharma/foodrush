@@ -72,8 +72,20 @@ function validateEnv(env = process.env) {
   validateStorageConfig(env, isProd, errors, warnings);
   validateLocationConfig(env, isProd, errors, warnings);
   validatePaymentConfig(env, isProd, errors, warnings);
+  validateDeliveryOtpConfig(env, errors);
 
   return { errors, warnings };
+}
+
+// Both optional — deliveryOtp.service.js already has sensible defaults (30 minutes,
+// 5 attempts) when unset. Only rejects a genuinely nonsensical value.
+function validateDeliveryOtpConfig(env, errors) {
+  if (env.DELIVERY_OTP_EXPIRY_MINUTES && !(Number(env.DELIVERY_OTP_EXPIRY_MINUTES) > 0)) {
+    errors.push('DELIVERY_OTP_EXPIRY_MINUTES must be a positive number.');
+  }
+  if (env.DELIVERY_OTP_MAX_ATTEMPTS && !(Number.isInteger(Number(env.DELIVERY_OTP_MAX_ATTEMPTS)) && Number(env.DELIVERY_OTP_MAX_ATTEMPTS) > 0)) {
+    errors.push('DELIVERY_OTP_MAX_ATTEMPTS must be a positive whole number.');
+  }
 }
 
 // Google Maps is optional: without a key the app still works (GPS + popular cities), address

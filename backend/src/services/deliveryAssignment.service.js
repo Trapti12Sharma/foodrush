@@ -3,8 +3,11 @@ const DeliveryAssignment = require('../models/DeliveryAssignment');
 const DeliveryPartner = require('../models/DeliveryPartner');
 const Order = require('../models/Order');
 const Restaurant = require('../models/Restaurant');
+const User = require('../models/User');
 const ApiError = require('../utils/ApiError');
 const { emitTrackingEnded } = require('../realtime/io');
+const deliveryOtpService = require('./deliveryOtp.service');
+const emailService = require('./email.service');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { isValidPointCoordinates, haversineKm, roundTo, DEFAULT_RIDER_SEARCH_RADIUS_KM } = require('../utils/geo');
 const {
@@ -197,10 +200,16 @@ async function acceptAssignment(rider, assignmentId) {
     throw ApiError.badRequest('This offer is no longer available to respond to');
   }
 
+  // The delivery-completion OTP (M9) is generated right here — the moment a rider
+  // is actually assigned — never earlier. It rides along in the SAME atomic
+  // update that claims the order, so there is no window where the order is
+  // OUT_FOR_DELIVERY without an OTP already in place.
+  const { fields: otpFields } = deliveryOtpService.freshOtpFields();
+
   const order = await Order.findOneAndUpdate(
     { _id: claimed.order, deliveryPartner: null, orderStatus: ORDER_STATUS.READY_FOR_PICKUP },
     {
-      $set: { deliveryPartner: rider._id, orderStatus: ORDER_STATUS.OUT_FOR_DELIVERY },
+      $set: { deliveryPartner: rider._id, orderStatus: ORDER_STATUS.OUT_FOR_DELIVERY, ...otpFields },
       $push: { statusHistory: { status: ORDER_STATUS.OUT_FOR_DELIVERY, changedBy: rider.user } },
     },
     { new: true }
@@ -222,6 +231,111 @@ async function acceptAssignment(rider, assignmentId) {
   await claimed.save();
 
   return { assignment: claimed, order };
+}
+
+// Fires a best-effort "your order has been delivered" email — never blocks or
+// fails the completion it's reporting on (same pattern as auth.service.js's
+// notifyPasswordChanged).
+async function notifyOrderDelivered(order) {
+  try {
+    const customer = await User.findById(order.user).select('name email');
+    if (!customer) return;
+    await emailService.sendMail({ to: customer.email, ...emailService.orderDeliveredEmail({ name: customer.name, orderNumber: order.orderNumber }) });
+  } catch (err) {
+    console.error(`Order-delivered notification failed for order ${order.orderNumber}:`, err.message);
+  }
+}
+
+// The rider's OTP-verified delivery completion — the ONLY way this milestone lets
+// a rider (as opposed to the restaurant/admin's pre-existing, unchanged manual
+// PATCH /orders/:id/status path) mark their own assigned delivery DELIVERED.
+//
+// Two-phase, both phases atomic, exactly mirroring acceptAssignment's own two-step
+// claim above — bcrypt/AES comparisons can't live inside a MongoDB query filter,
+// so "verify the code" and "atomically transition" are necessarily separate steps,
+// but each individual STATE MUTATION (the attempt-count increment, and the actual
+// DELIVERED transition) is its own atomic findOneAndUpdate:
+//   1) atomically claim one verification ATTEMPT (increments deliveryOtpAttempts
+//      and returns the current ciphertext in the same operation) — this is what
+//      makes concurrent verification attempts safe: every concurrent request
+//      serializes through this single atomic increment, so attempts are counted
+//      exactly once each, never lost or double-counted.
+//   2) only if the decrypted code actually matches, atomically claim the ORDER
+//      itself (still OUT_FOR_DELIVERY, still this rider) — this is what prevents
+//      duplicate completion: if two requests somehow both had the correct code
+//      (e.g. a genuine double-submit), only the first one's update can possibly
+//      match, since it immediately moves orderStatus off OUT_FOR_DELIVERY; the
+//      second gets a clear "already delivered" conflict instead of re-processing.
+async function verifyDeliveryOtp(rider, assignmentId, submittedOtp) {
+  if (rider.accountStatus !== DELIVERY_ACCOUNT_STATUS.ACTIVE) throw ApiError.badRequest('Your account is not active');
+  if (rider.kycStatus !== DELIVERY_KYC_STATUS.VERIFIED) throw ApiError.badRequest('Your KYC is not verified');
+
+  const assignment = await DeliveryAssignment.findById(assignmentId);
+  if (!assignment) throw ApiError.notFound('Delivery assignment not found');
+  if (assignment.deliveryPartner.toString() !== rider._id.toString()) throw ApiError.forbidden('This assignment does not belong to you');
+  if (assignment.status !== DELIVERY_ASSIGNMENT_STATUS.ASSIGNED) {
+    throw ApiError.badRequest(`This delivery is not currently active (status: "${assignment.status}")`);
+  }
+
+  const now = new Date();
+  const claimed = await Order.findOneAndUpdate(
+    {
+      _id: assignment.order,
+      deliveryPartner: rider._id,
+      orderStatus: ORDER_STATUS.OUT_FOR_DELIVERY,
+      deliveryOtpCipher: { $ne: null },
+      deliveryOtpExpiresAt: { $gt: now },
+      deliveryOtpAttempts: { $lt: deliveryOtpService.MAX_ATTEMPTS },
+    },
+    { $inc: { deliveryOtpAttempts: 1 } },
+    { new: true, select: '+deliveryOtpCipher +deliveryOtpExpiresAt +deliveryOtpAttempts' }
+  );
+
+  if (!claimed) {
+    // A precise, non-sensitive reason for the common cases; a generic message for
+    // the rare concurrent-edge-case fallback (see the long comment in the model
+    // about an admin cancelling the assignment in the same instant) — never
+    // reveals the OTP itself or confirms a partial match either way.
+    const current = await Order.findById(assignment.order).select('+deliveryOtpCipher +deliveryOtpExpiresAt +deliveryOtpAttempts');
+    if (!current || current.orderStatus !== ORDER_STATUS.OUT_FOR_DELIVERY) {
+      throw ApiError.badRequest('This delivery is not currently awaiting OTP verification');
+    }
+    if (!current.deliveryOtpCipher) throw ApiError.badRequest('No delivery OTP has been generated for this order yet');
+    if (current.deliveryOtpAttempts >= deliveryOtpService.MAX_ATTEMPTS) {
+      throw ApiError.badRequest('Too many incorrect attempts — this OTP is now locked. Ask the restaurant or support for help.');
+    }
+    throw ApiError.badRequest('This delivery OTP has expired');
+  }
+
+  const expectedOtp = deliveryOtpService.decryptOtp(claimed.deliveryOtpCipher);
+  const isCorrect = expectedOtp !== null && deliveryOtpService.safeEqual(submittedOtp, expectedOtp);
+
+  if (!isCorrect) {
+    const remaining = Math.max(0, deliveryOtpService.MAX_ATTEMPTS - claimed.deliveryOtpAttempts);
+    throw ApiError.badRequest(
+      remaining > 0 ? `Incorrect OTP. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.` : 'Incorrect OTP. This OTP is now locked.'
+    );
+  }
+
+  const order = await Order.findOneAndUpdate(
+    { _id: assignment.order, deliveryPartner: rider._id, orderStatus: ORDER_STATUS.OUT_FOR_DELIVERY },
+    {
+      $set: { orderStatus: ORDER_STATUS.DELIVERED, deliveryOtpVerifiedAt: now, deliveryOtpCipher: null },
+      $push: { statusHistory: { status: ORDER_STATUS.DELIVERED, changedBy: rider.user } },
+    },
+    { new: true }
+  );
+  if (!order) throw ApiError.conflict('This order has already been marked delivered');
+
+  // The exact same M7/M8 hook the restaurant/admin's own manual completion path
+  // already triggers — it atomically flips the assignment to COMPLETED and emits
+  // tracking:ended. One place decides "what happens when an order is delivered",
+  // never duplicated here.
+  await onOrderStatusChanged(order, { _id: rider.user });
+  await notifyOrderDelivered(order);
+
+  const completedAssignment = await DeliveryAssignment.findById(assignment._id);
+  return { order, assignment: completedAssignment };
 }
 
 async function rejectAssignment(rider, assignmentId, reason) {
@@ -382,6 +496,7 @@ module.exports = {
   dispatchOrder,
   adminAssign,
   acceptAssignment,
+  verifyDeliveryOtp,
   rejectAssignment,
   cancelAssignment,
   onOrderStatusChanged,

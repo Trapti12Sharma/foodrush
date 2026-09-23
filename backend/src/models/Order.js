@@ -156,6 +156,59 @@ const orderSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    // M9 — delivery-completion OTP. Generated the moment a rider accepts (order
+    // becomes OUT_FOR_DELIVERY — see deliveryAssignment.service.js#acceptAssignment),
+    // never at order creation.
+    //
+    // deliveryOtpCipher is AES-256-GCM CIPHERTEXT, not a one-way hash, and that is a
+    // deliberate choice, not a shortcut: the customer must be able to re-view the
+    // exact 6-digit code on demand from GET /orders/:id/delivery-otp (the actual,
+    // explicit requirement), which is architecturally impossible from a one-way hash
+    // — nothing can ever turn a hash back into the code it came from. A one-way hash
+    // (bcrypt, matching how User passwords are hashed) IS used for the rider's
+    // verify-otp compare's own internal bookkeeping is unnecessary here since the
+    // decrypted value is compared directly (see deliveryOtp.service.js) with a
+    // constant-time comparison to avoid leaking timing information. The encryption
+    // key is derived from the existing JWT_SECRET (no new secret to provision) and
+    // never stored in the database — so, exactly like a hash, a raw database leak
+    // alone cannot recover any OTP; the app's own secret would also have to leak.
+    // `select: false` on every field here is a structural guarantee, not just a
+    // convention: no existing or future .find()/.findById() anywhere in the app
+    // (order listings, admin views, rider views) can accidentally return these unless
+    // a query explicitly opts in with .select('+deliveryOtpCipher' ...), which only
+    // deliveryOtp.service.js and its two callers ever do.
+    deliveryOtpCipher: {
+      type: String,
+      default: null,
+      select: false,
+    },
+    deliveryOtpExpiresAt: {
+      type: Date,
+      default: null,
+      select: false,
+    },
+    // Every verification attempt increments this, right or wrong — a wrong guess still
+    // counts, which is the actual brute-force protection. Reaching the configured max
+    // permanently locks this OTP generation (no separate timed lockout: there is no
+    // self-service "resend OTP" endpoint in this milestone, so a further timed unlock
+    // would have no path to actually happen — see deliveryOtp.service.js).
+    deliveryOtpAttempts: {
+      type: Number,
+      default: 0,
+      select: false,
+    },
+    deliveryOtpGeneratedAt: {
+      type: Date,
+      default: null,
+      select: false,
+    },
+    // Set the instant verification succeeds — also doubles as the "already used,
+    // never re-servable" guard alongside orderStatus itself moving off OUT_FOR_DELIVERY.
+    deliveryOtpVerifiedAt: {
+      type: Date,
+      default: null,
+      select: false,
+    },
   },
   { timestamps: true }
 );

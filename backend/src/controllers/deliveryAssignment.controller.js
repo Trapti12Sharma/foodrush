@@ -38,4 +38,10 @@ const reject = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, 'Delivery declined', { assignment }));
 });
 
-module.exports = { myOffers, myCurrentDelivery, myAssignments, accept, reject };
+const verifyOtp = asyncHandler(async (req, res) => {
+  const rider = await deliveryPartnerService.getMyProfile(req.user);
+  const { order, assignment } = await deliveryAssignmentService.verifyDeliveryOtp(rider, req.params.id, req.body.otp);
+  res.json(new ApiResponse(200, 'Delivery completed', { order, assignment }));
+});
+
+module.exports = { myOffers, myCurrentDelivery, myAssignments, accept, reject, verifyOtp };
