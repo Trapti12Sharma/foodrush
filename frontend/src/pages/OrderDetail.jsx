@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import OrderStatusBadge from '../components/OrderStatusBadge';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EmptyState from '../components/EmptyState';
+import DeliveryTracker from '../components/DeliveryTracker';
 import { loadRazorpayScript, openRazorpayCheckout } from '../utils/razorpay';
 
 const CUSTOMER_CANCELLABLE_STATUSES = ['PLACED', 'CONFIRMED'];
@@ -190,6 +191,8 @@ export default function OrderDetail() {
           </p>
         )}
       </div>
+
+      {order.orderStatus === 'OUT_FOR_DELIVERY' && order.deliveryPartner && <DeliveryTracker orderId={order._id} />}
 
       {canRetryPayment && (
         <button

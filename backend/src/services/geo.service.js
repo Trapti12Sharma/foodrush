@@ -9,6 +9,7 @@ const ApiError = require('../utils/ApiError');
 // coordinates. Nothing here discovers, imports or lists external restaurants.
 const PLACES_URL = 'https://places.googleapis.com/v1';
 const GEOCODE_URL = 'https://maps.googleapis.com/maps/api/geocode/json';
+const STATIC_MAP_URL = 'https://maps.googleapis.com/maps/api/staticmap';
 const REQUEST_TIMEOUT_MS = 5000;
 
 function isConfigured() {
@@ -158,4 +159,32 @@ async function reverseGeocode({ latitude, longitude }) {
   };
 }
 
-module.exports = { isConfigured, autocomplete, placeDetails, reverseGeocode };
+// A small static map image (M8 delivery tracking), centered on a point and
+// carrying one marker. Fetched and streamed through the backend — same as every
+// other Google Maps call here — so the API key never reaches the browser, even
+// though Static Maps requests are conventionally built as a plain client-side
+// <img src>. The caller (order.routes.js) re-requests this with fresh coordinates
+// on each location update, which is a periodically-refreshed snapshot, not a
+// smoothly panning interactive map — a deliberate simplification since there is
+// no Maps JavaScript SDK anywhere in this frontend yet (see M8 notes).
+async function staticMapImage({ latitude, longitude, zoom = 15, width = 400, height = 250 }) {
+  requireConfigured();
+  const params = new URLSearchParams({
+    center: `${latitude},${longitude}`,
+    zoom: String(zoom),
+    size: `${width}x${height}`,
+    scale: '2',
+    markers: `color:red|${latitude},${longitude}`,
+    key: process.env.GOOGLE_MAPS_API_KEY,
+  });
+  const response = await google(`${STATIC_MAP_URL}?${params}`);
+  if (!response.ok) {
+    console.error(`Google Static Maps failed: HTTP ${response.status}`);
+    throw new ApiError(502, 'The map could not be loaded right now.');
+  }
+  const buffer = Buffer.from(await response.arrayBuffer());
+  const contentType = response.headers.get('content-type') || 'image/png';
+  return { buffer, contentType };
+}
+
+module.exports = { isConfigured, autocomplete, placeDetails, reverseGeocode, staticMapImage };

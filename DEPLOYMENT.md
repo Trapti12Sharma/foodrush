@@ -160,8 +160,9 @@ location before logging in — and rate-limited per IP (60/min) to protect your 
 Setup:
 1. In [Google Cloud Console](https://console.cloud.google.com), create a project and **enable billing** (Maps
    Platform requires it; there is a monthly free credit).
-2. Enable exactly two APIs: **Places API (New)** and **Geocoding API**.
-3. Create an API key and **restrict it to just those two APIs**. (Render's free tier has no fixed IP, so an IP
+2. Enable **Places API (New)**, **Geocoding API**, and **Maps Static API** (the third is used only for the small
+   map image on the delivery-tracking page — see §6).
+3. Create an API key and **restrict it to just those APIs**. (Render's free tier has no fixed IP, so an IP
    restriction isn't practical — the API restriction plus the steps below are your protection.)
 4. Under *Quotas*, set a **daily request cap**, and create a **budget alert** in Billing, so a bug or abuse can't
    run up a bill.
@@ -205,6 +206,31 @@ Creates the three demo accounts (`admin@example.com`, `restaurant@example.com`,
 menu, order, review, and coupon. Safe to re-run — it upserts rather than
 duplicating. **Do not run this against a database you intend to put real users
 in** — the credentials are public (they're printed in this document).
+
+## 6. Real-time delivery tracking (Socket.IO)
+
+Socket.IO attaches to the SAME Express server/port — there is no separate service, process, or port to expose on
+Render. `CLIENT_URL`/`CLIENT_URLS` (already required for REST CORS) is the only configuration it needs; it reads
+the identical allow-list, so nothing new to set. `LOCATION_UPDATE_MIN_INTERVAL_MS` (default `5000`) is optional —
+raise it if you want riders' location updates persisted/broadcast less often.
+
+**What works out of the box:** authenticated live location updates from an assigned, active, KYC-verified rider to
+the customer/owner/admin watching that specific order, over a real WebSocket (falling back to HTTP long-polling if
+a network in between blocks WebSocket upgrades, which Socket.IO handles automatically).
+
+**Render free-tier limitation — read before relying on this in production.** The `free` plan (see `render.yaml`)
+spins the instance down after ~15 minutes with no HTTP traffic, and cold-starts (up to ~50s) on the next request.
+Any open Socket.IO connection is dropped the moment the instance spins down. In practice, an active delivery keeps
+generating HTTP/socket traffic (location updates, order-status polling) that should keep the instance awake for the
+duration of that delivery — but a rider who goes idle mid-shift with no active delivery, or a customer who opens
+the tracking page and then the backend happens to spin down between updates, will see their connection drop and
+have to reconnect (the frontend's socket client does this automatically, and the customer's tracking page reloads
+the last-known position from `GET /orders/:id/tracking` on reconnect — but there will be a visible gap, and a
+cold-start delay, until the instance is back up). This is a genuine gap, not a hidden one: **do not represent this
+setup as providing always-on, production-grade live tracking on the free plan.** A paid Render plan (no spin-down)
+removes this specific issue. Horizontal scaling to multiple instances would additionally need a Socket.IO adapter
+(e.g. Redis) plus sticky sessions at the load balancer — not required at a single free-tier instance, and not
+implemented here.
 
 ## Payments
 

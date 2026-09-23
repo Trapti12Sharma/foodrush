@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Bike, Wallet, MapPin, Store, Clock, Navigation } from 'lucide-react';
+import { Bike, Wallet, MapPin, Store, Clock, Navigation, Radio } from 'lucide-react';
 import { useDeliveryPartner } from '../../context/DeliveryPartnerContext';
 import { deliveryPartnerService } from '../../services/deliveryPartnerService';
 import { deliveryAssignmentService } from '../../services/deliveryAssignmentService';
+import { useLocationSharing } from '../../hooks/useLocationSharing';
 
 // No push notifications yet (Socket.IO is a later milestone) — the dashboard polls
 // for new offers while it's open. A rider must have the app/tab open to see one.
@@ -69,6 +70,48 @@ function OfferCard({ offer, onAccept, onReject, busy }) {
   );
 }
 
+const SHARING_TEXT = {
+  idle: 'Location sharing is off',
+  requesting: 'Requesting location permission…',
+  sharing: 'Location sharing active',
+  denied: 'Location permission denied — enable it in your browser/device settings to share your location',
+  timeout: 'Could not get your location (timed out) — try again',
+  unavailable: 'Location unavailable right now',
+  unsupported: 'This browser does not support location sharing',
+};
+const SHARING_STYLE = {
+  sharing: 'text-green-700',
+  idle: 'text-gray-500',
+};
+
+function LocationSharingControl({ assignmentId }) {
+  const { state, lastSentAt, start, stop } = useLocationSharing(assignmentId);
+  const isSharing = state === 'sharing' || state === 'requesting';
+
+  return (
+    <div className="mt-3 rounded-lg bg-white p-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className={`flex items-center gap-1.5 text-xs font-medium ${SHARING_STYLE[state] || 'text-amber-700'}`}>
+          <Radio size={12} /> {SHARING_TEXT[state]}
+        </p>
+        <button
+          type="button"
+          onClick={isSharing ? stop : start}
+          disabled={state === 'unsupported'}
+          className={`rounded-lg px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
+            isSharing ? 'bg-red-50 text-red-700 hover:bg-red-100' : 'bg-brand-600 text-white hover:bg-brand-700'
+          }`}
+        >
+          {isSharing ? 'Stop sharing' : 'Start sharing'}
+        </button>
+      </div>
+      {state === 'sharing' && lastSentAt && (
+        <p className="mt-1 text-xs text-gray-400">Last sent {lastSentAt.toLocaleTimeString()}</p>
+      )}
+    </div>
+  );
+}
+
 function CurrentDeliveryCard({ assignment }) {
   const order = assignment.order;
   return (
@@ -89,6 +132,7 @@ function CurrentDeliveryCard({ assignment }) {
       <p className="mt-1 text-xs text-gray-500">
         Order {order?.orderNumber} · {order?.paymentMethod === 'COD' ? `Collect ₹${order?.totalAmount?.toFixed(2)}` : 'Prepaid'}
       </p>
+      <LocationSharingControl assignmentId={assignment._id} />
     </div>
   );
 }

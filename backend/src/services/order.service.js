@@ -4,6 +4,7 @@ const FoodItem = require('../models/FoodItem');
 const Restaurant = require('../models/Restaurant');
 const Address = require('../models/Address');
 const Payment = require('../models/Payment');
+const DeliveryPartner = require('../models/DeliveryPartner');
 const ApiError = require('../utils/ApiError');
 const paymentService = require('./payment.service');
 const couponService = require('./coupon.service');
@@ -255,18 +256,64 @@ async function listOrdersForUser(user, query) {
   return { items, pagination: buildPaginationMeta(total, page, limit) };
 }
 
+// The single rule for "may this user see this order" — shared by getOrderById,
+// the tracking-snapshot endpoint below, and the Socket.IO room-join authorization
+// (realtime/socketHandlers.js), so all three transports agree exactly. Never
+// leaks existence to someone who fails every check (callers throw notFound, not
+// forbidden, on a false return — same reasoning as the rest of this file).
+async function canAccessOrder(user, order) {
+  const isCustomer = order.user.toString() === user._id.toString();
+  const isOwner = user.role === ROLES.RESTAURANT_OWNER && order.restaurant.owner.toString() === user._id.toString();
+  const isAdmin = hasPermission(user, PERMISSIONS.ORDERS_READ_ALL);
+  if (isCustomer || isOwner || isAdmin) return true;
+
+  if (user.role === ROLES.DELIVERY_PARTNER && order.deliveryPartner) {
+    const rider = await DeliveryPartner.findOne({ user: user._id }).select('_id');
+    if (!rider) return false;
+    const orderRiderId = order.deliveryPartner._id || order.deliveryPartner;
+    return rider._id.toString() === orderRiderId.toString();
+  }
+  return false;
+}
+
 async function getOrderById(user, orderId) {
   const order = await Order.findById(orderId)
     .populate('restaurant', 'name image owner')
     .populate('deliveryPartner', deliveryAssignmentService.PUBLIC_RIDER_FIELDS);
   if (!order) throw ApiError.notFound('Order not found');
-
-  const isCustomer = order.user.toString() === user._id.toString();
-  const isOwner = user.role === ROLES.RESTAURANT_OWNER && order.restaurant.owner.toString() === user._id.toString();
-  const isAdmin = hasPermission(user, PERMISSIONS.ORDERS_READ_ALL);
-  if (!isCustomer && !isOwner && !isAdmin) throw ApiError.notFound('Order not found');
+  if (!(await canAccessOrder(user, order))) throw ApiError.notFound('Order not found');
 
   return order;
+}
+
+// A lightweight snapshot for the tracking page's initial load / reconnect
+// recovery (live updates afterwards arrive over Socket.IO) — the same
+// authorization as getOrderById, but returns only what the map/UI needs, never
+// the rider's KYC fields. `tracking: false` covers every reason there is
+// currently nothing to show (no rider assigned yet, order not OUT_FOR_DELIVERY,
+// or the rider hasn't sent a location yet) without distinguishing which, so the
+// frontend has one simple branch plus a friendly message it already owns.
+async function getOrderTrackingSnapshot(user, orderId) {
+  const order = await Order.findById(orderId)
+    .populate('restaurant', 'owner')
+    .populate('deliveryPartner', 'fullName vehicleType vehicleNumber phone currentLocation locationAccuracyMeters lastLocationAt');
+  if (!order) throw ApiError.notFound('Order not found');
+  if (!(await canAccessOrder(user, order))) throw ApiError.notFound('Order not found');
+
+  const rider = order.deliveryPartner;
+  if (!rider || order.orderStatus !== ORDER_STATUS.OUT_FOR_DELIVERY) {
+    return { tracking: false, orderStatus: order.orderStatus };
+  }
+
+  const coordinates = rider.currentLocation?.coordinates;
+  return {
+    tracking: true,
+    orderStatus: order.orderStatus,
+    rider: { fullName: rider.fullName, vehicleType: rider.vehicleType, vehicleNumber: rider.vehicleNumber, phone: rider.phone },
+    location: coordinates
+      ? { latitude: coordinates[1], longitude: coordinates[0], accuracy: rider.locationAccuracyMeters, updatedAt: rider.lastLocationAt }
+      : null,
+  };
 }
 
 async function updateOrderStatus(user, orderId, nextStatus) {
@@ -387,4 +434,14 @@ async function verifyOnlinePayment(user, orderId, { razorpayOrderId, razorpayPay
   return order;
 }
 
-module.exports = { createOrder, retryPayment, listOrdersForUser, getOrderById, updateOrderStatus, cancelOrder, verifyOnlinePayment };
+module.exports = {
+  createOrder,
+  retryPayment,
+  listOrdersForUser,
+  getOrderById,
+  updateOrderStatus,
+  cancelOrder,
+  verifyOnlinePayment,
+  canAccessOrder,
+  getOrderTrackingSnapshot,
+};

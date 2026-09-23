@@ -52,4 +52,9 @@ const verifyPayment = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, 'Payment verified', { order }));
 });
 
-module.exports = { createOrder, retryPayment, listOrders, getOrder, updateStatus, cancelOrder, verifyPayment };
+const getTracking = asyncHandler(async (req, res) => {
+  const snapshot = await orderService.getOrderTrackingSnapshot(req.user, req.params.id);
+  res.json(new ApiResponse(200, 'Tracking snapshot fetched', snapshot));
+});
+
+module.exports = { createOrder, retryPayment, listOrders, getOrder, updateStatus, cancelOrder, verifyPayment, getTracking };

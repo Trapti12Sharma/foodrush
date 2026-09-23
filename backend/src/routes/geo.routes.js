@@ -3,6 +3,7 @@ const { query, param } = require('express-validator');
 const geoController = require('../controllers/geo.controller');
 const validate = require('../middleware/validate');
 const { geoLimiter } = require('../middleware/rateLimiter');
+const { authenticateUser } = require('../middleware/auth.middleware');
 
 const router = express.Router();
 
@@ -90,6 +91,44 @@ router.get(
   ],
   validate,
   geoController.reverse
+);
+
+/**
+ * @swagger
+ * /geo/static-map:
+ *   get:
+ *     summary: A small static map image centered on a point, with one marker (M8 delivery tracking)
+ *     description: >
+ *       Authenticated (unlike the other /geo endpoints — this one returns actual image bytes and
+ *       is heavier, so it isn't left fully public). Proxied through the backend so the Google key
+ *       never reaches the browser. Returns 503 when GOOGLE_MAPS_API_KEY is not configured — the
+ *       frontend shows a "map unavailable" state rather than anything fake.
+ *     tags: [Location]
+ *     parameters:
+ *       - { in: query, name: lat, required: true, schema: { type: number, minimum: -90, maximum: 90 } }
+ *       - { in: query, name: lng, required: true, schema: { type: number, minimum: -180, maximum: 180 } }
+ *       - { in: query, name: zoom, schema: { type: integer, minimum: 1, maximum: 20, default: 15 } }
+ *       - { in: query, name: width, schema: { type: integer, minimum: 100, maximum: 640, default: 400 } }
+ *       - { in: query, name: height, schema: { type: integer, minimum: 100, maximum: 640, default: 250 } }
+ *     responses:
+ *       200: { description: PNG image, content: { image/png: { schema: { type: string, format: binary } } } }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       422: { $ref: '#/components/responses/ValidationError' }
+ *       502: { description: Google unavailable }
+ *       503: { description: Not configured }
+ */
+router.get(
+  '/static-map',
+  authenticateUser,
+  [
+    query('lat').isFloat({ min: -90, max: 90 }).withMessage('lat must be between -90 and 90'),
+    query('lng').isFloat({ min: -180, max: 180 }).withMessage('lng must be between -180 and 180'),
+    query('zoom').optional().isInt({ min: 1, max: 20 }),
+    query('width').optional().isInt({ min: 100, max: 640 }),
+    query('height').optional().isInt({ min: 100, max: 640 }),
+  ],
+  validate,
+  geoController.staticMap
 );
 
 module.exports = router;

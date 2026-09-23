@@ -19,21 +19,25 @@ function isRevoked(payload, user) {
   return payload.iat < Math.floor(user.passwordChangedAt.getTime() / 1000);
 }
 
-// Verifies the JWT, then re-loads the user from the DB (not just trusting the
-// token payload) so a deactivated account or role change takes effect immediately
-// instead of waiting for the token to expire.
-const authenticateUser = asyncHandler(async (req, res, next) => {
-  const token = extractToken(req);
+// The single place that turns a raw JWT into a trusted, live User document —
+// shared by the HTTP middleware below AND the Socket.IO auth middleware
+// (realtime/socketAuth.js), so a deactivated account or role change takes effect
+// identically and immediately on both transports, not just HTTP. Throws
+// ApiError.unauthorized (never a raw jsonwebtoken error) on any failure, and
+// never leaks which specific check failed.
+async function resolveUserFromToken(token) {
   if (!token) throw ApiError.unauthorized('Authentication required');
-
-  const payload = verifyToken(token); // throws JsonWebTokenError/TokenExpiredError -> errorHandler
+  const payload = verifyToken(token); // throws JsonWebTokenError/TokenExpiredError
   const user = await User.findById(payload.sub);
-
   if (!user || !user.isActive || isRevoked(payload, user)) {
     throw ApiError.unauthorized('Session expired. Please login again.');
   }
+  return user;
+}
 
-  req.user = user;
+const authenticateUser = asyncHandler(async (req, res, next) => {
+  const token = extractToken(req);
+  req.user = await resolveUserFromToken(token); // JWT errors -> errorHandler via asyncHandler
   next();
 });
 
@@ -86,4 +90,11 @@ const optionalAuth = asyncHandler(async (req, res, next) => {
   next();
 });
 
-module.exports = { authenticateUser, authorizeRoles, requirePermission, requireOwnerOrPermission, optionalAuth };
+module.exports = {
+  authenticateUser,
+  authorizeRoles,
+  requirePermission,
+  requireOwnerOrPermission,
+  optionalAuth,
+  resolveUserFromToken,
+};

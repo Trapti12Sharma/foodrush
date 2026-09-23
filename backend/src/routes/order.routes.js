@@ -119,7 +119,7 @@ router.get('/', orderController.listOrders);
  * /orders/{id}:
  *   get:
  *     summary: Get one order by id
- *     description: Visible to the customer who placed it, the owner of its restaurant, or an admin — 404 for anyone else.
+ *     description: Visible to the customer who placed it, the owner of its restaurant, its assigned delivery partner, or an admin — 404 for anyone else.
  *     tags: [Orders]
  *     parameters:
  *       - in: path
@@ -136,6 +136,29 @@ router.get('/', orderController.listOrders);
  *       404: { $ref: '#/components/responses/NotFound' }
  */
 router.get('/:id', orderController.getOrder);
+
+/**
+ * @swagger
+ * /orders/{id}/tracking:
+ *   get:
+ *     summary: A lightweight live-tracking snapshot for this order (M8)
+ *     description: >
+ *       Same authorization as GET /orders/{id}. `tracking: false` whenever there is currently
+ *       nothing to show (no rider assigned yet, order not OUT_FOR_DELIVERY, or no location sent
+ *       yet) — the frontend uses this on page load / reconnect, then Socket.IO's `location:update`
+ *       event for live updates afterwards.
+ *     tags: [Orders]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: Tracking snapshot }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+router.get('/:id/tracking', orderController.getTracking);
 
 /**
  * @swagger

@@ -4,6 +4,7 @@ const DeliveryPartner = require('../models/DeliveryPartner');
 const Order = require('../models/Order');
 const Restaurant = require('../models/Restaurant');
 const ApiError = require('../utils/ApiError');
+const { emitTrackingEnded } = require('../realtime/io');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { isValidPointCoordinates, haversineKm, roundTo, DEFAULT_RIDER_SEARCH_RADIUS_KM } = require('../utils/geo');
 const {
@@ -263,9 +264,11 @@ async function cancelAssignment(id, actor, reason) {
 
   // If this assignment had actually claimed the order, free it back up so it can
   // be redispatched (order status is deliberately left as-is — an admin cancelling
-  // a rider's assignment doesn't retroactively un-cook the food).
+  // a rider's assignment doesn't retroactively un-cook the food), and tell anyone
+  // watching this delivery live that it has stopped.
   if (wasAssigned) {
     await Order.updateOne({ _id: assignment.order, deliveryPartner: assignment.deliveryPartner }, { $set: { deliveryPartner: null } });
+    emitTrackingEnded({ orderId: assignment.order, assignmentId: assignment._id, reason: 'cancelled' });
   }
 
   return assignment;
@@ -277,10 +280,11 @@ async function cancelAssignment(id, actor, reason) {
 async function onOrderStatusChanged(order, actor) {
   try {
     if (order.orderStatus === ORDER_STATUS.DELIVERED) {
-      await DeliveryAssignment.updateOne(
+      const completed = await DeliveryAssignment.findOneAndUpdate(
         { order: order._id, status: DELIVERY_ASSIGNMENT_STATUS.ASSIGNED },
         { $set: { status: DELIVERY_ASSIGNMENT_STATUS.COMPLETED, completedAt: new Date() } }
       );
+      if (completed) emitTrackingEnded({ orderId: order._id, assignmentId: completed._id, reason: 'delivered' });
       return;
     }
     if ([ORDER_STATUS.CANCELLED, ORDER_STATUS.REJECTED].includes(order.orderStatus)) {
