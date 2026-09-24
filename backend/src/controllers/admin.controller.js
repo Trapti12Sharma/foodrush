@@ -8,6 +8,7 @@ const refundService = require('../services/refund.service');
 const deliveryPartnerService = require('../services/deliveryPartner.service');
 const deliveryAssignmentService = require('../services/deliveryAssignment.service');
 const deliverySettlementService = require('../services/deliverySettlement.service');
+const supportTicketService = require('../services/supportTicket.service');
 const Order = require('../models/Order');
 
 const getDashboard = asyncHandler(async (req, res) => {
@@ -71,6 +72,11 @@ const listOrders = asyncHandler(async (req, res) => {
 const listAuditLogs = asyncHandler(async (req, res) => {
   const { items, pagination } = await auditService.listLogs(req.query);
   res.json(new ApiResponse(200, 'Audit logs fetched', { logs: items, pagination }));
+});
+
+const getAuditLog = asyncHandler(async (req, res) => {
+  const log = await auditService.getLogById(req.params.id);
+  res.json(new ApiResponse(200, 'Audit log entry fetched', { log }));
 });
 
 const refundOrder = asyncHandler(async (req, res) => {
@@ -245,6 +251,81 @@ const markDeliverySettlementFailed = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, 'Delivery settlement marked failed', { settlement }));
 });
 
+const listSupportTickets = asyncHandler(async (req, res) => {
+  const { items, pagination } = await supportTicketService.listForAdmin(req.query);
+  res.json(new ApiResponse(200, 'Support tickets fetched', { tickets: items, pagination }));
+});
+
+const getSupportTicket = asyncHandler(async (req, res) => {
+  const ticket = await supportTicketService.getForAdmin(req.params.id);
+  res.json(new ApiResponse(200, 'Support ticket fetched', { ticket }));
+});
+
+const updateSupportTicketStatus = asyncHandler(async (req, res) => {
+  const ticket = await supportTicketService.updateStatusForAdmin(req.params.id, req.body.status, req.user);
+  await auditService.record({
+    req,
+    action: 'support_ticket.status_change',
+    entityType: 'SupportTicket',
+    entityId: ticket._id,
+    metadata: { ticketNumber: ticket.ticketNumber, status: ticket.status },
+  });
+  res.json(new ApiResponse(200, 'Support ticket status updated', { ticket }));
+});
+
+const updateSupportTicketPriority = asyncHandler(async (req, res) => {
+  const ticket = await supportTicketService.updatePriorityForAdmin(req.params.id, req.body.priority);
+  await auditService.record({
+    req,
+    action: 'support_ticket.priority_change',
+    entityType: 'SupportTicket',
+    entityId: ticket._id,
+    metadata: { ticketNumber: ticket.ticketNumber, priority: ticket.priority },
+  });
+  res.json(new ApiResponse(200, 'Support ticket priority updated', { ticket }));
+});
+
+const assignSupportTicket = asyncHandler(async (req, res) => {
+  const ticket = await supportTicketService.assignForAdmin(req.params.id, req.body.assignedTo);
+  await auditService.record({
+    req,
+    action: 'support_ticket.assign',
+    entityType: 'SupportTicket',
+    entityId: ticket._id,
+    metadata: { ticketNumber: ticket.ticketNumber, assignedTo: ticket.assignedTo ? ticket.assignedTo.toString() : null },
+  });
+  res.json(new ApiResponse(200, 'Support ticket assigned', { ticket }));
+});
+
+const addSupportTicketMessage = asyncHandler(async (req, res) => {
+  const ticket = await supportTicketService.addMessageAsAdmin(req.user, req.params.id, req.body);
+  res.status(201).json(new ApiResponse(201, 'Message added', { ticket }));
+});
+
+const resolveSupportTicket = asyncHandler(async (req, res) => {
+  const ticket = await supportTicketService.resolveForAdmin(req.params.id, req.user, req.body.resolution);
+  await auditService.record({
+    req,
+    action: 'support_ticket.resolve',
+    entityType: 'SupportTicket',
+    entityId: ticket._id,
+    metadata: { ticketNumber: ticket.ticketNumber },
+  });
+  res.json(new ApiResponse(200, 'Support ticket resolved', { ticket }));
+});
+
+const closeSupportTicketAdmin = asyncHandler(async (req, res) => {
+  const ticket = await supportTicketService.closeForAdmin(req.params.id, req.user);
+  await auditService.record({
+    req,
+    action: 'support_ticket.close',
+    entityType: 'SupportTicket',
+    entityId: ticket._id,
+    metadata: { ticketNumber: ticket.ticketNumber },
+  });
+  res.json(new ApiResponse(200, 'Support ticket closed', { ticket }));
+});
+
 module.exports = {
   getDashboard,
   listUsers,
@@ -254,6 +335,7 @@ module.exports = {
   setRestaurantActive,
   listOrders,
   listAuditLogs,
+  getAuditLog,
   refundOrder,
   listRefunds,
   listDeliveryPartners,
@@ -272,4 +354,12 @@ module.exports = {
   approveDeliverySettlement,
   markDeliverySettlementPaid,
   markDeliverySettlementFailed,
+  listSupportTickets,
+  getSupportTicket,
+  updateSupportTicketStatus,
+  updateSupportTicketPriority,
+  assignSupportTicket,
+  addSupportTicketMessage,
+  resolveSupportTicket,
+  closeSupportTicketAdmin,
 };

@@ -320,6 +320,44 @@ same rider/period can never both succeed or double-claim the same earnings.
 **this milestone does not integrate any real bank/UPI/payment-gateway payout**;
 it is a settlement-tracking foundation, not a money-transfer system.
 
+## 9. Support tickets and audit logging (M11)
+
+No new environment variables — this milestone is purely additive on top of the
+existing auth/RBAC/upload infrastructure.
+
+**Support tickets.** Customers, restaurant owners, delivery partners, and staff
+can open a ticket at `POST /support/tickets`, optionally referencing an order
+(and, for a restaurant owner, their own restaurant) — every such relationship is
+verified server-side against the caller's own records (their own order, their
+own restaurant, a delivery they were actually assigned), never trusted from the
+request body. Each ticket gets a short, human-readable, atomically-generated
+number (`FR-TKT-000001`, ...), the same `Counter`-based pattern as order numbers.
+Status moves through an explicit allow-list only:
+
+```
+OPEN -> IN_PROGRESS -> WAITING_FOR_USER -> RESOLVED -> CLOSED
+              \-> RESOLVED         \-> RESOLVED
+                                RESOLVED -> IN_PROGRESS (explicit, staff-only reopen)
+```
+
+`CLOSED` is terminal. A normal user cannot reply to a `RESOLVED` or `CLOSED`
+ticket — staff must reopen it first. Attachments reuse the existing image-upload
+pipeline exactly (`POST /uploads/image?purpose=support`, JPEG/PNG/WEBP only, up
+to 3 per ticket/message) — no new upload infrastructure was introduced. Ticket
+management (assign/status/priority/resolve/close on ANY ticket, not just one's
+own) requires the `support_tickets:manage` permission, held by `SUPER_ADMIN`,
+`ADMIN`, and `SUPPORT_AGENT`.
+
+**Audit logging.** `AuditLog`/`audit.service.js` already existed from earlier
+milestones; M11 adds `GET /admin/audit-logs/{id}`, an `actorRole` filter, and
+new audit events: `delivery.otp_verified`, `refund.created`/`refund.failed`
+(covering both an admin-initiated and an automatic post-cancellation refund),
+and `support_ticket.create`/`.assign`/`.status_change`/`.resolve`/`.close`.
+Viewing the audit trail requires the `audit:read` permission, held by
+`SUPER_ADMIN` only — not even a plain `ADMIN` account can see it. Entries remain
+append-only (enforced at the model level) and anything credential-shaped in
+metadata is redacted before it is ever stored.
+
 ## Payments
 
 Real online payments require a Razorpay account. Set `RAZORPAY_KEY_ID` and

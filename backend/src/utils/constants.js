@@ -199,6 +199,58 @@ const DELIVERY_SETTLEMENT_TRANSITIONS = Object.freeze({
   [DELIVERY_SETTLEMENT_STATUS.CANCELLED]: [],
 });
 
+// M11 — Support Tickets. Any signed-in customer, restaurant owner, delivery
+// partner, or staff member with SUPPORT_TICKETS_MANAGE may create one; only
+// staff holding that permission may triage/assign/resolve them (see
+// utils/permissions.js and services/supportTicket.service.js).
+const SUPPORT_TICKET_CATEGORY = Object.freeze({
+  ORDER: 'ORDER',
+  PAYMENT: 'PAYMENT',
+  REFUND: 'REFUND',
+  DELIVERY: 'DELIVERY',
+  RESTAURANT: 'RESTAURANT',
+  ACCOUNT: 'ACCOUNT',
+  TECHNICAL: 'TECHNICAL',
+  OTHER: 'OTHER',
+});
+
+const SUPPORT_TICKET_PRIORITY = Object.freeze({
+  LOW: 'LOW',
+  MEDIUM: 'MEDIUM',
+  HIGH: 'HIGH',
+  URGENT: 'URGENT',
+});
+
+const SUPPORT_TICKET_STATUS = Object.freeze({
+  OPEN: 'OPEN',
+  IN_PROGRESS: 'IN_PROGRESS',
+  WAITING_FOR_USER: 'WAITING_FOR_USER',
+  RESOLVED: 'RESOLVED',
+  CLOSED: 'CLOSED',
+});
+
+// Explicit allow-list, enforced in supportTicket.service.js — never a raw
+// `status = req.body.status` write. CLOSED is terminal (matches "closed tickets
+// don't accept replies" — there is nothing left to do with one). Reopening a
+// RESOLVED ticket is an intentional, explicit, admin-only action (RESOLVED ->
+// IN_PROGRESS), not an accidental side effect of anything else.
+const SUPPORT_TICKET_TRANSITIONS = Object.freeze({
+  [SUPPORT_TICKET_STATUS.OPEN]: [SUPPORT_TICKET_STATUS.IN_PROGRESS, SUPPORT_TICKET_STATUS.CLOSED],
+  [SUPPORT_TICKET_STATUS.IN_PROGRESS]: [SUPPORT_TICKET_STATUS.WAITING_FOR_USER, SUPPORT_TICKET_STATUS.RESOLVED, SUPPORT_TICKET_STATUS.CLOSED],
+  [SUPPORT_TICKET_STATUS.WAITING_FOR_USER]: [SUPPORT_TICKET_STATUS.IN_PROGRESS, SUPPORT_TICKET_STATUS.RESOLVED, SUPPORT_TICKET_STATUS.CLOSED],
+  [SUPPORT_TICKET_STATUS.RESOLVED]: [SUPPORT_TICKET_STATUS.CLOSED, SUPPORT_TICKET_STATUS.IN_PROGRESS], // the "reopen" path
+  [SUPPORT_TICKET_STATUS.CLOSED]: [],
+});
+
+// Statuses a normal (non-staff) user may still post a message into — a RESOLVED
+// or CLOSED ticket must be reopened (staff-only) before the creator can reply
+// again, so a "resolved" ticket can't be silently kept alive forever by replies.
+const SUPPORT_TICKET_OPEN_FOR_USER_REPLY = Object.freeze([
+  SUPPORT_TICKET_STATUS.OPEN,
+  SUPPORT_TICKET_STATUS.IN_PROGRESS,
+  SUPPORT_TICKET_STATUS.WAITING_FOR_USER,
+]);
+
 module.exports = {
   ROLES,
   ORDER_STATUS,
@@ -219,4 +271,9 @@ module.exports = {
   DELIVERY_EARNING_STATUS,
   DELIVERY_SETTLEMENT_STATUS,
   DELIVERY_SETTLEMENT_TRANSITIONS,
+  SUPPORT_TICKET_CATEGORY,
+  SUPPORT_TICKET_PRIORITY,
+  SUPPORT_TICKET_STATUS,
+  SUPPORT_TICKET_TRANSITIONS,
+  SUPPORT_TICKET_OPEN_FOR_USER_REPLY,
 };

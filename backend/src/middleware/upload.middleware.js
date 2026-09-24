@@ -9,8 +9,10 @@ const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 // What an upload is FOR decides who may do it. Profile photos are open to any signed-in
 // user; catalog images (restaurant, food, category) only to restaurant owners and the
 // staff who manage restaurants; kyc documents only to delivery partners — so a customer
-// account can't be used as free image hosting.
-const PURPOSES = Object.freeze(['avatar', 'restaurant', 'food', 'category', 'kyc']);
+// account can't be used as free image hosting. `support` (M11 ticket attachments,
+// typically screenshots) is open to any signed-in user, same as avatar — a support
+// ticket can come from a customer, rider, or restaurant owner alike.
+const PURPOSES = Object.freeze(['avatar', 'restaurant', 'food', 'category', 'kyc', 'support']);
 const DEFAULT_PURPOSE = 'avatar';
 
 // Checked BEFORE multer runs, so an unauthorised request never gets its file buffered.
@@ -23,7 +25,7 @@ function authorizeUpload(req, res, next) {
   if (purpose === 'kyc' && req.user.role !== ROLES.DELIVERY_PARTNER) {
     return next(ApiError.forbidden('You do not have permission to upload this kind of image'));
   }
-  if (purpose !== 'avatar' && purpose !== 'kyc' && !mayUploadCatalogImages) {
+  if (purpose !== 'avatar' && purpose !== 'kyc' && purpose !== 'support' && !mayUploadCatalogImages) {
     return next(ApiError.forbidden('You do not have permission to upload this kind of image'));
   }
   req.uploadPurpose = purpose;

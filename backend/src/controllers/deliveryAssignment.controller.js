@@ -2,6 +2,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiResponse = require('../utils/ApiResponse');
 const deliveryPartnerService = require('../services/deliveryPartner.service');
 const deliveryAssignmentService = require('../services/deliveryAssignment.service');
+const auditService = require('../services/audit.service');
 
 // Every handler here first resolves the caller's OWN DeliveryPartner profile
 // (404 if they haven't created one) — every assignment operation is scoped to
@@ -41,6 +42,13 @@ const reject = asyncHandler(async (req, res) => {
 const verifyOtp = asyncHandler(async (req, res) => {
   const rider = await deliveryPartnerService.getMyProfile(req.user);
   const { order, assignment } = await deliveryAssignmentService.verifyDeliveryOtp(rider, req.params.id, req.body.otp);
+  await auditService.record({
+    req,
+    action: 'delivery.otp_verified',
+    entityType: 'Order',
+    entityId: order._id,
+    metadata: { orderNumber: order.orderNumber, assignmentId: assignment._id.toString() },
+  });
   res.json(new ApiResponse(200, 'Delivery completed', { order, assignment }));
 });
 

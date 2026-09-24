@@ -1,4 +1,5 @@
 const AuditLog = require('../models/AuditLog');
+const ApiError = require('../utils/ApiError');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 
 // Anything whose key looks like a credential is replaced before storage, so an
@@ -46,9 +47,12 @@ async function record({ req, actor, action, entityType, entityId, metadata }) {
 
 async function listLogs(query) {
   const { page, limit, skip } = parsePagination(query);
+  // Whitelisted fields only — never a raw client-supplied filter object, so this
+  // can never become a way to run an arbitrary Mongo query against the audit trail.
   const filter = {};
   if (query.action) filter.action = query.action;
   if (query.actor) filter.actor = query.actor;
+  if (query.actorRole) filter.actorRole = query.actorRole;
   if (query.entityType) filter.entityType = query.entityType;
   if (query.entityId) filter.entityId = query.entityId;
   if (query.from || query.to) {
@@ -64,4 +68,10 @@ async function listLogs(query) {
   return { items, pagination: buildPaginationMeta(total, page, limit) };
 }
 
-module.exports = { record, listLogs, redact };
+async function getLogById(id) {
+  const entry = await AuditLog.findById(id).populate('actor', 'name email role');
+  if (!entry) throw ApiError.notFound('Audit log entry not found');
+  return entry;
+}
+
+module.exports = { record, listLogs, getLogById, redact };

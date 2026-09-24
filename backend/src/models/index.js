@@ -17,4 +17,6 @@ module.exports = {
   DeliveryAssignment: require('./DeliveryAssignment'),
   DeliveryEarning: require('./DeliveryEarning'),
   DeliverySettlement: require('./DeliverySettlement'),
+  SupportTicket: require('./SupportTicket'),
+  AuditLog: require('./AuditLog'),
 };

@@ -72,4 +72,19 @@ const otpLimiter = rateLimit({
   },
 });
 
-module.exports = { apiLimiter, authLimiter, uploadLimiter, geoLimiter, otpLimiter };
+// Guards against spam ticket creation and message flooding — a real customer/rider/
+// owner never needs anywhere near this many in 15 minutes; a script hammering the
+// endpoint does.
+const supportLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isTest ? 100000 : 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many support requests. Please try again later.',
+    errors: [],
+  },
+});
+
+module.exports = { apiLimiter, authLimiter, uploadLimiter, geoLimiter, otpLimiter, supportLimiter };

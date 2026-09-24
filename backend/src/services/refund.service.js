@@ -3,6 +3,7 @@ const Payment = require('../models/Payment');
 const Refund = require('../models/Refund');
 const ApiError = require('../utils/ApiError');
 const paymentService = require('./payment.service');
+const auditService = require('./audit.service');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { ORDER_STATUS, PAYMENT_METHODS, PAYMENT_STATUS, REFUND_STATUS, REFUNDABLE_FROM_STATUSES } = require('../utils/constants');
 
@@ -68,11 +69,31 @@ async function initiateRefund(order, { reason, actor = null, amount } = {}) {
     order.paymentStatus = PAYMENT_STATUS.REFUNDED;
     order.statusHistory.push({ status: order.orderStatus, changedBy: actor ? actor._id : null });
     await order.save();
+
+    // One place records this regardless of trigger source — an automatic refund
+    // from a customer/restaurant cancellation has no controller call site of its
+    // own to log from, so the audit call has to live here rather than being
+    // duplicated at every caller.
+    await auditService.record({
+      actor,
+      action: 'refund.created',
+      entityType: 'Refund',
+      entityId: refund._id,
+      metadata: { orderId: order._id.toString(), orderNumber: order.orderNumber, amount: refund.amount, status: refund.status, reason },
+    });
   } catch (err) {
     refund.status = REFUND_STATUS.FAILED;
     refund.failureReason = err.message;
     await refund.save();
     console.error(`Refund failed for order ${order.orderNumber}:`, err.message);
+
+    await auditService.record({
+      actor,
+      action: 'refund.failed',
+      entityType: 'Refund',
+      entityId: refund._id,
+      metadata: { orderId: order._id.toString(), orderNumber: order.orderNumber, amount: refund.amount, reason, failureReason: err.message },
+    });
   }
 
   return refund;

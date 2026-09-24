@@ -3,7 +3,15 @@ const { body } = require('express-validator');
 const adminController = require('../controllers/admin.controller');
 const validate = require('../middleware/validate');
 const { authenticateUser, requirePermission } = require('../middleware/auth.middleware');
+const { supportLimiter } = require('../middleware/rateLimiter');
 const { PERMISSIONS } = require('../utils/permissions');
+const {
+  updateStatusValidator: ticketStatusValidator,
+  updatePriorityValidator: ticketPriorityValidator,
+  assignTicketValidator,
+  resolveTicketValidator,
+  addMessageValidator: addTicketMessageValidator,
+} = require('../validators/supportTicket.validator');
 
 const REFUND_REASONS = ['customer_cancellation', 'restaurant_rejection', 'restaurant_unavailable', 'operational_issue', 'admin_initiated'];
 const refundOrderValidator = [
@@ -341,6 +349,7 @@ router.get('/refunds', requirePermission(PERMISSIONS.REFUNDS_MANAGE), adminContr
  *       - { in: query, name: actor, schema: { type: string }, description: Actor user id }
  *       - { in: query, name: entityType, schema: { type: string } }
  *       - { in: query, name: entityId, schema: { type: string } }
+ *       - { in: query, name: actorRole, schema: { type: string } }
  *       - { in: query, name: from, schema: { type: string, format: date-time } }
  *       - { in: query, name: to, schema: { type: string, format: date-time } }
  *     responses:
@@ -349,6 +358,22 @@ router.get('/refunds', requirePermission(PERMISSIONS.REFUNDS_MANAGE), adminContr
  *       403: { $ref: '#/components/responses/Forbidden' }
  */
 router.get('/audit-logs', requirePermission(PERMISSIONS.AUDIT_READ), adminController.listAuditLogs);
+
+/**
+ * @swagger
+ * /admin/audit-logs/{id}:
+ *   get:
+ *     summary: Get one audit log entry (requires the audit:read permission)
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Audit log entry }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+router.get('/audit-logs/:id', requirePermission(PERMISSIONS.AUDIT_READ), adminController.getAuditLog);
 
 /**
  * @swagger
@@ -744,5 +769,218 @@ router.patch(
   validate,
   adminController.markDeliverySettlementFailed
 );
+
+/**
+ * @swagger
+ * /admin/support/tickets:
+ *   get:
+ *     summary: List/search/filter every support ticket (requires the support_tickets:manage permission)
+ *     description: Never loads the whole collection — filtered, paginated MongoDB queries only.
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: query, name: status, schema: { type: string, enum: [OPEN, IN_PROGRESS, WAITING_FOR_USER, RESOLVED, CLOSED] } }
+ *       - { in: query, name: priority, schema: { type: string, enum: [LOW, MEDIUM, HIGH, URGENT] } }
+ *       - { in: query, name: category, schema: { type: string, enum: [ORDER, PAYMENT, REFUND, DELIVERY, RESTAURANT, ACCOUNT, TECHNICAL, OTHER] } }
+ *       - { in: query, name: role, schema: { type: string }, description: Filters by createdByRole }
+ *       - { in: query, name: assignedTo, schema: { type: string } }
+ *       - { in: query, name: search, schema: { type: string }, description: Matches ticketNumber or subject }
+ *       - { in: query, name: orderNumber, schema: { type: string } }
+ *       - { in: query, name: page, schema: { type: integer, default: 1 } }
+ *       - { in: query, name: limit, schema: { type: integer, default: 12 } }
+ *     responses:
+ *       200: { description: A page of tickets (list view omits messages/description) }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+router.get('/support/tickets', requirePermission(PERMISSIONS.SUPPORT_TICKETS_MANAGE), adminController.listSupportTickets);
+
+/**
+ * @swagger
+ * /admin/support/tickets/{id}:
+ *   get:
+ *     summary: Full ticket detail, including the full conversation (requires the support_tickets:manage permission)
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Ticket detail }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+router.get('/support/tickets/:id', requirePermission(PERMISSIONS.SUPPORT_TICKETS_MANAGE), adminController.getSupportTicket);
+
+/**
+ * @swagger
+ * /admin/support/tickets/{id}/status:
+ *   patch:
+ *     summary: Move a ticket to a new status (requires the support_tickets:manage permission)
+ *     description: Enforces an explicit allow-list of transitions — an arbitrary status is rejected with 400, never silently applied.
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object, required: [status], properties: { status: { type: string, enum: [OPEN, IN_PROGRESS, WAITING_FOR_USER, RESOLVED, CLOSED] } } }
+ *     responses:
+ *       200: { description: Updated }
+ *       400: { description: That transition is not allowed from the ticket's current status }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       422: { $ref: '#/components/responses/ValidationError' }
+ */
+router.patch(
+  '/support/tickets/:id/status',
+  requirePermission(PERMISSIONS.SUPPORT_TICKETS_MANAGE),
+  ticketStatusValidator,
+  validate,
+  adminController.updateSupportTicketStatus
+);
+
+/**
+ * @swagger
+ * /admin/support/tickets/{id}/priority:
+ *   patch:
+ *     summary: Change a ticket's priority (requires the support_tickets:manage permission)
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object, required: [priority], properties: { priority: { type: string, enum: [LOW, MEDIUM, HIGH, URGENT] } } }
+ *     responses:
+ *       200: { description: Updated }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       422: { $ref: '#/components/responses/ValidationError' }
+ */
+router.patch(
+  '/support/tickets/:id/priority',
+  requirePermission(PERMISSIONS.SUPPORT_TICKETS_MANAGE),
+  ticketPriorityValidator,
+  validate,
+  adminController.updateSupportTicketPriority
+);
+
+/**
+ * @swagger
+ * /admin/support/tickets/{id}/assign:
+ *   patch:
+ *     summary: Assign (or unassign) a ticket to a staff member (requires the support_tickets:manage permission)
+ *     description: >
+ *       The assignee must themselves hold the support_tickets:manage permission — a normal customer, restaurant
+ *       owner or delivery partner id is rejected with 400, and can never be used to assign a ticket to themselves
+ *       or to another admin.  Omit assignedTo to unassign.
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema: { type: object, properties: { assignedTo: { type: string, description: 'A staff user id, or omit to unassign' } } }
+ *     responses:
+ *       200: { description: Assigned }
+ *       400: { description: assignedTo is not a support-capable staff member }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       422: { $ref: '#/components/responses/ValidationError' }
+ */
+router.patch(
+  '/support/tickets/:id/assign',
+  requirePermission(PERMISSIONS.SUPPORT_TICKETS_MANAGE),
+  assignTicketValidator,
+  validate,
+  adminController.assignSupportTicket
+);
+
+/**
+ * @swagger
+ * /admin/support/tickets/{id}/messages:
+ *   post:
+ *     summary: Reply to a ticket as staff (requires the support_tickets:manage permission)
+ *     description: Rejected with 400 while the ticket is CLOSED — reopen it first (PATCH .../status to IN_PROGRESS).
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [message]
+ *             properties:
+ *               message: { type: string, maxLength: 2000 }
+ *               attachments: { type: array, items: { type: string }, maxItems: 3 }
+ *     responses:
+ *       201: { description: Message added }
+ *       400: { description: This ticket is closed }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       422: { $ref: '#/components/responses/ValidationError' }
+ *       429: { description: Too many requests }
+ */
+router.post(
+  '/support/tickets/:id/messages',
+  supportLimiter,
+  requirePermission(PERMISSIONS.SUPPORT_TICKETS_MANAGE),
+  addTicketMessageValidator,
+  validate,
+  adminController.addSupportTicketMessage
+);
+
+/**
+ * @swagger
+ * /admin/support/tickets/{id}/resolve:
+ *   patch:
+ *     summary: Mark a ticket resolved, optionally recording a resolution note (requires the support_tickets:manage permission)
+ *     description: Only valid from IN_PROGRESS or WAITING_FOR_USER (the same allow-list PATCH .../status enforces).
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema: { type: object, properties: { resolution: { type: string, maxLength: 2000 } } }
+ *     responses:
+ *       200: { description: Resolved }
+ *       400: { description: That transition is not allowed from the ticket's current status }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       422: { $ref: '#/components/responses/ValidationError' }
+ */
+router.patch(
+  '/support/tickets/:id/resolve',
+  requirePermission(PERMISSIONS.SUPPORT_TICKETS_MANAGE),
+  resolveTicketValidator,
+  validate,
+  adminController.resolveSupportTicket
+);
+
+/**
+ * @swagger
+ * /admin/support/tickets/{id}/close:
+ *   patch:
+ *     summary: Close a ticket (requires the support_tickets:manage permission)
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Closed }
+ *       400: { description: That transition is not allowed from the ticket's current status }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+router.patch('/support/tickets/:id/close', requirePermission(PERMISSIONS.SUPPORT_TICKETS_MANAGE), adminController.closeSupportTicketAdmin);
 
 module.exports = router;

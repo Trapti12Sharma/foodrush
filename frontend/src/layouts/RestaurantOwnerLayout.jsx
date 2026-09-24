@@ -1,6 +1,6 @@
 import { Outlet, NavLink } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { LayoutDashboard, ClipboardList, UtensilsCrossed, FolderTree, Store, Star } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, UtensilsCrossed, FolderTree, Store, Star, LifeBuoy } from 'lucide-react';
 import { RestaurantOwnerProvider, useRestaurantOwner } from '../context/RestaurantOwnerContext';
 import { restaurantService } from '../services/restaurantService';
 import CreateRestaurantForm from '../components/CreateRestaurantForm';
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { to: '/restaurant/categories', label: 'Categories', icon: FolderTree },
   { to: '/restaurant/profile', label: 'Profile', icon: Store },
   { to: '/restaurant/reviews', label: 'Reviews', icon: Star },
+  { to: '/restaurant/support', label: 'Support', icon: LifeBuoy },
 ];
 
 function Onboarding() {

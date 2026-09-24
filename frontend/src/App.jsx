@@ -32,6 +32,9 @@ import OwnerProfile from './pages/owner/Profile';
 import OwnerReviews from './pages/owner/Reviews';
 import DeliveryDashboard from './pages/delivery/Dashboard';
 import DeliveryProfile from './pages/delivery/Profile';
+import DeliverySupport from './pages/delivery/Support';
+import Support from './pages/Support';
+import OwnerSupport from './pages/owner/Support';
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminUsers from './pages/admin/Users';
 import AdminRestaurants from './pages/admin/Restaurants';
@@ -40,6 +43,8 @@ import AdminCoupons from './pages/admin/Coupons';
 import AdminDeliveryPartners from './pages/admin/DeliveryPartners';
 import AdminDeliveryAssignments from './pages/admin/DeliveryAssignments';
 import AdminDeliverySettlements from './pages/admin/DeliverySettlements';
+import AdminSupportTickets from './pages/admin/SupportTickets';
+import AdminAuditLogs from './pages/admin/AuditLogs';
 import Profile from './pages/Profile';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
@@ -113,6 +118,14 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/support"
+                element={
+                  <ProtectedRoute>
+                    <Support />
+                  </ProtectedRoute>
+                }
+              />
 
               <Route
                 path="/restaurant"
@@ -128,6 +141,7 @@ function App() {
                 <Route path="categories" element={<OwnerCategories />} />
                 <Route path="profile" element={<OwnerProfile />} />
                 <Route path="reviews" element={<OwnerReviews />} />
+                <Route path="support" element={<OwnerSupport />} />
               </Route>
 
               <Route
@@ -140,6 +154,7 @@ function App() {
               >
                 <Route path="dashboard" element={<DeliveryDashboard />} />
                 <Route path="profile" element={<DeliveryProfile />} />
+                <Route path="support" element={<DeliverySupport />} />
               </Route>
 
               <Route
@@ -158,6 +173,8 @@ function App() {
                 <Route path="delivery-partners" element={<AdminDeliveryPartners />} />
                 <Route path="delivery-assignments" element={<AdminDeliveryAssignments />} />
                 <Route path="delivery-settlements" element={<AdminDeliverySettlements />} />
+                <Route path="support-tickets" element={<AdminSupportTickets />} />
+                <Route path="audit-logs" element={<AdminAuditLogs />} />
               </Route>
 
               <Route path="*" element={<NotFound />} />

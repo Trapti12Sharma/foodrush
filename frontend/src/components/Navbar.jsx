@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, MapPin, User, ShoppingCart, Menu, X, LogOut, ClipboardList, Heart, MapPinned, Store, LayoutDashboard, Bike } from 'lucide-react';
+import { Search, MapPin, User, ShoppingCart, Menu, X, LogOut, ClipboardList, Heart, MapPinned, Store, LayoutDashboard, Bike, LifeBuoy } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useDeliveryLocation } from '../context/LocationContext';
@@ -134,6 +134,13 @@ export default function Navbar() {
                   >
                     <Heart size={14} /> Favorites
                   </Link>
+                  <Link
+                    to="/support"
+                    onClick={() => setProfileOpen(false)}
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    <LifeBuoy size={14} /> Support
+                  </Link>
                   <button
                     type="button"
                     onClick={handleLogout}
@@ -238,6 +245,9 @@ export default function Navbar() {
                 </Link>
                 <Link to="/favorites" onClick={() => setMobileOpen(false)} className="rounded px-2 py-2 text-sm hover:bg-gray-50">
                   Favorites
+                </Link>
+                <Link to="/support" onClick={() => setMobileOpen(false)} className="rounded px-2 py-2 text-sm hover:bg-gray-50">
+                  Support
                 </Link>
                 <button
                   type="button"

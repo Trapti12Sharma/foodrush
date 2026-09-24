@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { LayoutDashboard, UserRound } from 'lucide-react';
+import { LayoutDashboard, UserRound, LifeBuoy } from 'lucide-react';
 import { DeliveryPartnerProvider, useDeliveryPartner } from '../context/DeliveryPartnerContext';
 import { deliveryPartnerService } from '../services/deliveryPartnerService';
 import CreateDeliveryPartnerForm from '../components/CreateDeliveryPartnerForm';
@@ -9,6 +9,7 @@ import CreateDeliveryPartnerForm from '../components/CreateDeliveryPartnerForm';
 const NAV_ITEMS = [
   { to: '/delivery/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/delivery/profile', label: 'Profile', icon: UserRound },
+  { to: '/delivery/support', label: 'Support', icon: LifeBuoy },
 ];
 
 function Onboarding() {
