@@ -7,6 +7,7 @@ const User = require('../models/User');
 const ApiError = require('../utils/ApiError');
 const { emitTrackingEnded } = require('../realtime/io');
 const deliveryOtpService = require('./deliveryOtp.service');
+const deliveryEarningService = require('./deliveryEarning.service');
 const emailService = require('./email.service');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { isValidPointCoordinates, haversineKm, roundTo, DEFAULT_RIDER_SEARCH_RADIUS_KM } = require('../utils/geo');
@@ -396,9 +397,17 @@ async function onOrderStatusChanged(order, actor) {
     if (order.orderStatus === ORDER_STATUS.DELIVERED) {
       const completed = await DeliveryAssignment.findOneAndUpdate(
         { order: order._id, status: DELIVERY_ASSIGNMENT_STATUS.ASSIGNED },
-        { $set: { status: DELIVERY_ASSIGNMENT_STATUS.COMPLETED, completedAt: new Date() } }
+        { $set: { status: DELIVERY_ASSIGNMENT_STATUS.COMPLETED, completedAt: new Date() } },
+        { new: true }
       );
-      if (completed) emitTrackingEnded({ orderId: order._id, assignmentId: completed._id, reason: 'delivered' });
+      if (completed) {
+        emitTrackingEnded({ orderId: order._id, assignmentId: completed._id, reason: 'delivered' });
+        // M10 — the single, shared point both the OTP-verify path and the
+        // restaurant/admin manual-completion fallback funnel through, so a
+        // rider earns identically either way. Never blocks/undoes the delivery
+        // completion itself if this somehow fails — see the outer try/catch.
+        await deliveryEarningService.createEarningForCompletedDelivery(order, completed);
+      }
       return;
     }
     if ([ORDER_STATUS.CANCELLED, ORDER_STATUS.REJECTED].includes(order.orderStatus)) {

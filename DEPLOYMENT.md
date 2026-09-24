@@ -276,6 +276,50 @@ fallback). The OTP expires after `DELIVERY_OTP_EXPIRY_MINUTES` (default 30). Onl
 the customer who placed the order can ever retrieve it — never the restaurant
 owner, the assigned rider, or an admin.
 
+## 8. Delivery earnings and settlement foundation (M10)
+
+Each completed delivery (the exact moment `DeliveryAssignment` reaches
+`COMPLETED` — the same single hook both the OTP-verify path and the
+restaurant/admin manual-completion fallback funnel through) creates one
+`DeliveryEarning` row for the rider who delivered it. This is a **server-side
+calculation only**: the amount is derived from `DELIVERY_BASE_EARNING` plus
+`DELIVERY_PER_KM_RATE × Order.deliveryDistanceKm` (the same real distance
+computed once at order placement in M5 — never a fresh GPS/Maps lookup, never
+invented). If the order has no reliable distance, the earning falls back to
+base-only rather than guessing one. A configured `DELIVERY_MIN_EARNING` floor
+and optional `DELIVERY_MAX_EARNING` ceiling are applied last. A client can
+never influence the amount — any `amount`/`netAmount` sent in a request body
+is ignored.
+
+Optional environment variables (all have safe defaults; none are required to
+deploy):
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `DELIVERY_BASE_EARNING` | `20` | Flat amount (₹) earned per completed delivery. |
+| `DELIVERY_PER_KM_RATE` | `6` | Amount (₹) earned per km of `Order.deliveryDistanceKm`. |
+| `DELIVERY_MIN_EARNING` | `20` | Floor applied to the final net amount. |
+| `DELIVERY_MAX_EARNING` | unset (no cap) | Optional ceiling applied to the final net amount. |
+
+Earning lifecycle: `PENDING` (created, unsettled) → `SETTLED` (moved there
+only when its settlement is marked `PAID`). Settlement lifecycle (admin-only,
+gated by the `delivery_settlements:manage` permission — never given to a
+rider, restaurant owner, or customer):
+
+```
+PENDING -> APPROVED -> PAID
+              \-> FAILED -> APPROVED (retry)
+```
+
+`PAID` is terminal (no reversal architecture exists yet). An admin generates a
+settlement for one rider over a date range; generation atomically claims every
+`PENDING`, not-yet-settled earning in that range for that rider before the
+settlement document is created, so two concurrent generate requests for the
+same rider/period can never both succeed or double-claim the same earnings.
+`payoutReference` on `markPaid` is an admin-entered note for bookkeeping only —
+**this milestone does not integrate any real bank/UPI/payment-gateway payout**;
+it is a settlement-tracking foundation, not a money-transfer system.
+
 ## Payments
 
 Real online payments require a Razorpay account. Set `RAZORPAY_KEY_ID` and

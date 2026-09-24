@@ -16,6 +16,17 @@ const suspendDeliveryPartnerValidator = [body('reason').optional({ checkFalsy: t
 const assignOrderValidator = [body('deliveryPartnerId').optional({ checkFalsy: true }).isMongoId().withMessage('deliveryPartnerId must be a valid id')];
 const cancelAssignmentValidator = [body('reason').optional({ checkFalsy: true }).trim().isLength({ max: 500 })];
 
+const generateSettlementValidator = [
+  body('deliveryPartnerId').isMongoId().withMessage('A valid deliveryPartnerId is required'),
+  body('periodStart').isISO8601().withMessage('periodStart must be a valid date'),
+  body('periodEnd').isISO8601().withMessage('periodEnd must be a valid date'),
+];
+const markSettlementPaidValidator = [
+  body('payoutReference').optional({ checkFalsy: true }).trim().isLength({ max: 200 }),
+  body('notes').optional({ checkFalsy: true }).trim().isLength({ max: 500 }),
+];
+const markSettlementFailedValidator = [body('reason').optional({ checkFalsy: true }).trim().isLength({ max: 500 })];
+
 const router = express.Router();
 
 router.use(authenticateUser);
@@ -577,6 +588,161 @@ router.patch(
   cancelAssignmentValidator,
   validate,
   adminController.cancelDeliveryAssignment
+);
+
+/**
+ * @swagger
+ * /admin/delivery-settlements:
+ *   get:
+ *     summary: List/filter delivery settlements (requires the delivery_settlements:manage permission)
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: query, name: status, schema: { type: string, enum: [PENDING, APPROVED, PROCESSING, PAID, FAILED, CANCELLED] } }
+ *       - { in: query, name: deliveryPartner, schema: { type: string } }
+ *       - { in: query, name: page, schema: { type: integer, default: 1 } }
+ *       - { in: query, name: limit, schema: { type: integer, default: 12 } }
+ *     responses:
+ *       200: { description: A page of settlements }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+router.get('/delivery-settlements', requirePermission(PERMISSIONS.DELIVERY_SETTLEMENTS_MANAGE), adminController.listDeliverySettlements);
+
+/**
+ * @swagger
+ * /admin/delivery-settlements/{id}:
+ *   get:
+ *     summary: One settlement's detail, including every earning it includes (requires the delivery_settlements:manage permission)
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Settlement detail + its earnings }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+router.get('/delivery-settlements/:id', requirePermission(PERMISSIONS.DELIVERY_SETTLEMENTS_MANAGE), adminController.getDeliverySettlement);
+
+/**
+ * @swagger
+ * /admin/delivery-settlements/generate:
+ *   post:
+ *     summary: Generate one settlement for a rider covering a period (requires the delivery_settlements:manage permission)
+ *     description: >
+ *       Includes every PENDING earning for this rider, earned within [periodStart, periodEnd], not already
+ *       claimed by another settlement. Atomic against two admins racing to generate the same settlement — see
+ *       deliverySettlement.service.js. Fails with 400 if there is nothing unsettled to include.
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [deliveryPartnerId, periodStart, periodEnd]
+ *             properties:
+ *               deliveryPartnerId: { type: string }
+ *               periodStart: { type: string, format: date }
+ *               periodEnd: { type: string, format: date }
+ *     responses:
+ *       201: { description: Settlement generated }
+ *       400: { description: 'Invalid period, or nothing unsettled to include' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       422: { $ref: '#/components/responses/ValidationError' }
+ */
+router.post(
+  '/delivery-settlements/generate',
+  requirePermission(PERMISSIONS.DELIVERY_SETTLEMENTS_MANAGE),
+  generateSettlementValidator,
+  validate,
+  adminController.generateDeliverySettlement
+);
+
+/**
+ * @swagger
+ * /admin/delivery-settlements/{id}/approve:
+ *   patch:
+ *     summary: Approve a pending settlement (requires the delivery_settlements:manage permission)
+ *     description: Only valid from PENDING.
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Approved }
+ *       400: { description: Not currently PENDING }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+router.patch('/delivery-settlements/:id/approve', requirePermission(PERMISSIONS.DELIVERY_SETTLEMENTS_MANAGE), adminController.approveDeliverySettlement);
+
+/**
+ * @swagger
+ * /admin/delivery-settlements/{id}/mark-paid:
+ *   patch:
+ *     summary: Mark a settlement as paid (requires the delivery_settlements:manage permission)
+ *     description: >
+ *       Only valid from APPROVED. This records that the admin confirmed payment happened by some OTHER
+ *       means (bank transfer, cash, UPI) — it does NOT itself transfer money or call any payout provider (none
+ *       is integrated in this milestone). `payoutReference` is a free-text note the admin enters, never a
+ *       gateway-confirmed value. Every earning included in this settlement moves to SETTLED.
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               payoutReference: { type: string, description: 'Admin-entered note, e.g. a bank UTR — never gateway-confirmed' }
+ *               notes: { type: string }
+ *     responses:
+ *       200: { description: Marked paid }
+ *       400: { description: Not currently APPROVED }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       422: { $ref: '#/components/responses/ValidationError' }
+ */
+router.patch(
+  '/delivery-settlements/:id/mark-paid',
+  requirePermission(PERMISSIONS.DELIVERY_SETTLEMENTS_MANAGE),
+  markSettlementPaidValidator,
+  validate,
+  adminController.markDeliverySettlementPaid
+);
+
+/**
+ * @swagger
+ * /admin/delivery-settlements/{id}/failed:
+ *   patch:
+ *     summary: Mark a settlement as failed (requires the delivery_settlements:manage permission)
+ *     description: Only valid from APPROVED or PROCESSING. Does not release the settlement's earnings — re-approve to retry.
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema: { type: object, properties: { reason: { type: string } } }
+ *     responses:
+ *       200: { description: Marked failed }
+ *       400: { description: 'Not currently APPROVED/PROCESSING' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       422: { $ref: '#/components/responses/ValidationError' }
+ */
+router.patch(
+  '/delivery-settlements/:id/failed',
+  requirePermission(PERMISSIONS.DELIVERY_SETTLEMENTS_MANAGE),
+  markSettlementFailedValidator,
+  validate,
+  adminController.markDeliverySettlementFailed
 );
 
 module.exports = router;

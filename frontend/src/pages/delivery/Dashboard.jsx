@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Bike, Wallet, MapPin, Store, Clock, Navigation, Radio, ShieldCheck } from 'lucide-react';
+import { Bike, Wallet, MapPin, Store, Clock, Navigation, Radio, ShieldCheck, ChevronDown, ChevronUp } from 'lucide-react';
 import { useDeliveryPartner } from '../../context/DeliveryPartnerContext';
 import { deliveryPartnerService } from '../../services/deliveryPartnerService';
 import { deliveryAssignmentService } from '../../services/deliveryAssignmentService';
+import { deliveryEarningService } from '../../services/deliveryEarningService';
 import { useLocationSharing } from '../../hooks/useLocationSharing';
 
 // No push notifications yet (Socket.IO is a later milestone) — the dashboard polls
@@ -193,6 +194,98 @@ function CurrentDeliveryCard({ assignment, onDelivered }) {
   );
 }
 
+function EarningRow({ earning }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="rounded-lg border border-gray-100">
+      <button type="button" onClick={() => setExpanded((v) => !v)} className="flex w-full items-center justify-between px-3 py-2.5 text-left">
+        <div>
+          <p className="text-sm font-medium text-gray-900">Delivery #{earning.orderNumber}</p>
+          <p className="text-xs text-gray-400">{new Date(earning.earnedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-gray-900">₹{earning.netAmount.toFixed(2)}</span>
+          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${earning.status === 'SETTLED' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+            {earning.status}
+          </span>
+          {expanded ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+        </div>
+      </button>
+      {expanded && (
+        <div className="space-y-1 border-t border-gray-100 px-3 py-2.5 text-xs text-gray-600">
+          <div className="flex justify-between"><span>Base</span><span>₹{earning.baseAmount.toFixed(2)}</span></div>
+          <div className="flex justify-between">
+            <span>Distance{earning.distanceKm != null ? ` (${earning.distanceKm} km)` : ' (unavailable)'}</span>
+            <span>₹{earning.distanceAmount.toFixed(2)}</span>
+          </div>
+          {earning.incentiveAmount > 0 && (
+            <div className="flex justify-between"><span>Incentive</span><span>₹{earning.incentiveAmount.toFixed(2)}</span></div>
+          )}
+          <div className="flex justify-between font-medium text-gray-800"><span>Gross</span><span>₹{earning.grossAmount.toFixed(2)}</span></div>
+          {earning.deductions > 0 && (
+            <div className="flex justify-between text-red-600"><span>Deductions</span><span>-₹{earning.deductions.toFixed(2)}</span></div>
+          )}
+          <div className="flex justify-between border-t border-gray-100 pt-1 font-semibold text-gray-900"><span>Net</span><span>₹{earning.netAmount.toFixed(2)}</span></div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EarningsSection() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    deliveryEarningService
+      .myEarnings({ limit: 5 })
+      .then(setData)
+      .catch(() => setData(null))
+      .finally(() => setLoading(false));
+  }, []);
+
+  return (
+    <div className="mt-4 rounded-xl border border-gray-200 bg-white p-4">
+      <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900">
+        <Wallet size={16} /> Earnings
+      </p>
+      {loading ? (
+        <p className="text-sm text-gray-400">Loading…</p>
+      ) : !data ? (
+        <p className="text-sm text-gray-400">Could not load earnings.</p>
+      ) : (
+        <>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-lg bg-gray-50 p-3 text-center">
+              <p className="text-xs text-gray-500">Total Earnings</p>
+              <p className="mt-1 text-lg font-bold text-gray-900">₹{data.summary.totalEarned.toFixed(2)}</p>
+            </div>
+            <div className="rounded-lg bg-amber-50 p-3 text-center">
+              <p className="text-xs text-amber-700">Pending Settlement</p>
+              <p className="mt-1 text-lg font-bold text-amber-700">₹{data.summary.pendingSettlement.toFixed(2)}</p>
+            </div>
+            <div className="rounded-lg bg-green-50 p-3 text-center">
+              <p className="text-xs text-green-700">Settled Amount</p>
+              <p className="mt-1 text-lg font-bold text-green-700">₹{data.summary.settledAmount.toFixed(2)}</p>
+            </div>
+          </div>
+
+          <p className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-gray-400">Recent deliveries</p>
+          {data.items.length === 0 ? (
+            <p className="text-sm text-gray-400">No completed deliveries yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {data.items.map((earning) => (
+                <EarningRow key={earning._id} earning={earning} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 const KYC_STYLES = {
   PENDING: 'bg-amber-100 text-amber-700',
   SUBMITTED: 'bg-blue-100 text-blue-700',
@@ -368,12 +461,7 @@ export default function Dashboard() {
         </p>
       </div>
 
-      <div className="mt-4 rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4">
-        <p className="flex items-center gap-2 text-sm font-semibold text-gray-500">
-          <Wallet size={16} /> Earnings
-        </p>
-        <p className="mt-1 text-sm text-gray-400">Coming in a later update — earnings and payouts are not tracked yet.</p>
-      </div>
+      <EarningsSection />
     </div>
   );
 }

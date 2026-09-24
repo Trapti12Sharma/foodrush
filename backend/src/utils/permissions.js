@@ -24,6 +24,7 @@ const PERMISSIONS = Object.freeze({
   REFUNDS_MANAGE: 'refunds:manage',
   DELIVERY_PARTNERS_MANAGE: 'delivery_partners:manage', // view KYC details, approve/reject KYC, suspend/reactivate
   DELIVERY_ASSIGNMENTS_MANAGE: 'delivery_assignments:manage', // view/cancel assignments, manually dispatch a rider
+  DELIVERY_SETTLEMENTS_MANAGE: 'delivery_settlements:manage', // generate/approve/mark paid or failed
 });
 
 const P = PERMISSIONS;
@@ -44,6 +45,7 @@ const ADMIN_PERMISSIONS = [
   P.REFUNDS_MANAGE,
   P.DELIVERY_PARTNERS_MANAGE,
   P.DELIVERY_ASSIGNMENTS_MANAGE,
+  P.DELIVERY_SETTLEMENTS_MANAGE,
 ];
 
 const ROLE_PERMISSIONS = Object.freeze({
@@ -57,7 +59,13 @@ const ROLE_PERMISSIONS = Object.freeze({
     P.RESTAURANTS_MANAGE,
     P.REVIEWS_MODERATE,
   ],
-  [ROLES.DELIVERY_MANAGER]: [P.DASHBOARD_VIEW, P.ORDERS_READ_ALL, P.DELIVERY_PARTNERS_MANAGE, P.DELIVERY_ASSIGNMENTS_MANAGE],
+  [ROLES.DELIVERY_MANAGER]: [
+    P.DASHBOARD_VIEW,
+    P.ORDERS_READ_ALL,
+    P.DELIVERY_PARTNERS_MANAGE,
+    P.DELIVERY_ASSIGNMENTS_MANAGE,
+    P.DELIVERY_SETTLEMENTS_MANAGE,
+  ],
   [ROLES.SUPPORT_AGENT]: [P.DASHBOARD_VIEW, P.USERS_READ, P.ORDERS_READ_ALL],
   [ROLES.RESTAURANT_OWNER]: [],
   [ROLES.DELIVERY_PARTNER]: [],

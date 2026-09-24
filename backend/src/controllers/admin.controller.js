@@ -7,6 +7,7 @@ const auditService = require('../services/audit.service');
 const refundService = require('../services/refund.service');
 const deliveryPartnerService = require('../services/deliveryPartner.service');
 const deliveryAssignmentService = require('../services/deliveryAssignment.service');
+const deliverySettlementService = require('../services/deliverySettlement.service');
 const Order = require('../models/Order');
 
 const getDashboard = asyncHandler(async (req, res) => {
@@ -186,6 +187,64 @@ const cancelDeliveryAssignment = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, 'Delivery assignment cancelled', { assignment }));
 });
 
+const listDeliverySettlements = asyncHandler(async (req, res) => {
+  const { items, pagination } = await deliverySettlementService.listForAdmin(req.query);
+  res.json(new ApiResponse(200, 'Delivery settlements fetched', { settlements: items, pagination }));
+});
+
+const getDeliverySettlement = asyncHandler(async (req, res) => {
+  const { settlement, earnings } = await deliverySettlementService.getByIdForAdmin(req.params.id);
+  res.json(new ApiResponse(200, 'Delivery settlement fetched', { settlement, earnings }));
+});
+
+const generateDeliverySettlement = asyncHandler(async (req, res) => {
+  const settlement = await deliverySettlementService.generate(
+    { deliveryPartnerId: req.body.deliveryPartnerId, periodStart: req.body.periodStart, periodEnd: req.body.periodEnd },
+    req.user
+  );
+  await auditService.record({
+    req,
+    action: 'delivery_settlement.generate',
+    entityType: 'DeliverySettlement',
+    entityId: settlement._id,
+    metadata: { deliveryPartner: settlement.deliveryPartner.toString(), netAmount: settlement.netAmount, deliveryCount: settlement.deliveryCount },
+  });
+  res.status(201).json(new ApiResponse(201, 'Delivery settlement generated', { settlement }));
+});
+
+const approveDeliverySettlement = asyncHandler(async (req, res) => {
+  const settlement = await deliverySettlementService.approve(req.params.id, req.user);
+  await auditService.record({ req, action: 'delivery_settlement.approve', entityType: 'DeliverySettlement', entityId: settlement._id });
+  res.json(new ApiResponse(200, 'Delivery settlement approved', { settlement }));
+});
+
+const markDeliverySettlementPaid = asyncHandler(async (req, res) => {
+  const settlement = await deliverySettlementService.markPaid(req.params.id, req.user, {
+    payoutReference: req.body.payoutReference,
+    notes: req.body.notes,
+  });
+  await auditService.record({
+    req,
+    action: 'delivery_settlement.mark_paid',
+    entityType: 'DeliverySettlement',
+    entityId: settlement._id,
+    metadata: { payoutReference: req.body.payoutReference || null, netAmount: settlement.netAmount },
+  });
+  res.json(new ApiResponse(200, 'Delivery settlement marked paid', { settlement }));
+});
+
+const markDeliverySettlementFailed = asyncHandler(async (req, res) => {
+  const settlement = await deliverySettlementService.markFailed(req.params.id, req.user, req.body.reason);
+  await auditService.record({
+    req,
+    action: 'delivery_settlement.mark_failed',
+    entityType: 'DeliverySettlement',
+    entityId: settlement._id,
+    metadata: { reason: req.body.reason || null },
+  });
+  res.json(new ApiResponse(200, 'Delivery settlement marked failed', { settlement }));
+});
+
 module.exports = {
   getDashboard,
   listUsers,
@@ -207,4 +266,10 @@ module.exports = {
   listEligibleRiders,
   assignOrder,
   cancelDeliveryAssignment,
+  listDeliverySettlements,
+  getDeliverySettlement,
+  generateDeliverySettlement,
+  approveDeliverySettlement,
+  markDeliverySettlementPaid,
+  markDeliverySettlementFailed,
 };

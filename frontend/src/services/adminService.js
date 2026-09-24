@@ -25,4 +25,10 @@ export const adminService = {
   assignOrder: (orderId, deliveryPartnerId) =>
     api.post(`/admin/orders/${orderId}/assign`, deliveryPartnerId ? { deliveryPartnerId } : {}).then((r) => r.data.assignment),
   cancelDeliveryAssignment: (id, reason) => api.patch(`/admin/delivery-assignments/${id}/cancel`, { reason }).then((r) => r.data.assignment),
+  listDeliverySettlements: (params) => api.get('/admin/delivery-settlements', { params }).then((r) => r.data),
+  getDeliverySettlement: (id) => api.get(`/admin/delivery-settlements/${id}`).then((r) => r.data),
+  generateDeliverySettlement: (payload) => api.post('/admin/delivery-settlements/generate', payload).then((r) => r.data.settlement),
+  approveDeliverySettlement: (id) => api.patch(`/admin/delivery-settlements/${id}/approve`).then((r) => r.data.settlement),
+  markDeliverySettlementPaid: (id, payload) => api.patch(`/admin/delivery-settlements/${id}/mark-paid`, payload).then((r) => r.data.settlement),
+  markDeliverySettlementFailed: (id, reason) => api.patch(`/admin/delivery-settlements/${id}/failed`, { reason }).then((r) => r.data.settlement),
 };

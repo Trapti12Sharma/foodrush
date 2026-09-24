@@ -73,6 +73,7 @@ function validateEnv(env = process.env) {
   validateLocationConfig(env, isProd, errors, warnings);
   validatePaymentConfig(env, isProd, errors, warnings);
   validateDeliveryOtpConfig(env, errors);
+  validateDeliveryEarningConfig(env, errors);
 
   return { errors, warnings };
 }
@@ -85,6 +86,18 @@ function validateDeliveryOtpConfig(env, errors) {
   }
   if (env.DELIVERY_OTP_MAX_ATTEMPTS && !(Number.isInteger(Number(env.DELIVERY_OTP_MAX_ATTEMPTS)) && Number(env.DELIVERY_OTP_MAX_ATTEMPTS) > 0)) {
     errors.push('DELIVERY_OTP_MAX_ATTEMPTS must be a positive whole number.');
+  }
+}
+
+// All optional — deliveryEarning.service.js has sensible defaults when unset.
+// Only rejects a genuinely nonsensical value (never a business-rule opinion).
+function validateDeliveryEarningConfig(env, errors) {
+  const positiveIfSet = (key) => {
+    if (env[key] && !(Number(env[key]) >= 0)) errors.push(`${key} must be a non-negative number.`);
+  };
+  ['DELIVERY_BASE_EARNING', 'DELIVERY_PER_KM_RATE', 'DELIVERY_MIN_EARNING', 'DELIVERY_MAX_EARNING'].forEach(positiveIfSet);
+  if (env.DELIVERY_MIN_EARNING && env.DELIVERY_MAX_EARNING && Number(env.DELIVERY_MIN_EARNING) > Number(env.DELIVERY_MAX_EARNING)) {
+    errors.push('DELIVERY_MIN_EARNING cannot be greater than DELIVERY_MAX_EARNING.');
   }
 }
 

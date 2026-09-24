@@ -165,6 +165,40 @@ const ACTIVE_ASSIGNMENT_STATUSES = Object.freeze([
   DELIVERY_ASSIGNMENT_STATUS.ASSIGNED,
 ]);
 
+// M10 — Delivery Earnings & Settlement Foundation. Deliberately just two values:
+// whether an earning has actually been PAID OUT yet, from the rider's point of
+// view — not whether it has merely been grouped into a settlement that itself
+// isn't paid yet (that in-between state still reads as PENDING here; see
+// deliverySettlement.service.js's markPaid, the only place SETTLED is reached).
+const DELIVERY_EARNING_STATUS = Object.freeze({
+  PENDING: 'PENDING',
+  SETTLED: 'SETTLED',
+});
+
+// A settlement groups one rider's unpaid earnings for a period into a single
+// internal payout record. PROCESSING is defined now but not reachable by any
+// action in this milestone (nothing here talks to a real payout gateway that
+// could report "in flight") — the same "define now, wire up later" approach M6
+// used for DELIVERY_KYC_STATUS.PENDING. PAID is terminal: there is no reversal
+// architecture, so nothing transitions out of it (matches instructions).
+const DELIVERY_SETTLEMENT_STATUS = Object.freeze({
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  PROCESSING: 'PROCESSING',
+  PAID: 'PAID',
+  FAILED: 'FAILED',
+  CANCELLED: 'CANCELLED',
+});
+
+const DELIVERY_SETTLEMENT_TRANSITIONS = Object.freeze({
+  [DELIVERY_SETTLEMENT_STATUS.PENDING]: [DELIVERY_SETTLEMENT_STATUS.APPROVED, DELIVERY_SETTLEMENT_STATUS.CANCELLED],
+  [DELIVERY_SETTLEMENT_STATUS.APPROVED]: [DELIVERY_SETTLEMENT_STATUS.PAID, DELIVERY_SETTLEMENT_STATUS.FAILED, DELIVERY_SETTLEMENT_STATUS.CANCELLED],
+  [DELIVERY_SETTLEMENT_STATUS.PROCESSING]: [DELIVERY_SETTLEMENT_STATUS.PAID, DELIVERY_SETTLEMENT_STATUS.FAILED],
+  [DELIVERY_SETTLEMENT_STATUS.FAILED]: [DELIVERY_SETTLEMENT_STATUS.APPROVED], // retry
+  [DELIVERY_SETTLEMENT_STATUS.PAID]: [],
+  [DELIVERY_SETTLEMENT_STATUS.CANCELLED]: [],
+});
+
 module.exports = {
   ROLES,
   ORDER_STATUS,
@@ -182,4 +216,7 @@ module.exports = {
   DELIVERY_VEHICLE_TYPES,
   DELIVERY_ASSIGNMENT_STATUS,
   ACTIVE_ASSIGNMENT_STATUSES,
+  DELIVERY_EARNING_STATUS,
+  DELIVERY_SETTLEMENT_STATUS,
+  DELIVERY_SETTLEMENT_TRANSITIONS,
 };

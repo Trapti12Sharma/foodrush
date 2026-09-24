@@ -15,4 +15,6 @@ module.exports = {
   Counter: require('./Counter'),
   DeliveryPartner: require('./DeliveryPartner'),
   DeliveryAssignment: require('./DeliveryAssignment'),
+  DeliveryEarning: require('./DeliveryEarning'),
+  DeliverySettlement: require('./DeliverySettlement'),
 };
