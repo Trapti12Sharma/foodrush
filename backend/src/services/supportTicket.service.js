@@ -9,8 +9,11 @@ const ApiError = require('../utils/ApiError');
 const { nextTicketNumber } = require('../utils/ticketNumber');
 const { escapeRegex } = require('../utils/regex');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
+const notificationService = require('./notification.service');
 const { PERMISSIONS, hasPermission } = require('../utils/permissions');
-const { ROLES, SUPPORT_TICKET_STATUS, SUPPORT_TICKET_TRANSITIONS, SUPPORT_TICKET_OPEN_FOR_USER_REPLY } = require('../utils/constants');
+const {
+  ROLES, SUPPORT_TICKET_STATUS, SUPPORT_TICKET_TRANSITIONS, SUPPORT_TICKET_OPEN_FOR_USER_REPLY, NOTIFICATION_TYPE,
+} = require('../utils/constants');
 
 // The atomic Counter increment (utils/ticketNumber.js) already makes each
 // ticketNumber unique under real concurrency — this retry is defense in depth
@@ -102,17 +105,35 @@ async function createTicket(user, payload) {
   };
 
   let lastErr;
-  for (let attempt = 1; attempt <= MAX_TICKET_NUMBER_ATTEMPTS; attempt += 1) {
+  let ticket;
+  for (let attempt = 1; attempt <= MAX_TICKET_NUMBER_ATTEMPTS && !ticket; attempt += 1) {
     const ticketNumber = await nextTicketNumber();
     try {
       // eslint-disable-next-line no-await-in-loop
-      return await SupportTicket.create({ ...data, ticketNumber });
+      ticket = await SupportTicket.create({ ...data, ticketNumber });
     } catch (err) {
       if (err.code !== 11000) throw err;
       lastErr = err;
     }
   }
-  throw lastErr || ApiError.internal('Could not generate a unique ticket number. Please try again.');
+  if (!ticket) throw lastErr || ApiError.internal('Could not generate a unique ticket number. Please try again.');
+
+  const notifyData = { ticketId: ticket._id, ticketNumber: ticket.ticketNumber };
+  await notificationService.notify({
+    recipient: user,
+    type: NOTIFICATION_TYPE.SUPPORT_TICKET_CREATED,
+    data: notifyData,
+    eventKey: `SUPPORT_TICKET:${ticket._id}:CREATED:${user._id}`,
+  });
+  // Nobody is assigned yet — every support-capable staff member is told a new
+  // ticket needs triage (Part 16), never every admin.
+  await notificationService.notifyStaff(PERMISSIONS.SUPPORT_TICKETS_MANAGE, {
+    type: NOTIFICATION_TYPE.SUPPORT_TICKET_CREATED,
+    data: notifyData,
+    entityId: ticket._id,
+  });
+
+  return ticket;
 }
 
 async function listForUser(user, query) {
@@ -143,8 +164,21 @@ async function addMessageAsUser(user, ticketId, { message, attachments }) {
   if (!ticket) throw ApiError.notFound('Support ticket not found');
   assertUserMayReply(ticket);
 
-  ticket.messages.push({ sender: user._id, senderRole: user.role, message, attachments: attachments || [] });
+  const pushed = ticket.messages[ticket.messages.push({ sender: user._id, senderRole: user.role, message, attachments: attachments || [] }) - 1];
   await ticket.save();
+
+  // Only the assigned staff member — nobody is "everyone on support" for a
+  // single ticket's reply, and an unassigned ticket simply has nobody to tell
+  // yet (the staff-wide SUPPORT_TICKET_CREATED notification already covers that).
+  if (ticket.assignedTo) {
+    await notificationService.notify({
+      recipient: ticket.assignedTo,
+      type: NOTIFICATION_TYPE.SUPPORT_TICKET_REPLIED,
+      data: { ticketId: ticket._id, ticketNumber: ticket.ticketNumber },
+      eventKey: `SUPPORT_TICKET:${ticket._id}:REPLIED:${pushed._id}:${ticket.assignedTo}`,
+    });
+  }
+
   return ticket;
 }
 
@@ -231,6 +265,29 @@ async function updateStatusForAdmin(ticketId, nextStatus, admin) {
     ticket.resolution = null;
   }
   await ticket.save();
+
+  // Both resolveForAdmin and closeForAdmin funnel through this one function —
+  // one notification call covers both, at the single point the transition
+  // actually happens. Reopening (-> IN_PROGRESS) and a plain PENDING->IN_PROGRESS
+  // triage move are deliberately silent — neither is something the creator needs
+  // a push for.
+  if (nextStatus === SUPPORT_TICKET_STATUS.RESOLVED) {
+    await notificationService.notify({
+      recipient: ticket.createdBy,
+      type: NOTIFICATION_TYPE.SUPPORT_TICKET_RESOLVED,
+      data: { ticketId: ticket._id, ticketNumber: ticket.ticketNumber },
+      eventKey: `SUPPORT_TICKET:${ticket._id}:RESOLVED:${ticket.createdBy}`,
+    });
+  }
+  if (nextStatus === SUPPORT_TICKET_STATUS.CLOSED) {
+    await notificationService.notify({
+      recipient: ticket.createdBy,
+      type: NOTIFICATION_TYPE.SUPPORT_TICKET_CLOSED,
+      data: { ticketId: ticket._id, ticketNumber: ticket.ticketNumber },
+      eventKey: `SUPPORT_TICKET:${ticket._id}:CLOSED:${ticket.createdBy}`,
+    });
+  }
+
   return ticket;
 }
 
@@ -258,6 +315,14 @@ async function assignForAdmin(ticketId, assignedToId) {
   }
   ticket.assignedTo = assignee._id;
   await ticket.save();
+
+  await notificationService.notify({
+    recipient: assignee,
+    type: NOTIFICATION_TYPE.SUPPORT_TICKET_ASSIGNED,
+    data: { ticketId: ticket._id, ticketNumber: ticket.ticketNumber },
+    eventKey: `SUPPORT_TICKET:${ticket._id}:ASSIGNED:${assignee._id}`,
+  });
+
   return ticket;
 }
 
@@ -267,8 +332,16 @@ async function addMessageAsAdmin(admin, ticketId, { message, attachments }) {
   if (ticket.status === SUPPORT_TICKET_STATUS.CLOSED) {
     throw ApiError.badRequest('This ticket is closed. Reopen it first if it needs another reply.');
   }
-  ticket.messages.push({ sender: admin._id, senderRole: admin.role, message, attachments: attachments || [] });
+  const pushed = ticket.messages[ticket.messages.push({ sender: admin._id, senderRole: admin.role, message, attachments: attachments || [] }) - 1];
   await ticket.save();
+
+  await notificationService.notify({
+    recipient: ticket.createdBy,
+    type: NOTIFICATION_TYPE.SUPPORT_TICKET_REPLIED,
+    data: { ticketId: ticket._id, ticketNumber: ticket.ticketNumber },
+    eventKey: `SUPPORT_TICKET:${ticket._id}:REPLIED:${pushed._id}:${ticket.createdBy}`,
+  });
+
   return ticket;
 }
 

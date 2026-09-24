@@ -1,5 +1,6 @@
 import { Outlet, NavLink } from 'react-router-dom';
 import { LayoutDashboard, Users, Store, ClipboardList, Tag, Bike, Navigation, Wallet, LifeBuoy, ScrollText } from 'lucide-react';
+import NotificationBell from '../components/NotificationBell';
 
 const NAV_ITEMS = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -36,6 +37,9 @@ export default function AdminLayout() {
         </nav>
       </aside>
       <div className="flex-1">
+        <div className="mb-4 flex justify-end">
+          <NotificationBell />
+        </div>
         <Outlet />
       </div>
     </div>

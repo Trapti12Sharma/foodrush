@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { MapPinned } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
+import { notificationService } from '../services/notificationService';
 import ImageUploadField from '../components/ImageUploadField';
 
 const inputClass =
@@ -176,6 +177,71 @@ function PasswordForm() {
   );
 }
 
+const PREFERENCE_LABELS = [
+  { key: 'orderUpdates', label: 'Order updates', description: 'Placed, confirmed, ready, out for delivery, delivered' },
+  { key: 'paymentUpdates', label: 'Payment & refund updates', description: 'Payment success/failure, refund progress' },
+  { key: 'deliveryUpdates', label: 'Delivery updates', description: 'Assignment, delivery OTP, earnings & settlements' },
+  { key: 'supportUpdates', label: 'Support ticket updates', description: 'Replies, assignment, resolution' },
+  { key: 'marketing', label: 'Marketing', description: 'Off by default — FoodRush does not send marketing email yet' },
+];
+
+// Controls the EMAIL channel only — in-app notifications (the bell) are always
+// on, and ACCOUNT_SECURITY/SYSTEM notifications are never affected by any of
+// these (see backend/src/utils/constants.js NOTIFICATION_PREFERENCE_FIELD).
+function NotificationPreferencesForm() {
+  const [preferences, setPreferences] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    notificationService
+      .getPreferences()
+      .then(setPreferences)
+      .catch(() => toast.error('Could not load notification preferences'));
+  }, []);
+
+  async function toggle(key) {
+    const next = { ...preferences, [key]: !preferences[key] };
+    setPreferences(next); // optimistic
+    setSaving(true);
+    try {
+      await notificationService.updatePreferences({ [key]: next[key] });
+    } catch (err) {
+      setPreferences(preferences); // revert
+      toast.error(err.message || 'Could not update preference');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!preferences) return null;
+
+  return (
+    <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <h2 className="text-lg font-semibold text-gray-900">Email notifications</h2>
+      <p className="text-xs text-gray-500">You'll always see these in your notification bell — this only controls what's also emailed to you.</p>
+      <div className="divide-y divide-gray-100">
+        {PREFERENCE_LABELS.map(({ key, label, description }) => (
+          <div key={key} className="flex items-center justify-between py-3">
+            <div>
+              <p className="text-sm font-medium text-gray-800">{label}</p>
+              <p className="text-xs text-gray-400">{description}</p>
+            </div>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => toggle(key)}
+              aria-label={`Toggle ${label}`}
+              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${preferences[key] ? 'bg-brand-600' : 'bg-gray-200'}`}
+            >
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${preferences[key] ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Profile() {
   const { user } = useAuth();
 
@@ -188,6 +254,7 @@ export default function Profile() {
 
       <ProfileForm />
       <PasswordForm />
+      <NotificationPreferencesForm />
 
       <Link
         to="/profile/addresses"

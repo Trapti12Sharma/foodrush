@@ -4,8 +4,12 @@ const Refund = require('../models/Refund');
 const ApiError = require('../utils/ApiError');
 const paymentService = require('./payment.service');
 const auditService = require('./audit.service');
+const notificationService = require('./notification.service');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
-const { ORDER_STATUS, PAYMENT_METHODS, PAYMENT_STATUS, REFUND_STATUS, REFUNDABLE_FROM_STATUSES } = require('../utils/constants');
+const { PERMISSIONS } = require('../utils/permissions');
+const {
+  ORDER_STATUS, PAYMENT_METHODS, PAYMENT_STATUS, REFUND_STATUS, REFUNDABLE_FROM_STATUSES, NOTIFICATION_TYPE,
+} = require('../utils/constants');
 
 // Initiates a refund for a paid ONLINE order — called automatically by
 // order.service.js when a paid order is cancelled or rejected, and by the admin
@@ -81,6 +85,22 @@ async function initiateRefund(order, { reason, actor = null, amount } = {}) {
       entityId: refund._id,
       metadata: { orderId: order._id.toString(), orderNumber: order.orderNumber, amount: refund.amount, status: refund.status, reason },
     });
+
+    const notifyData = { orderId: order._id, orderNumber: order.orderNumber, amount: refund.amount };
+    await notificationService.notify({
+      recipient: order.user,
+      type: NOTIFICATION_TYPE.REFUND_CREATED,
+      data: notifyData,
+      eventKey: `REFUND:${refund._id}:CREATED:${order.user}`,
+    });
+    if (refund.status === REFUND_STATUS.COMPLETED) {
+      await notificationService.notify({
+        recipient: order.user,
+        type: NOTIFICATION_TYPE.REFUND_COMPLETED,
+        data: notifyData,
+        eventKey: `REFUND:${refund._id}:COMPLETED:${order.user}`,
+      });
+    }
   } catch (err) {
     refund.status = REFUND_STATUS.FAILED;
     refund.failureReason = err.message;
@@ -93,6 +113,21 @@ async function initiateRefund(order, { reason, actor = null, amount } = {}) {
       entityType: 'Refund',
       entityId: refund._id,
       metadata: { orderId: order._id.toString(), orderNumber: order.orderNumber, amount: refund.amount, reason, failureReason: err.message },
+    });
+
+    await notificationService.notify({
+      recipient: order.user,
+      type: NOTIFICATION_TYPE.REFUND_FAILED,
+      data: { orderId: order._id, orderNumber: order.orderNumber, amount: refund.amount },
+      eventKey: `REFUND:${refund._id}:FAILED:${order.user}`,
+    });
+    // A refund failure is exactly the kind of thing an admin needs to see and
+    // act on — never every admin, only staff who can actually do something
+    // about it (Part 16).
+    await notificationService.notifyStaff(PERMISSIONS.REFUNDS_MANAGE, {
+      type: NOTIFICATION_TYPE.REFUND_FAILED,
+      data: { orderId: order._id, orderNumber: order.orderNumber, amount: refund.amount },
+      entityId: refund._id,
     });
   }
 
@@ -108,7 +143,19 @@ async function markRefundProcessed(razorpayRefundId) {
   refund.status = REFUND_STATUS.COMPLETED;
   await refund.save();
 
-  await Order.updateOne({ _id: refund.order, orderStatus: ORDER_STATUS.REFUND_PENDING }, { orderStatus: ORDER_STATUS.REFUNDED });
+  const order = await Order.findOneAndUpdate(
+    { _id: refund.order, orderStatus: ORDER_STATUS.REFUND_PENDING },
+    { orderStatus: ORDER_STATUS.REFUNDED },
+    { new: true }
+  );
+  if (order) {
+    await notificationService.notify({
+      recipient: order.user,
+      type: NOTIFICATION_TYPE.REFUND_COMPLETED,
+      data: { orderId: order._id, orderNumber: order.orderNumber, amount: refund.amount },
+      eventKey: `REFUND:${refund._id}:COMPLETED:${order.user}`,
+    });
+  }
 }
 
 async function listRefunds(query) {

@@ -12,12 +12,13 @@ const refundService = require('./refund.service');
 const deliveryAssignmentService = require('./deliveryAssignment.service');
 const deliveryOtpService = require('./deliveryOtp.service');
 const restaurantGeoService = require('./restaurantGeo.service');
+const notificationService = require('./notification.service');
 const { isOpenNow } = require('../utils/openingHours');
 const { nextOrderNumber } = require('../utils/orderNumber');
 const pricing = require('./pricing.service');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const {
-  ORDER_STATUS, ORDER_STATUS_TRANSITIONS, PAYMENT_METHODS, PAYMENT_STATUS, PAYMENT_ATTEMPT_STATUS, ROLES,
+  ORDER_STATUS, ORDER_STATUS_TRANSITIONS, PAYMENT_METHODS, PAYMENT_STATUS, PAYMENT_ATTEMPT_STATUS, ROLES, NOTIFICATION_TYPE,
 } = require('../utils/constants');
 const { PERMISSIONS, hasPermission } = require('../utils/permissions');
 
@@ -196,6 +197,23 @@ async function createOrder(user, { addressId, paymentMethod }) {
   cart.total = 0;
   await cart.save();
 
+  // Awaited for determinism (a caller checking for the notification right after
+  // this resolves should find it) — notify() itself never throws, so this can
+  // never turn into an order-creation failure (Part 13).
+  const orderNotifyData = { orderId: order._id, orderNumber: order.orderNumber, totalAmount };
+  await notificationService.notify({
+    recipient: user,
+    type: NOTIFICATION_TYPE.ORDER_PLACED,
+    data: orderNotifyData,
+    eventKey: `ORDER:${order._id}:PLACED:${user._id}`,
+  });
+  await notificationService.notify({
+    recipient: restaurant.owner,
+    type: NOTIFICATION_TYPE.ORDER_PLACED,
+    data: orderNotifyData,
+    eventKey: `ORDER:${order._id}:PLACED:${restaurant.owner}`,
+  });
+
   return { order, razorpay };
 }
 
@@ -371,9 +389,34 @@ async function updateOrderStatus(user, orderId, nextStatus) {
   order.statusHistory.push({ status: nextStatus, changedBy: user._id });
   await order.save();
 
+  const notifyData = { orderId: order._id, orderNumber: order.orderNumber };
+  if (nextStatus === ORDER_STATUS.CONFIRMED) {
+    await notificationService.notify({
+      recipient: order.user,
+      type: NOTIFICATION_TYPE.ORDER_CONFIRMED,
+      data: notifyData,
+      eventKey: `ORDER:${order._id}:CONFIRMED:${order.user}`,
+    });
+  }
+
   if (nextStatus === ORDER_STATUS.REJECTED) {
+    await notificationService.notify({
+      recipient: order.user,
+      type: NOTIFICATION_TYPE.ORDER_REJECTED,
+      data: notifyData,
+      eventKey: `ORDER:${order._id}:REJECTED:${order.user}`,
+    });
     await autoRefundIfPaid(order, user, 'restaurant_rejection');
     await deliveryAssignmentService.onOrderStatusChanged(order, user);
+  }
+
+  if (nextStatus === ORDER_STATUS.READY_FOR_PICKUP) {
+    await notificationService.notify({
+      recipient: order.user,
+      type: NOTIFICATION_TYPE.ORDER_READY,
+      data: notifyData,
+      eventKey: `ORDER:${order._id}:READY:${order.user}`,
+    });
   }
 
   // The restaurant marking food ready is the dispatch trigger (M7) — find an
@@ -422,7 +465,18 @@ async function cancelOrder(user, orderId, reason) {
   order.statusHistory.push({ status: ORDER_STATUS.CANCELLED, changedBy: user._id });
   await order.save();
 
-  const refundReason = isCustomer && !isOwner && !isAdmin ? 'customer_cancellation' : 'restaurant_unavailable';
+  // Notify whichever side did NOT perform the cancellation — the actor already
+  // knows, since they just did it.
+  const cancelledByCustomer = isCustomer && !isOwner && !isAdmin;
+  const notifyRecipient = cancelledByCustomer ? order.restaurant.owner : order.user;
+  await notificationService.notify({
+    recipient: notifyRecipient,
+    type: NOTIFICATION_TYPE.ORDER_CANCELLED,
+    data: { orderId: order._id, orderNumber: order.orderNumber, reason: order.cancellationReason },
+    eventKey: `ORDER:${order._id}:CANCELLED:${notifyRecipient}`,
+  });
+
+  const refundReason = cancelledByCustomer ? 'customer_cancellation' : 'restaurant_unavailable';
   await autoRefundIfPaid(order, user, refundReason);
   await deliveryAssignmentService.onOrderStatusChanged(order, user);
 
@@ -457,6 +511,18 @@ async function verifyOnlinePayment(user, orderId, { razorpayOrderId, razorpayPay
       payment.failureReason = 'Signature verification failed';
       await payment.save();
     }
+    // The customer is right here on the checkout page — a retry really is the
+    // immediate next action, unlike an out-of-band webhook failure (see
+    // payment.controller.js's handlePaymentFailed, which uses PAYMENT_FAILED
+    // instead). Fired before the throw below: the state change already
+    // happened and is real, independent of what this call then reports back
+    // to the caller's own browser.
+    await notificationService.notify({
+      recipient: order.user,
+      type: NOTIFICATION_TYPE.PAYMENT_RETRY_REQUIRED,
+      data: { orderId: order._id, orderNumber: order.orderNumber },
+      eventKey: `PAYMENT:${razorpayOrderId}:RETRY_REQUIRED:${order.user}`,
+    });
     throw ApiError.badRequest('Payment verification failed');
   }
 
@@ -469,6 +535,18 @@ async function verifyOnlinePayment(user, orderId, { razorpayOrderId, razorpayPay
     payment.confirmedVia = 'verify_endpoint';
     await payment.save();
   }
+
+  // Scoped to the razorpayPaymentId (not the order) so this converges with the
+  // webhook's own handlePaymentCaptured notification for the SAME payment
+  // (Part 12) — whichever of the two reaches Mongo first wins; the other's
+  // duplicate eventKey is a harmless no-op, never a second email/notification.
+  await notificationService.notify({
+    recipient: order.user,
+    type: NOTIFICATION_TYPE.PAYMENT_SUCCESS,
+    data: { orderId: order._id, orderNumber: order.orderNumber, amount: order.totalAmount },
+    eventKey: `PAYMENT:${razorpayPaymentId}:SUCCESS:${order.user}`,
+  });
+
   return order;
 }
 

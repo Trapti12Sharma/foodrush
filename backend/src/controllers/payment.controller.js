@@ -2,9 +2,10 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiResponse = require('../utils/ApiResponse');
 const paymentService = require('../services/payment.service');
 const refundService = require('../services/refund.service');
+const notificationService = require('../services/notification.service');
 const Order = require('../models/Order');
 const Payment = require('../models/Payment');
-const { PAYMENT_STATUS, PAYMENT_ATTEMPT_STATUS } = require('../utils/constants');
+const { PAYMENT_STATUS, PAYMENT_ATTEMPT_STATUS, NOTIFICATION_TYPE } = require('../utils/constants');
 
 // Razorpay POSTs events here independently of whether the customer's browser ever
 // called POST /orders/:id/verify-payment (e.g. they closed the tab right after
@@ -55,10 +56,22 @@ async function handlePaymentCaptured(entity) {
   payment.confirmedVia = 'webhook';
   await payment.save();
 
-  await Order.updateOne(
+  const order = await Order.findOneAndUpdate(
     { _id: payment.order, razorpayOrderId: entity.order_id, paymentStatus: { $ne: PAYMENT_STATUS.PAID } },
-    { paymentStatus: PAYMENT_STATUS.PAID, transactionId: entity.id }
+    { paymentStatus: PAYMENT_STATUS.PAID, transactionId: entity.id },
+    { new: true }
   );
+  if (order) {
+    // Same eventKey shape as order.service.js#verifyOnlinePayment's own
+    // PAYMENT_SUCCESS notification, keyed on the same razorpayPaymentId — the
+    // two paths converge on one notification/email, never two, for one real payment.
+    await notificationService.notify({
+      recipient: order.user,
+      type: NOTIFICATION_TYPE.PAYMENT_SUCCESS,
+      data: { orderId: order._id, orderNumber: order.orderNumber, amount: order.totalAmount },
+      eventKey: `PAYMENT:${entity.id}:SUCCESS:${order.user}`,
+    });
+  }
 }
 
 async function handlePaymentFailed(entity) {
@@ -71,10 +84,22 @@ async function handlePaymentFailed(entity) {
   payment.confirmedVia = 'webhook';
   await payment.save();
 
-  await Order.updateOne(
+  const order = await Order.findOneAndUpdate(
     { _id: payment.order, razorpayOrderId: entity.order_id, paymentStatus: { $ne: PAYMENT_STATUS.PAID } },
-    { paymentStatus: PAYMENT_STATUS.FAILED }
+    { paymentStatus: PAYMENT_STATUS.FAILED },
+    { new: true }
   );
+  if (order) {
+    // Deliberately PAYMENT_FAILED, not PAYMENT_RETRY_REQUIRED — the customer's
+    // browser is not necessarily open for this out-of-band webhook event (see
+    // order.service.js#verifyOnlinePayment for the synchronous-failure case).
+    await notificationService.notify({
+      recipient: order.user,
+      type: NOTIFICATION_TYPE.PAYMENT_FAILED,
+      data: { orderId: order._id, orderNumber: order.orderNumber },
+      eventKey: `PAYMENT:${entity.id}:FAILED:${order.user}`,
+    });
+  }
 }
 
 module.exports = { webhook };

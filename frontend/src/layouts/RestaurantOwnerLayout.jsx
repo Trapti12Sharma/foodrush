@@ -4,6 +4,7 @@ import { LayoutDashboard, ClipboardList, UtensilsCrossed, FolderTree, Store, Sta
 import { RestaurantOwnerProvider, useRestaurantOwner } from '../context/RestaurantOwnerContext';
 import { restaurantService } from '../services/restaurantService';
 import CreateRestaurantForm from '../components/CreateRestaurantForm';
+import NotificationBell from '../components/NotificationBell';
 import { useState } from 'react';
 
 const NAV_ITEMS = [
@@ -98,6 +99,9 @@ function LayoutInner() {
     <div className="mx-auto flex max-w-6xl gap-6 px-4 py-6">
       <Sidebar />
       <div className="flex-1">
+        <div className="mb-4 flex justify-end">
+          <NotificationBell />
+        </div>
         <Outlet />
       </div>
     </div>

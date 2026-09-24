@@ -251,6 +251,102 @@ const SUPPORT_TICKET_OPEN_FOR_USER_REPLY = Object.freeze([
   SUPPORT_TICKET_STATUS.WAITING_FOR_USER,
 ]);
 
+// M12 — Notifications & Communication. One flat enum shared by in-app,
+// Socket.IO, and email — a single type always means the same event everywhere.
+const NOTIFICATION_TYPE = Object.freeze({
+  ORDER_PLACED: 'ORDER_PLACED',
+  ORDER_CONFIRMED: 'ORDER_CONFIRMED',
+  ORDER_REJECTED: 'ORDER_REJECTED',
+  ORDER_CANCELLED: 'ORDER_CANCELLED',
+  ORDER_READY: 'ORDER_READY',
+  ORDER_OUT_FOR_DELIVERY: 'ORDER_OUT_FOR_DELIVERY',
+  ORDER_DELIVERED: 'ORDER_DELIVERED',
+
+  PAYMENT_SUCCESS: 'PAYMENT_SUCCESS',
+  PAYMENT_FAILED: 'PAYMENT_FAILED',
+  PAYMENT_RETRY_REQUIRED: 'PAYMENT_RETRY_REQUIRED',
+  REFUND_CREATED: 'REFUND_CREATED',
+  REFUND_FAILED: 'REFUND_FAILED',
+  REFUND_COMPLETED: 'REFUND_COMPLETED',
+
+  DELIVERY_ASSIGNED: 'DELIVERY_ASSIGNED',
+  DELIVERY_ACCEPTED: 'DELIVERY_ACCEPTED',
+  DELIVERY_REJECTED: 'DELIVERY_REJECTED',
+  DELIVERY_STARTED: 'DELIVERY_STARTED',
+  DELIVERY_COMPLETED: 'DELIVERY_COMPLETED',
+  DELIVERY_OTP_REQUIRED: 'DELIVERY_OTP_REQUIRED',
+
+  SUPPORT_TICKET_CREATED: 'SUPPORT_TICKET_CREATED',
+  SUPPORT_TICKET_ASSIGNED: 'SUPPORT_TICKET_ASSIGNED',
+  SUPPORT_TICKET_REPLIED: 'SUPPORT_TICKET_REPLIED',
+  SUPPORT_TICKET_RESOLVED: 'SUPPORT_TICKET_RESOLVED',
+  SUPPORT_TICKET_CLOSED: 'SUPPORT_TICKET_CLOSED',
+
+  SETTLEMENT_GENERATED: 'SETTLEMENT_GENERATED',
+  SETTLEMENT_APPROVED: 'SETTLEMENT_APPROVED',
+  SETTLEMENT_PAID: 'SETTLEMENT_PAID',
+  SETTLEMENT_FAILED: 'SETTLEMENT_FAILED',
+
+  // Reserved for a future milestone — defined now so the enum is complete, not
+  // wired to any trigger yet (matches the "define now, wire up later" precedent
+  // already used for DELIVERY_KYC_STATUS.PENDING and DELIVERY_SETTLEMENT_STATUS.PROCESSING).
+  ACCOUNT_SECURITY: 'ACCOUNT_SECURITY',
+  SYSTEM: 'SYSTEM',
+});
+
+// Whether an email SEND was ever actually attempted/succeeded for a notification.
+// SKIPPED covers every reason there was nothing to send (channel not requested,
+// EMAIL_PROVIDER unset, or the recipient's own preference turned it off) — the
+// in-app row is unaffected either way (see notification.service.js).
+const NOTIFICATION_EMAIL_STATUS = Object.freeze({
+  SKIPPED: 'SKIPPED',
+  PENDING: 'PENDING',
+  SENT: 'SENT',
+  FAILED: 'FAILED',
+});
+
+// Which user-controllable NotificationPreference field gates the EMAIL channel
+// for each type — the in-app row is ALWAYS created regardless (see
+// notification.service.js's design note). A type with no entry here
+// (ACCOUNT_SECURITY, SYSTEM) is mandatory and never gated by a preference.
+const NOTIFICATION_PREFERENCE_FIELD = Object.freeze({
+  ORDER_PLACED: 'orderUpdates',
+  ORDER_CONFIRMED: 'orderUpdates',
+  ORDER_REJECTED: 'orderUpdates',
+  ORDER_CANCELLED: 'orderUpdates',
+  ORDER_READY: 'orderUpdates',
+  ORDER_OUT_FOR_DELIVERY: 'orderUpdates',
+  ORDER_DELIVERED: 'orderUpdates',
+
+  PAYMENT_SUCCESS: 'paymentUpdates',
+  PAYMENT_FAILED: 'paymentUpdates',
+  PAYMENT_RETRY_REQUIRED: 'paymentUpdates',
+  REFUND_CREATED: 'paymentUpdates',
+  REFUND_FAILED: 'paymentUpdates',
+  REFUND_COMPLETED: 'paymentUpdates',
+
+  DELIVERY_ASSIGNED: 'deliveryUpdates',
+  DELIVERY_ACCEPTED: 'deliveryUpdates',
+  DELIVERY_REJECTED: 'deliveryUpdates',
+  DELIVERY_STARTED: 'deliveryUpdates',
+  DELIVERY_COMPLETED: 'deliveryUpdates',
+  DELIVERY_OTP_REQUIRED: 'deliveryUpdates',
+
+  SUPPORT_TICKET_CREATED: 'supportUpdates',
+  SUPPORT_TICKET_ASSIGNED: 'supportUpdates',
+  SUPPORT_TICKET_REPLIED: 'supportUpdates',
+  SUPPORT_TICKET_RESOLVED: 'supportUpdates',
+  SUPPORT_TICKET_CLOSED: 'supportUpdates',
+
+  // A rider's settlement is part of their delivery-earnings experience —
+  // there is no dedicated "payouts" preference field, and inventing one the
+  // spec never asked for would be its own unrequested feature.
+  SETTLEMENT_GENERATED: 'deliveryUpdates',
+  SETTLEMENT_APPROVED: 'deliveryUpdates',
+  SETTLEMENT_PAID: 'deliveryUpdates',
+  SETTLEMENT_FAILED: 'deliveryUpdates',
+});
+
 module.exports = {
   ROLES,
   ORDER_STATUS,
@@ -276,4 +372,7 @@ module.exports = {
   SUPPORT_TICKET_STATUS,
   SUPPORT_TICKET_TRANSITIONS,
   SUPPORT_TICKET_OPEN_FOR_USER_REPLY,
+  NOTIFICATION_TYPE,
+  NOTIFICATION_EMAIL_STATUS,
+  NOTIFICATION_PREFERENCE_FIELD,
 };

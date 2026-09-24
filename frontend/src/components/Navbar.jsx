@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useDeliveryLocation } from '../context/LocationContext';
 import { isAdminPanelUser } from '../constants/roles';
+import NotificationBell from './NotificationBell';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -69,6 +70,8 @@ export default function Navbar() {
           </Link>
 
           {user ? (
+            <>
+            <NotificationBell />
             <div className="relative">
               <button
                 type="button"
@@ -151,6 +154,7 @@ export default function Navbar() {
                 </div>
               )}
             </div>
+            </>
           ) : (
             <Link
               to="/login"

@@ -74,8 +74,18 @@ function validateEnv(env = process.env) {
   validatePaymentConfig(env, isProd, errors, warnings);
   validateDeliveryOtpConfig(env, errors);
   validateDeliveryEarningConfig(env, errors);
+  validateNotificationConfig(env, errors);
 
   return { errors, warnings };
+}
+
+// Optional — notification.service.js defaults to 3 when unset. Only rejects a
+// genuinely nonsensical value; email itself is governed entirely by the
+// existing EMAIL_PROVIDER config validated below, nothing new to check there.
+function validateNotificationConfig(env, errors) {
+  if (env.NOTIFICATION_EMAIL_MAX_ATTEMPTS && !(Number.isInteger(Number(env.NOTIFICATION_EMAIL_MAX_ATTEMPTS)) && Number(env.NOTIFICATION_EMAIL_MAX_ATTEMPTS) > 0)) {
+    errors.push('NOTIFICATION_EMAIL_MAX_ATTEMPTS must be a positive whole number.');
+  }
 }
 
 // Both optional — deliveryOtp.service.js already has sensible defaults (30 minutes,

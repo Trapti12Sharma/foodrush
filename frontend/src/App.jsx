@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
+import { NotificationProvider } from './context/NotificationContext';
 import { CartProvider } from './context/CartContext';
 import { FavoritesProvider } from './context/FavoritesContext';
 import { LocationProvider } from './context/LocationContext';
@@ -53,6 +54,7 @@ import NotFound from './pages/NotFound';
 function App() {
   return (
     <AuthProvider>
+      <NotificationProvider>
       <CartProvider>
         <FavoritesProvider>
           <LocationProvider>
@@ -183,6 +185,7 @@ function App() {
           </LocationProvider>
         </FavoritesProvider>
       </CartProvider>
+      </NotificationProvider>
     </AuthProvider>
   );
 }

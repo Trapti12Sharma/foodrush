@@ -4,11 +4,14 @@ const DeliverySettlement = require('../models/DeliverySettlement');
 const DeliveryPartner = require('../models/DeliveryPartner');
 const ApiError = require('../utils/ApiError');
 const { round2 } = require('./pricing.service');
+const notificationService = require('./notification.service');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
+const { PERMISSIONS } = require('../utils/permissions');
 const {
   DELIVERY_EARNING_STATUS,
   DELIVERY_SETTLEMENT_STATUS,
   DELIVERY_SETTLEMENT_TRANSITIONS,
+  NOTIFICATION_TYPE,
 } = require('../utils/constants');
 
 function assertTransition(settlement, nextStatus) {
@@ -16,6 +19,15 @@ function assertTransition(settlement, nextStatus) {
   if (!allowed.includes(nextStatus)) {
     throw ApiError.badRequest(`Cannot move a settlement from "${settlement.status}" to "${nextStatus}"`);
   }
+}
+
+// approve/markPaid/markFailed only ever load the settlement itself (deliveryPartner
+// is just an id there, not populated) — this is the one place that resolves the
+// rider's actual User id for a notification, rather than repeating the lookup three times.
+async function notifyRider(settlement, type, data) {
+  const rider = await DeliveryPartner.findById(settlement.deliveryPartner).select('user');
+  if (!rider) return;
+  await notificationService.notify({ recipient: rider.user, type, data, eventKey: `SETTLEMENT:${settlement._id}:${type}:${rider.user}` });
 }
 
 // Generates ONE settlement for a rider covering [periodStart, periodEnd], from
@@ -61,8 +73,9 @@ async function generate({ deliveryPartnerId, periodStart, periodEnd }, actor) {
   const deductions = round2(earnings.reduce((sum, e) => sum + e.deductions, 0));
   const netAmount = round2(earnings.reduce((sum, e) => sum + e.netAmount, 0));
 
+  let settlement;
   try {
-    return await DeliverySettlement.create({
+    settlement = await DeliverySettlement.create({
       _id: settlementId,
       deliveryPartner: rider._id,
       periodStart: start,
@@ -80,6 +93,15 @@ async function generate({ deliveryPartnerId, periodStart, periodEnd }, actor) {
     await DeliveryEarning.updateMany({ settlement: settlementId }, { $set: { settlement: null } });
     throw err;
   }
+
+  await notificationService.notify({
+    recipient: rider.user,
+    type: NOTIFICATION_TYPE.SETTLEMENT_GENERATED,
+    data: { settlementId: settlement._id, netAmount: settlement.netAmount },
+    eventKey: `SETTLEMENT:${settlement._id}:GENERATED:${rider.user}`,
+  });
+
+  return settlement;
 }
 
 async function approve(id, actor) {
@@ -91,6 +113,7 @@ async function approve(id, actor) {
   settlement.approvedAt = new Date();
   settlement.approvedBy = actor._id;
   await settlement.save();
+  await notifyRider(settlement, NOTIFICATION_TYPE.SETTLEMENT_APPROVED, { settlementId: settlement._id, netAmount: settlement.netAmount });
   return settlement;
 }
 
@@ -115,6 +138,8 @@ async function markPaid(id, actor, { payoutReference, notes } = {}) {
     { $set: { status: DELIVERY_EARNING_STATUS.SETTLED, settledAt: settlement.paidAt } }
   );
 
+  await notifyRider(settlement, NOTIFICATION_TYPE.SETTLEMENT_PAID, { settlementId: settlement._id, netAmount: settlement.netAmount });
+
   return settlement;
 }
 
@@ -127,6 +152,16 @@ async function markFailed(id, actor, reason) {
   settlement.failedAt = new Date();
   settlement.failureReason = reason || null;
   await settlement.save();
+
+  await notifyRider(settlement, NOTIFICATION_TYPE.SETTLEMENT_FAILED, { settlementId: settlement._id, reason: settlement.failureReason });
+  // A settlement failure needs operational attention — never every admin, only
+  // staff who can actually act on it (Part 16).
+  await notificationService.notifyStaff(PERMISSIONS.DELIVERY_SETTLEMENTS_MANAGE, {
+    type: NOTIFICATION_TYPE.SETTLEMENT_FAILED,
+    data: { settlementId: settlement._id, reason: settlement.failureReason },
+    entityId: settlement._id,
+  });
+
   return settlement;
 }
 

@@ -3,12 +3,11 @@ const DeliveryAssignment = require('../models/DeliveryAssignment');
 const DeliveryPartner = require('../models/DeliveryPartner');
 const Order = require('../models/Order');
 const Restaurant = require('../models/Restaurant');
-const User = require('../models/User');
 const ApiError = require('../utils/ApiError');
 const { emitTrackingEnded } = require('../realtime/io');
 const deliveryOtpService = require('./deliveryOtp.service');
 const deliveryEarningService = require('./deliveryEarning.service');
-const emailService = require('./email.service');
+const notificationService = require('./notification.service');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { isValidPointCoordinates, haversineKm, roundTo, DEFAULT_RIDER_SEARCH_RADIUS_KM } = require('../utils/geo');
 const {
@@ -18,6 +17,7 @@ const {
   DELIVERY_ACCOUNT_STATUS,
   DELIVERY_KYC_STATUS,
   DELIVERY_AVAILABILITY,
+  NOTIFICATION_TYPE,
 } = require('../utils/constants');
 
 // How long a rider has to respond to an offer. Deliberately generous for a
@@ -112,8 +112,9 @@ async function dispatchOrder(order) {
 }
 
 async function createOffer(orderId, deliveryPartnerId, distanceKm = null) {
+  let assignment;
   try {
-    return await DeliveryAssignment.create({
+    assignment = await DeliveryAssignment.create({
       order: orderId,
       deliveryPartner: deliveryPartnerId,
       status: DELIVERY_ASSIGNMENT_STATUS.OFFERED,
@@ -126,6 +127,24 @@ async function createOffer(orderId, deliveryPartnerId, distanceKm = null) {
     if (err.code === 11000) throw ApiError.conflict('This order already has an active delivery assignment');
     throw err;
   }
+
+  // The single choke point both automatic dispatch and admin manual assignment
+  // flow through — one notification call covers both. Best-effort: a rider who
+  // never sees this offer just lets it expire, exactly like today.
+  const [rider, order] = await Promise.all([
+    DeliveryPartner.findById(deliveryPartnerId).select('user'),
+    Order.findById(orderId).select('orderNumber'),
+  ]);
+  if (rider && order) {
+    await notificationService.notify({
+      recipient: rider.user,
+      type: NOTIFICATION_TYPE.DELIVERY_ASSIGNED,
+      data: { orderId, orderNumber: order.orderNumber, assignmentId: assignment._id },
+      eventKey: `DELIVERY:${assignment._id}:ASSIGNED:${rider.user}`,
+    });
+  }
+
+  return assignment;
 }
 
 // Admin-triggered: either offer to a SPECIFIC rider (manual dispatch), or, with no
@@ -231,20 +250,36 @@ async function acceptAssignment(rider, assignmentId) {
   claimed.assignedAt = new Date();
   await claimed.save();
 
-  return { assignment: claimed, order };
-}
-
-// Fires a best-effort "your order has been delivered" email — never blocks or
-// fails the completion it's reporting on (same pattern as auth.service.js's
-// notifyPasswordChanged).
-async function notifyOrderDelivered(order) {
-  try {
-    const customer = await User.findById(order.user).select('name email');
-    if (!customer) return;
-    await emailService.sendMail({ to: customer.email, ...emailService.orderDeliveredEmail({ name: customer.name, orderNumber: order.orderNumber }) });
-  } catch (err) {
-    console.error(`Order-delivered notification failed for order ${order.orderNumber}:`, err.message);
+  // Customer-facing: their order is now genuinely out for delivery, and its OTP
+  // (just generated above, in the very same atomic update) is ready to view —
+  // never the OTP digits themselves, only that it's ready (see
+  // NOTIFICATION_TYPE.DELIVERY_OTP_REQUIRED's own comment in
+  // notification.service.js). Restaurant-facing: a rider is now on the way to
+  // pick up, a distinct, non-redundant fact from what the customer needed to know.
+  const notifyData = { orderId: order._id, orderNumber: order.orderNumber };
+  await notificationService.notify({
+    recipient: order.user,
+    type: NOTIFICATION_TYPE.ORDER_OUT_FOR_DELIVERY,
+    data: notifyData,
+    eventKey: `ORDER:${order._id}:OUT_FOR_DELIVERY:${order.user}`,
+  });
+  await notificationService.notify({
+    recipient: order.user,
+    type: NOTIFICATION_TYPE.DELIVERY_OTP_REQUIRED,
+    data: notifyData,
+    eventKey: `DELIVERY:${order._id}:OTP_REQUIRED:${order.user}`,
+  });
+  const restaurant = await Restaurant.findById(order.restaurant).select('owner');
+  if (restaurant) {
+    await notificationService.notify({
+      recipient: restaurant.owner,
+      type: NOTIFICATION_TYPE.DELIVERY_ACCEPTED,
+      data: notifyData,
+      eventKey: `DELIVERY:${claimed._id}:ACCEPTED:${restaurant.owner}`,
+    });
   }
+
+  return { assignment: claimed, order };
 }
 
 // The rider's OTP-verified delivery completion — the ONLY way this milestone lets
@@ -331,9 +366,10 @@ async function verifyDeliveryOtp(rider, assignmentId, submittedOtp) {
   // The exact same M7/M8 hook the restaurant/admin's own manual completion path
   // already triggers — it atomically flips the assignment to COMPLETED and emits
   // tracking:ended. One place decides "what happens when an order is delivered",
-  // never duplicated here.
+  // never duplicated here — including the customer's ORDER_DELIVERED
+  // notification/email, now sent from inside onOrderStatusChanged itself
+  // rather than a second, separate ad hoc email call here.
   await onOrderStatusChanged(order, { _id: rider.user });
-  await notifyOrderDelivered(order);
 
   const completedAssignment = await DeliveryAssignment.findById(assignment._id);
   return { order, assignment: completedAssignment };
@@ -382,8 +418,27 @@ async function cancelAssignment(id, actor, reason) {
   // a rider's assignment doesn't retroactively un-cook the food), and tell anyone
   // watching this delivery live that it has stopped.
   if (wasAssigned) {
-    await Order.updateOne({ _id: assignment.order, deliveryPartner: assignment.deliveryPartner }, { $set: { deliveryPartner: null } });
+    const order = await Order.findOneAndUpdate(
+      { _id: assignment.order, deliveryPartner: assignment.deliveryPartner },
+      { $set: { deliveryPartner: null } },
+      { new: true }
+    );
     emitTrackingEnded({ orderId: assignment.order, assignmentId: assignment._id, reason: 'cancelled' });
+
+    // Only when the ORDER itself is still otherwise proceeding — i.e. a genuine
+    // admin "pull this rider off, we'll find another" action (cancelDeliveryAssignment).
+    // When this same function runs as onOrderStatusChanged's own cleanup for an
+    // order that just became CANCELLED/REJECTED, the customer already gets that
+    // order-level notification directly from order.service.js — a second one
+    // here would be redundant/confusing.
+    if (order && ![ORDER_STATUS.CANCELLED, ORDER_STATUS.REJECTED].includes(order.orderStatus)) {
+      await notificationService.notify({
+        recipient: order.user,
+        type: NOTIFICATION_TYPE.DELIVERY_REJECTED,
+        data: { orderId: order._id, orderNumber: order.orderNumber },
+        eventKey: `DELIVERY:${assignment._id}:REJECTED:${order.user}`,
+      });
+    }
   }
 
   return assignment;
@@ -406,8 +461,27 @@ async function onOrderStatusChanged(order, actor) {
         // restaurant/admin manual-completion fallback funnel through, so a
         // rider earns identically either way. Never blocks/undoes the delivery
         // completion itself if this somehow fails — see the outer try/catch.
-        await deliveryEarningService.createEarningForCompletedDelivery(order, completed);
+        const earning = await deliveryEarningService.createEarningForCompletedDelivery(order, completed);
+        const rider = await DeliveryPartner.findById(completed.deliveryPartner).select('user');
+        if (rider) {
+          await notificationService.notify({
+            recipient: rider.user,
+            type: NOTIFICATION_TYPE.DELIVERY_COMPLETED,
+            data: { orderId: order._id, orderNumber: order.orderNumber, netAmount: earning ? earning.netAmount : null },
+            eventKey: `DELIVERY:${completed._id}:COMPLETED:${rider.user}`,
+          });
+        }
       }
+      // Customer-facing — fires for EVERY order that reaches DELIVERED,
+      // regardless of whether a rider was ever involved (self-delivery via the
+      // restaurant/admin's manual completion path has no `completed` assignment
+      // at all, but the customer still needs to know their order arrived).
+      await notificationService.notify({
+        recipient: order.user,
+        type: NOTIFICATION_TYPE.ORDER_DELIVERED,
+        data: { orderId: order._id, orderNumber: order.orderNumber },
+        eventKey: `ORDER:${order._id}:DELIVERED:${order.user}`,
+      });
       return;
     }
     if ([ORDER_STATUS.CANCELLED, ORDER_STATUS.REJECTED].includes(order.orderStatus)) {

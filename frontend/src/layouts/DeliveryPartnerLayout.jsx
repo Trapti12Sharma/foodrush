@@ -5,6 +5,7 @@ import { LayoutDashboard, UserRound, LifeBuoy } from 'lucide-react';
 import { DeliveryPartnerProvider, useDeliveryPartner } from '../context/DeliveryPartnerContext';
 import { deliveryPartnerService } from '../services/deliveryPartnerService';
 import CreateDeliveryPartnerForm from '../components/CreateDeliveryPartnerForm';
+import NotificationBell from '../components/NotificationBell';
 
 const NAV_ITEMS = [
   { to: '/delivery/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -85,6 +86,9 @@ function LayoutInner() {
     <div className="mx-auto flex max-w-6xl gap-6 px-4 py-6">
       <Sidebar />
       <div className="flex-1">
+        <div className="mb-4 flex justify-end">
+          <NotificationBell />
+        </div>
         <Outlet />
       </div>
     </div>

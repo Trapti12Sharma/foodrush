@@ -37,4 +37,17 @@ function emitTrackingEnded({ orderId, assignmentId, reason }) {
     .emit('tracking:ended', { orderId: orderId.toString(), assignmentId: assignmentId.toString(), reason });
 }
 
-module.exports = { setIO, getIO, orderRoom, deliveryRoom, userRoom, emitTrackingEnded };
+// M12 — the one place a notification ever reaches a socket. Every authenticated
+// connection already auto-joins its own userRoom (see realtime/socketHandlers.js),
+// so there is no separate "subscribe to notifications" step and no way for a
+// client to ask to receive someone else's — the room name is only ever derived
+// from a server-resolved recipient id (notification.service.js), never from
+// anything a client sends. Best-effort, like emitTrackingEnded: a null io (not
+// started, or in a test that never calls initSocket) must never fail the
+// business operation that triggered this notification.
+function emitToUser(userId, event, payload) {
+  if (!io) return;
+  io.to(userRoom(userId.toString())).emit(event, payload);
+}
+
+module.exports = { setIO, getIO, orderRoom, deliveryRoom, userRoom, emitTrackingEnded, emitToUser };

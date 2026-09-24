@@ -104,6 +104,148 @@ function orderDeliveredEmail({ name, orderNumber }) {
   };
 }
 
+// ---- M12 notification templates --------------------------------------------
+// Same shape as every template above: {subject, text, html}. Deliberately plain
+// — a short, factual line plus the one relevant number/id, never anything
+// credential- or OTP-shaped (see notification.service.js, which decides WHETHER
+// to call these; this file only ever decides HOW the email reads).
+
+function orderPlacedEmail({ name, orderNumber, totalAmount }) {
+  return {
+    subject: `Order ${orderNumber} placed — FoodRush`,
+    text: `Hi ${name},\n\nYour FoodRush order ${orderNumber} (₹${totalAmount}) has been placed. We'll notify you as it progresses.`,
+    html: `<p>Hi ${escapeHtml(name)},</p><p>Your FoodRush order <strong>${escapeHtml(orderNumber)}</strong> (₹${totalAmount}) has been placed. We'll notify you as it progresses.</p>`,
+  };
+}
+
+function orderConfirmedEmail({ name, orderNumber }) {
+  return {
+    subject: `Order ${orderNumber} confirmed — FoodRush`,
+    text: `Hi ${name},\n\nThe restaurant has confirmed your FoodRush order ${orderNumber} and is preparing it.`,
+    html: `<p>Hi ${escapeHtml(name)},</p><p>The restaurant has confirmed your FoodRush order <strong>${escapeHtml(orderNumber)}</strong> and is preparing it.</p>`,
+  };
+}
+
+function orderRejectedEmail({ name, orderNumber, reason }) {
+  return {
+    subject: `Order ${orderNumber} was rejected — FoodRush`,
+    text: `Hi ${name},\n\nWe're sorry — your FoodRush order ${orderNumber} was rejected by the restaurant${reason ? ` (${reason})` : ''}. If you paid online, a refund has been started automatically.`,
+    html: `<p>Hi ${escapeHtml(name)},</p><p>We're sorry — your FoodRush order <strong>${escapeHtml(orderNumber)}</strong> was rejected by the restaurant${reason ? ` (${escapeHtml(reason)})` : ''}. If you paid online, a refund has been started automatically.</p>`,
+  };
+}
+
+function orderCancelledEmail({ name, orderNumber, reason }) {
+  return {
+    subject: `Order ${orderNumber} cancelled — FoodRush`,
+    text: `Hi ${name},\n\nYour FoodRush order ${orderNumber} has been cancelled${reason ? ` (${reason})` : ''}. If you paid online, a refund has been started automatically.`,
+    html: `<p>Hi ${escapeHtml(name)},</p><p>Your FoodRush order <strong>${escapeHtml(orderNumber)}</strong> has been cancelled${reason ? ` (${escapeHtml(reason)})` : ''}. If you paid online, a refund has been started automatically.</p>`,
+  };
+}
+
+function paymentSuccessEmail({ name, orderNumber, amount }) {
+  return {
+    subject: `Payment received for order ${orderNumber} — FoodRush`,
+    text: `Hi ${name},\n\nWe've received your payment of ₹${amount} for FoodRush order ${orderNumber}.`,
+    html: `<p>Hi ${escapeHtml(name)},</p><p>We've received your payment of ₹${amount} for FoodRush order <strong>${escapeHtml(orderNumber)}</strong>.</p>`,
+  };
+}
+
+function paymentFailedEmail({ name, orderNumber }) {
+  return {
+    subject: `Payment failed for order ${orderNumber} — FoodRush`,
+    text: `Hi ${name},\n\nYour payment for FoodRush order ${orderNumber} could not be completed. No amount has been charged.`,
+    html: `<p>Hi ${escapeHtml(name)},</p><p>Your payment for FoodRush order <strong>${escapeHtml(orderNumber)}</strong> could not be completed. No amount has been charged.</p>`,
+  };
+}
+
+function paymentRetryRequiredEmail({ name, orderNumber }) {
+  return {
+    subject: `Complete payment for order ${orderNumber} — FoodRush`,
+    text: `Hi ${name},\n\nYour payment for FoodRush order ${orderNumber} didn't go through. You can retry payment from your order page.`,
+    html: `<p>Hi ${escapeHtml(name)},</p><p>Your payment for FoodRush order <strong>${escapeHtml(orderNumber)}</strong> didn't go through. You can retry payment from your order page.</p>`,
+  };
+}
+
+function refundCreatedEmail({ name, orderNumber, amount }) {
+  return {
+    subject: `Refund started for order ${orderNumber} — FoodRush`,
+    text: `Hi ${name},\n\nA refund of ₹${amount} for FoodRush order ${orderNumber} has been started. It can take a few days to reflect in your account.`,
+    html: `<p>Hi ${escapeHtml(name)},</p><p>A refund of ₹${amount} for FoodRush order <strong>${escapeHtml(orderNumber)}</strong> has been started. It can take a few days to reflect in your account.</p>`,
+  };
+}
+
+function refundFailedEmail({ name, orderNumber, amount }) {
+  return {
+    subject: `Refund issue for order ${orderNumber} — FoodRush`,
+    text: `Hi ${name},\n\nWe ran into an issue processing your ₹${amount} refund for FoodRush order ${orderNumber}. Our team has been notified and will follow up.`,
+    html: `<p>Hi ${escapeHtml(name)},</p><p>We ran into an issue processing your ₹${amount} refund for FoodRush order <strong>${escapeHtml(orderNumber)}</strong>. Our team has been notified and will follow up.</p>`,
+  };
+}
+
+function refundCompletedEmail({ name, orderNumber, amount }) {
+  return {
+    subject: `Refund completed for order ${orderNumber} — FoodRush`,
+    text: `Hi ${name},\n\nYour refund of ₹${amount} for FoodRush order ${orderNumber} is complete.`,
+    html: `<p>Hi ${escapeHtml(name)},</p><p>Your refund of ₹${amount} for FoodRush order <strong>${escapeHtml(orderNumber)}</strong> is complete.</p>`,
+  };
+}
+
+function deliveryAssignedEmail({ name, orderNumber }) {
+  return {
+    subject: `New delivery offer — FoodRush`,
+    text: `Hi ${name},\n\nYou have a new delivery offer for order ${orderNumber}. Open the FoodRush app to accept or decline.`,
+    html: `<p>Hi ${escapeHtml(name)},</p><p>You have a new delivery offer for order <strong>${escapeHtml(orderNumber)}</strong>. Open the FoodRush app to accept or decline.</p>`,
+  };
+}
+
+function orderOutForDeliveryEmail({ name, orderNumber }) {
+  return {
+    subject: `Order ${orderNumber} is out for delivery — FoodRush`,
+    text: `Hi ${name},\n\nYour FoodRush order ${orderNumber} is on its way!`,
+    html: `<p>Hi ${escapeHtml(name)},</p><p>Your FoodRush order <strong>${escapeHtml(orderNumber)}</strong> is on its way!</p>`,
+  };
+}
+
+function supportTicketCreatedEmail({ name, ticketNumber }) {
+  return {
+    subject: `Support ticket ${ticketNumber} received — FoodRush`,
+    text: `Hi ${name},\n\nWe've received your support ticket ${ticketNumber} and will get back to you soon.`,
+    html: `<p>Hi ${escapeHtml(name)},</p><p>We've received your support ticket <strong>${escapeHtml(ticketNumber)}</strong> and will get back to you soon.</p>`,
+  };
+}
+
+function supportTicketReplyEmail({ name, ticketNumber }) {
+  return {
+    subject: `New reply on ticket ${ticketNumber} — FoodRush`,
+    text: `Hi ${name},\n\nThere's a new reply on your support ticket ${ticketNumber}.`,
+    html: `<p>Hi ${escapeHtml(name)},</p><p>There's a new reply on your support ticket <strong>${escapeHtml(ticketNumber)}</strong>.</p>`,
+  };
+}
+
+function supportTicketResolvedEmail({ name, ticketNumber }) {
+  return {
+    subject: `Ticket ${ticketNumber} resolved — FoodRush`,
+    text: `Hi ${name},\n\nYour support ticket ${ticketNumber} has been marked resolved. Reply if you still need help.`,
+    html: `<p>Hi ${escapeHtml(name)},</p><p>Your support ticket <strong>${escapeHtml(ticketNumber)}</strong> has been marked resolved. Reply if you still need help.</p>`,
+  };
+}
+
+function settlementPaidEmail({ name, netAmount }) {
+  return {
+    subject: `Settlement paid — FoodRush`,
+    text: `Hi ${name},\n\nYour delivery-earnings settlement of ₹${netAmount} has been marked paid.`,
+    html: `<p>Hi ${escapeHtml(name)},</p><p>Your delivery-earnings settlement of ₹${netAmount} has been marked paid.</p>`,
+  };
+}
+
+function settlementFailedEmail({ name, reason }) {
+  return {
+    subject: `Settlement payout issue — FoodRush`,
+    text: `Hi ${name},\n\nThere was an issue with your delivery-earnings settlement payout${reason ? ` (${reason})` : ''}. Our team has been notified.`,
+    html: `<p>Hi ${escapeHtml(name)},</p><p>There was an issue with your delivery-earnings settlement payout${reason ? ` (${escapeHtml(reason)})` : ''}. Our team has been notified.</p>`,
+  };
+}
+
 module.exports = {
   PROVIDERS,
   getProvider,
@@ -112,5 +254,22 @@ module.exports = {
   passwordResetEmail,
   passwordChangedEmail,
   orderDeliveredEmail,
+  orderPlacedEmail,
+  orderConfirmedEmail,
+  orderRejectedEmail,
+  orderCancelledEmail,
+  paymentSuccessEmail,
+  paymentFailedEmail,
+  paymentRetryRequiredEmail,
+  refundCreatedEmail,
+  refundFailedEmail,
+  refundCompletedEmail,
+  deliveryAssignedEmail,
+  orderOutForDeliveryEmail,
+  supportTicketCreatedEmail,
+  supportTicketReplyEmail,
+  supportTicketResolvedEmail,
+  settlementPaidEmail,
+  settlementFailedEmail,
   escapeHtml,
 };

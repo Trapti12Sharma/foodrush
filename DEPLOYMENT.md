@@ -358,6 +358,55 @@ Viewing the audit trail requires the `audit:read` permission, held by
 append-only (enforced at the model level) and anything credential-shaped in
 metadata is redacted before it is ever stored.
 
+## 10. Notifications & communication (M12)
+
+No new email configuration — this reuses the EXISTING `EMAIL_PROVIDER` /
+`SMTP_*` / `RESEND_API_KEY` / `EMAIL_FROM` setup from section 2 unchanged. The
+one new, optional variable is:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `NOTIFICATION_EMAIL_MAX_ATTEMPTS` | `3` | Cap on how many times a single notification's email may be (re)attempted in total (the initial send plus any manual retries). |
+
+**Architecture.** One centralized `notification.service.js` — order/payment/
+refund/delivery-assignment/support-ticket/settlement services all call
+`notify({ recipient, type, data, eventKey })`, never their own ad hoc
+`sendMail`/`socket.emit`. Each call: (1) always creates an in-app
+`Notification` row (never gated by a preference), (2) pushes it over the
+existing M8 Socket.IO connection to the recipient's own `user:<id>` room (no
+second WebSocket server, no client-chosen room), (3) best-effort emails it if
+the type has an email template, the provider is configured, and the
+recipient's preference allows it.
+
+**Duplicate protection (Part 12).** Every notification call passes an
+`eventKey` — e.g. `ORDER:<orderId>:PLACED:<recipientId>`,
+`PAYMENT:<razorpayPaymentId>:SUCCESS:<recipientId>` — enforced by a unique+
+sparse index on `Notification.eventKey`. A retried request, a redelivered
+Razorpay webhook, or two genuinely concurrent calls for the same event/
+recipient can never produce more than one notification; the loser's insert
+hits the unique index and the existing document is returned instead.
+
+**Email retry.** No queue, no worker, no Redis/BullMQ (deliberately — see
+`emailStatus`/`emailAttempts`/`emailError` on the `Notification` model). A
+failed send is recorded, not lost; `notificationService.retryFailedEmail(id)`
+re-attempts it once, up to `NOTIFICATION_EMAIL_MAX_ATTEMPTS`. Nothing calls
+this automatically in this milestone — it exists as the retry primitive for a
+future scheduled task or admin action to use.
+
+**Preferences.** `GET`/`PUT /notification-preferences` control the EMAIL
+channel only (`orderUpdates`, `paymentUpdates`, `deliveryUpdates`,
+`supportUpdates`, `marketing` — the last defaults `false` and nothing in M12
+sends marketing mail). `ACCOUNT_SECURITY`/`SYSTEM` notifications are never
+gated by any preference. The in-app notification (the bell) is unaffected by
+every one of these — there is no way to turn off the in-app record of an
+event, only whether it's also emailed.
+
+**Failure isolation (Part 13).** `notify()` never throws — a bad recipient, a
+duplicate eventKey, a socket-emit error, or an email-provider outage can never
+fail the order/payment/refund/etc. operation that triggered it. This is
+covered by a dedicated test that mocks the email provider to throw and asserts
+the order API call still returns 201.
+
 ## Payments
 
 Real online payments require a Razorpay account. Set `RAZORPAY_KEY_ID` and
