@@ -102,4 +102,33 @@ async function cleanupReplaced(oldUrl, newUrl, ownerId) {
   return deleteIfOwned(oldUrl, ownerId);
 }
 
-module.exports = { isCloudinaryConfigured, isPersistentStorage, saveUploadedFile, deleteIfOwned, cleanupReplaced };
+// M13 — the reliable counterpart to deleteIfOwned, for callers that already have a
+// database-stored public_id (Restaurant/FoodItem's own *PublicId fields) rather than
+// needing to re-derive one from a URL. No ownership re-check here: by the time a
+// caller has this exact stored id in hand, the real authorization already happened
+// at the service layer (assertOwnerOrAdmin against the record that id came from) —
+// unlike deleteIfOwned, which exists specifically because the OLD design had no
+// stored id and had to prove ownership from the URL itself.
+//
+// Returns {success, skipped} rather than a bare boolean: a genuine Cloudinary error
+// (network/auth failure) is distinguished from "nothing to actually do" (no
+// publicId, or Cloudinary not configured) so a caller that must react to a REAL
+// failure (e.g. refuse to clear a delete request — see restaurant.service.js) can
+// tell them apart, unlike the best-effort, always-swallow cleanupReplaced above.
+// Cloudinary's destroy() itself treats an already-gone asset as a normal
+// {result: 'not found'} response, not an error — deliberately treated as success
+// here too, since the goal ("no such asset remains") is already met and refusing to
+// let a caller clear a stale reference would only make a DB/Cloudinary mismatch worse.
+async function deleteByPublicId(publicId) {
+  if (!publicId || !isCloudinaryConfigured()) return { success: true, skipped: true };
+  try {
+    configureCloudinary();
+    const result = await cloudinary.uploader.destroy(publicId, { resource_type: 'image', invalidate: true });
+    return { success: true, result: result?.result };
+  } catch (error) {
+    console.error('Image delete failed:', error.message);
+    return { success: false };
+  }
+}
+
+module.exports = { isCloudinaryConfigured, isPersistentStorage, saveUploadedFile, deleteIfOwned, cleanupReplaced, deleteByPublicId };

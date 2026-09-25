@@ -51,6 +51,15 @@ const restaurantSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    // M13 — the Cloudinary public_id backing each URL above, when it is one of ours,
+    // so a later replace/delete can remove the exact right asset directly rather than
+    // re-deriving it from the URL (see utils/imageUrl.js#parseCloudinaryUrl, still used
+    // as a fallback for records that predate this field). Always server-derived — see
+    // restaurant.service.js — never accepted directly from a client. null for a
+    // pre-M13 record, an externally-set https:// URL, or local dev storage.
+    imagePublicId: { type: String, default: null },
+    coverImagePublicId: { type: String, default: null },
+    logoPublicId: { type: String, default: null },
     cuisine: {
       type: [String],
       required: true,

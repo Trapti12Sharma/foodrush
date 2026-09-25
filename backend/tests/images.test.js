@@ -454,3 +454,306 @@ describe('scripts/import-images', () => {
     expect(saveSpy).not.toHaveBeenCalled();
   });
 });
+
+// M13 — dedicated one-request "upload and attach" / "delete" endpoints per image
+// slot, storing the real Cloudinary public_id (never client-supplied — see
+// restaurant.service.js#derivePublicId) so replace/delete no longer depends on
+// re-deriving ownership from the URL and can act reliably even when the
+// original uploader and the record's owner differ (e.g. an admin editing on
+// behalf of an owner) — the one real gap in the pre-M13 design.
+describe('M13 — dedicated restaurant/food image endpoints', () => {
+  let uploadStream;
+  let destroy;
+
+  function mockSuccessfulUpload() {
+    uploadStream = jest.spyOn(cloudinary.uploader, 'upload_stream').mockImplementation((options, callback) => ({
+      end: () => callback(null, { secure_url: `https://res.cloudinary.com/democloud/image/upload/v1/${options.public_id}.png`, public_id: options.public_id }),
+    }));
+  }
+
+  beforeEach(() => {
+    useCloudinary();
+    mockSuccessfulUpload();
+    destroy = jest.spyOn(cloudinary.uploader, 'destroy').mockResolvedValue({ result: 'ok' });
+  });
+
+  describe('restaurant images', () => {
+    it('uploads and persists both the URL and the real Cloudinary public_id', async () => {
+      const owner = await registerAndLogin({ name: 'O', email: uniqueEmail('m13-r-up'), role: 'RESTAURANT_OWNER' });
+      const { restaurant } = await setupOrderable(owner);
+
+      const res = await owner.post(`/api/restaurants/${restaurant._id}/images/logo`).attach('image', PNG, { filename: 'logo.png', contentType: 'image/png' });
+      expect(res.status).toBe(201);
+      expect(res.body.data.restaurant.logo).toMatch(/^https:\/\/res\.cloudinary\.com/);
+
+      const stored = await Restaurant.findById(restaurant._id);
+      expect(stored.logoPublicId).toBe(uploadStream.mock.calls[0][0].public_id);
+      expect(stored.logo).toBe(res.body.data.restaurant.logo);
+    });
+
+    it('rejects a bogus type param, a non-image file, and an oversized file, matching the existing upload validation', async () => {
+      const owner = await registerAndLogin({ name: 'O', email: uniqueEmail('m13-r-bad'), role: 'RESTAURANT_OWNER' });
+      const { restaurant } = await setupOrderable(owner);
+
+      expect((await owner.post(`/api/restaurants/${restaurant._id}/images/banner`).attach('image', PNG, 'a.png')).status).toBe(400);
+      expect((await owner.post(`/api/restaurants/${restaurant._id}/images/logo`).attach('image', Buffer.from('not an image'), { filename: 'a.png', contentType: 'image/png' })).status).toBe(400);
+
+      // MAX_UPLOAD_SIZE_MB is read into a module-level constant at require time
+      // (upload.middleware.js), so it can't be changed per-test — exceed the
+      // real default (5MB) instead of trying to lower the limit at runtime.
+      const big = await owner.post(`/api/restaurants/${restaurant._id}/images/logo`).attach('image', Buffer.concat([JPEG, Buffer.alloc(6 * 1024 * 1024)]), { filename: 'a.jpg', contentType: 'image/jpeg' });
+      expect(big.status).toBe(400);
+      expect(big.body.message).toMatch(/too large/i);
+    });
+
+    it('rejects an unauthenticated caller (401), a customer (403), and a different restaurant owner (403)', async () => {
+      const owner = await registerAndLogin({ name: 'O', email: uniqueEmail('m13-r-rbac'), role: 'RESTAURANT_OWNER' });
+      const stranger = await registerAndLogin({ name: 'S', email: uniqueEmail('m13-r-stranger'), role: 'RESTAURANT_OWNER' });
+      const customer = await registerAndLogin({ name: 'C', email: uniqueEmail('m13-r-cust'), role: 'CUSTOMER' });
+      const { restaurant } = await setupOrderable(owner);
+
+      expect((await request(app).post(`/api/restaurants/${restaurant._id}/images/logo`).attach('image', PNG, 'a.png')).status).toBe(401);
+      expect((await customer.post(`/api/restaurants/${restaurant._id}/images/logo`).attach('image', PNG, 'a.png')).status).toBe(403);
+      expect((await stranger.post(`/api/restaurants/${restaurant._id}/images/logo`).attach('image', PNG, 'a.png')).status).toBe(403);
+      expect((await customer.delete(`/api/restaurants/${restaurant._id}/images/logo`)).status).toBe(403);
+      expect((await stranger.delete(`/api/restaurants/${restaurant._id}/images/logo`)).status).toBe(403);
+    });
+
+    it('returns 404 for an unknown restaurant id', async () => {
+      const owner = await registerAndLogin({ name: 'O', email: uniqueEmail('m13-r-404'), role: 'RESTAURANT_OWNER' });
+      const fakeId = '507f1f77bcf86cd799439011';
+      expect((await owner.post(`/api/restaurants/${fakeId}/images/logo`).attach('image', PNG, 'a.png')).status).toBe(404);
+      expect((await owner.delete(`/api/restaurants/${fakeId}/images/logo`)).status).toBe(404);
+    });
+
+    it('lets an admin manage ANY restaurant\'s images, and reliably cleans up even though the admin is not the original uploader', async () => {
+      const owner = await registerAndLogin({ name: 'O', email: uniqueEmail('m13-r-admin-o'), role: 'RESTAURANT_OWNER' });
+      const { agent: admin } = await createUserWithRole('ADMIN');
+      const { restaurant } = await setupOrderable(owner);
+
+      // The owner uploads first — this asset's public_id embeds the OWNER's user id.
+      await owner.post(`/api/restaurants/${restaurant._id}/images/logo`).attach('image', PNG, { filename: 'a.png', contentType: 'image/png' });
+      const firstPublicId = (await Restaurant.findById(restaurant._id)).logoPublicId;
+
+      // The admin (a DIFFERENT user) replaces it. The old pre-M13 design would have
+      // silently failed to clean this up (the URL's embedded owner id is the
+      // restaurant owner's, not the admin's) — the stored publicId fixes this.
+      const res = await admin.post(`/api/restaurants/${restaurant._id}/images/logo`).attach('image', PNG, { filename: 'b.png', contentType: 'image/png' });
+      expect(res.status).toBe(201);
+      expect(destroy).toHaveBeenCalledWith(firstPublicId, expect.any(Object));
+
+      const del = await admin.delete(`/api/restaurants/${restaurant._id}/images/logo`);
+      expect(del.status).toBe(200);
+      expect(del.body.data.restaurant.logo).toBe('');
+    });
+
+    it('replace: the new asset is persisted, and ONLY THEN is the old one removed', async () => {
+      const owner = await registerAndLogin({ name: 'O', email: uniqueEmail('m13-r-replace'), role: 'RESTAURANT_OWNER' });
+      const { restaurant } = await setupOrderable(owner);
+
+      await owner.post(`/api/restaurants/${restaurant._id}/images/image`).attach('image', PNG, { filename: 'a.png', contentType: 'image/png' });
+      const first = await Restaurant.findById(restaurant._id);
+      expect(destroy).not.toHaveBeenCalled(); // nothing to clean up on the very first upload
+
+      const res = await owner.post(`/api/restaurants/${restaurant._id}/images/image`).attach('image', PNG, { filename: 'b.png', contentType: 'image/png' });
+      expect(res.status).toBe(201);
+      expect(res.body.data.restaurant.image).not.toBe(first.image);
+      expect(destroy).toHaveBeenCalledTimes(1);
+      expect(destroy).toHaveBeenCalledWith(first.imagePublicId, expect.any(Object));
+    });
+
+    it('a failed upload leaves the existing image completely intact (nothing touched yet)', async () => {
+      const owner = await registerAndLogin({ name: 'O', email: uniqueEmail('m13-r-upfail'), role: 'RESTAURANT_OWNER' });
+      const { restaurant } = await setupOrderable(owner);
+      await owner.post(`/api/restaurants/${restaurant._id}/images/logo`).attach('image', PNG, { filename: 'a.png', contentType: 'image/png' });
+      const before = await Restaurant.findById(restaurant._id);
+
+      uploadStream.mockImplementation((options, callback) => ({ end: () => callback(new Error('cloudinary down')) }));
+      const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const res = await owner.post(`/api/restaurants/${restaurant._id}/images/logo`).attach('image', PNG, { filename: 'b.png', contentType: 'image/png' });
+
+      expect(res.status).toBe(502);
+      const after = await Restaurant.findById(restaurant._id);
+      expect(after.logo).toBe(before.logo);
+      expect(after.logoPublicId).toBe(before.logoPublicId);
+      expect(destroy).not.toHaveBeenCalled(); // the (still current) old image was never touched
+      errSpy.mockRestore();
+    });
+
+    it('delete: removes the Cloudinary asset first, and only updates the record once that succeeds', async () => {
+      const owner = await registerAndLogin({ name: 'O', email: uniqueEmail('m13-r-del'), role: 'RESTAURANT_OWNER' });
+      const { restaurant } = await setupOrderable(owner);
+      await owner.post(`/api/restaurants/${restaurant._id}/images/coverImage`).attach('image', PNG, { filename: 'a.png', contentType: 'image/png' });
+      const publicId = (await Restaurant.findById(restaurant._id)).coverImagePublicId;
+
+      const res = await owner.delete(`/api/restaurants/${restaurant._id}/images/coverImage`);
+      expect(res.status).toBe(200);
+      expect(destroy).toHaveBeenCalledWith(publicId, { resource_type: 'image', invalidate: true });
+      expect(res.body.data.restaurant.coverImage).toBe('');
+      expect((await Restaurant.findById(restaurant._id)).coverImagePublicId).toBeNull();
+    });
+
+    it('delete: a genuine Cloudinary failure is reported (502) and the record is left unchanged — never pretends success', async () => {
+      const owner = await registerAndLogin({ name: 'O', email: uniqueEmail('m13-r-delfail'), role: 'RESTAURANT_OWNER' });
+      const { restaurant } = await setupOrderable(owner);
+      await owner.post(`/api/restaurants/${restaurant._id}/images/logo`).attach('image', PNG, { filename: 'a.png', contentType: 'image/png' });
+      const before = await Restaurant.findById(restaurant._id);
+
+      destroy.mockRejectedValueOnce(new Error('cloudinary down'));
+      const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const res = await owner.delete(`/api/restaurants/${restaurant._id}/images/logo`);
+
+      expect(res.status).toBe(502);
+      const after = await Restaurant.findById(restaurant._id);
+      expect(after.logo).toBe(before.logo);
+      expect(after.logoPublicId).toBe(before.logoPublicId);
+      errSpy.mockRestore();
+    });
+
+    it('delete: refuses with 400 when there is no image of that type to delete', async () => {
+      const owner = await registerAndLogin({ name: 'O', email: uniqueEmail('m13-r-delnone'), role: 'RESTAURANT_OWNER' });
+      const { restaurant } = await setupOrderable(owner);
+      expect((await owner.delete(`/api/restaurants/${restaurant._id}/images/logo`)).status).toBe(400);
+    });
+
+    it('delete: a legacy record with a URL but no stored publicId still clears the field (best-effort URL-based cleanup)', async () => {
+      const owner = await registerAndLogin({ name: 'O', email: uniqueEmail('m13-r-legacy'), role: 'RESTAURANT_OWNER' });
+      const ownerId = (await User.findOne({ email: (await owner.get('/api/auth/me')).body.data.user.email }))._id.toString();
+      const { restaurant } = await setupOrderable(owner);
+      // Simulate a pre-M13 record: a real Cloudinary URL with no publicId ever stored.
+      await Restaurant.findByIdAndUpdate(restaurant._id, { logo: cloudUrl(ownerId, 'restaurant', 'aaaaaaaaaaaaaaaaaaaaaaaa'), logoPublicId: null });
+
+      const res = await owner.delete(`/api/restaurants/${restaurant._id}/images/logo`);
+      expect(res.status).toBe(200);
+      expect(res.body.data.restaurant.logo).toBe('');
+      expect(destroy).toHaveBeenCalledWith(`foodrush/restaurant/${ownerId}/aaaaaaaaaaaaaaaaaaaaaaaa`, expect.any(Object));
+    });
+
+    it('never trusts a client-supplied publicId on the generic update endpoint — it is always re-derived from the URL', async () => {
+      const owner = await registerAndLogin({ name: 'O', email: uniqueEmail('m13-r-notrust'), role: 'RESTAURANT_OWNER' });
+      const { restaurant } = await setupOrderable(owner);
+
+      const res = await owner.put(`/api/restaurants/${restaurant._id}`).send({
+        logo: 'https://cdn.example.com/not-cloudinary.jpg',
+        logoPublicId: 'foodrush/restaurant/someone-elses-id/evil', // must be ignored entirely
+      });
+      expect(res.status).toBe(200);
+      // An external, non-Cloudinary URL correctly derives to null — never the injected value.
+      expect((await Restaurant.findById(restaurant._id)).logoPublicId).toBeNull();
+    });
+  });
+
+  describe('food item image', () => {
+    async function ownerWithFood() {
+      const owner = await registerAndLogin({ name: 'O', email: uniqueEmail('m13-f-o'), role: 'RESTAURANT_OWNER' });
+      const { restaurant, food } = await setupOrderable(owner);
+      return { owner, restaurant, food };
+    }
+
+    it('uploads and persists both the URL and the real Cloudinary public_id', async () => {
+      const { owner, food } = await ownerWithFood();
+      const res = await owner.post(`/api/foods/${food._id}/image`).attach('image', PNG, { filename: 'a.png', contentType: 'image/png' });
+      expect(res.status).toBe(201);
+      const stored = await FoodItem.findById(food._id);
+      expect(stored.imagePublicId).toBe(uploadStream.mock.calls[0][0].public_id);
+      expect(stored.image).toBe(res.body.data.food.image);
+    });
+
+    it('rejects a different restaurant\'s owner (403), a customer (403), and unauthenticated (401)', async () => {
+      const { food } = await ownerWithFood();
+      const stranger = await registerAndLogin({ name: 'S', email: uniqueEmail('m13-f-stranger'), role: 'RESTAURANT_OWNER' });
+      const customer = await registerAndLogin({ name: 'C', email: uniqueEmail('m13-f-cust'), role: 'CUSTOMER' });
+
+      expect((await request(app).post(`/api/foods/${food._id}/image`).attach('image', PNG, 'a.png')).status).toBe(401);
+      expect((await customer.post(`/api/foods/${food._id}/image`).attach('image', PNG, 'a.png')).status).toBe(403);
+      expect((await stranger.post(`/api/foods/${food._id}/image`).attach('image', PNG, 'a.png')).status).toBe(403);
+      expect((await customer.delete(`/api/foods/${food._id}/image`)).status).toBe(403);
+    });
+
+    it('returns 404 for an unknown food id', async () => {
+      const { owner } = await ownerWithFood();
+      const fakeId = '507f1f77bcf86cd799439011';
+      expect((await owner.post(`/api/foods/${fakeId}/image`).attach('image', PNG, 'a.png')).status).toBe(404);
+      expect((await owner.delete(`/api/foods/${fakeId}/image`)).status).toBe(404);
+    });
+
+    it('lets an admin manage any food item\'s image, and reliably cleans up despite not being the original uploader', async () => {
+      const { owner, food } = await ownerWithFood();
+      const { agent: admin } = await createUserWithRole('ADMIN');
+      await owner.post(`/api/foods/${food._id}/image`).attach('image', PNG, { filename: 'a.png', contentType: 'image/png' });
+      const firstPublicId = (await FoodItem.findById(food._id)).imagePublicId;
+
+      const res = await admin.post(`/api/foods/${food._id}/image`).attach('image', PNG, { filename: 'b.png', contentType: 'image/png' });
+      expect(res.status).toBe(201);
+      expect(destroy).toHaveBeenCalledWith(firstPublicId, expect.any(Object));
+    });
+
+    it('replace persists the new image before removing the old one; delete removes the asset before clearing the field', async () => {
+      const { owner, food } = await ownerWithFood();
+      await owner.post(`/api/foods/${food._id}/image`).attach('image', PNG, { filename: 'a.png', contentType: 'image/png' });
+      const first = await FoodItem.findById(food._id);
+
+      const replaced = await owner.post(`/api/foods/${food._id}/image`).attach('image', PNG, { filename: 'b.png', contentType: 'image/png' });
+      expect(replaced.status).toBe(201);
+      expect(destroy).toHaveBeenCalledWith(first.imagePublicId, expect.any(Object));
+
+      const secondPublicId = (await FoodItem.findById(food._id)).imagePublicId;
+      const deleted = await owner.delete(`/api/foods/${food._id}/image`);
+      expect(deleted.status).toBe(200);
+      expect(destroy).toHaveBeenCalledWith(secondPublicId, expect.any(Object));
+      expect(deleted.body.data.food.image).toBe('');
+    });
+
+    it('delete refuses with 400 when the food item has no image', async () => {
+      const { owner, food } = await ownerWithFood();
+      expect((await owner.delete(`/api/foods/${food._id}/image`)).status).toBe(400);
+    });
+
+    it('a genuine Cloudinary failure during delete is reported (502) and the food item is left unchanged', async () => {
+      const { owner, food } = await ownerWithFood();
+      await owner.post(`/api/foods/${food._id}/image`).attach('image', PNG, { filename: 'a.png', contentType: 'image/png' });
+      const before = await FoodItem.findById(food._id);
+
+      destroy.mockRejectedValueOnce(new Error('cloudinary down'));
+      const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const res = await owner.delete(`/api/foods/${food._id}/image`);
+
+      expect(res.status).toBe(502);
+      const after = await FoodItem.findById(food._id);
+      expect(after.image).toBe(before.image);
+      expect(after.imagePublicId).toBe(before.imagePublicId);
+      errSpy.mockRestore();
+    });
+  });
+
+  describe('backward compatibility and concurrency', () => {
+    it('an existing restaurant/food record with no images at all still loads and behaves normally', async () => {
+      const owner = await registerAndLogin({ name: 'O', email: uniqueEmail('m13-compat-o'), role: 'RESTAURANT_OWNER' });
+      const { restaurant, food } = await setupOrderable(owner);
+      const r = await owner.get(`/api/restaurants/${restaurant._id}`);
+      expect(r.status).toBe(200);
+      expect(r.body.data.restaurant).toMatchObject({ image: '', coverImage: '', logo: '', imagePublicId: null, coverImagePublicId: null, logoPublicId: null });
+      const f = await owner.get(`/api/foods/${food._id}`);
+      expect(f.body.data.food).toMatchObject({ image: '', imagePublicId: null });
+    });
+
+    it('two concurrent replace requests for the same slot both succeed without crashing or corrupting the record', async () => {
+      const owner = await registerAndLogin({ name: 'O', email: uniqueEmail('m13-race'), role: 'RESTAURANT_OWNER' });
+      const { restaurant } = await setupOrderable(owner);
+      await owner.post(`/api/restaurants/${restaurant._id}/images/logo`).attach('image', PNG, { filename: 'seed.png', contentType: 'image/png' });
+
+      // No distributed-transaction guarantee is claimed here — only that neither
+      // request crashes and the record ends up in ONE of the two valid end states
+      // (whichever write reached MongoDB last), never a corrupted mix.
+      const [a, b] = await Promise.all([
+        owner.post(`/api/restaurants/${restaurant._id}/images/logo`).attach('image', PNG, { filename: 'a.png', contentType: 'image/png' }),
+        owner.post(`/api/restaurants/${restaurant._id}/images/logo`).attach('image', PNG, { filename: 'b.png', contentType: 'image/png' }),
+      ]);
+      expect([a.status, b.status]).toEqual([201, 201]);
+
+      const final = await Restaurant.findById(restaurant._id);
+      expect([a.body.data.restaurant.logo, b.body.data.restaurant.logo]).toContain(final.logo);
+      expect(final.logoPublicId).toBeTruthy();
+    });
+  });
+});

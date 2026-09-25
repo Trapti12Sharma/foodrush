@@ -1,5 +1,6 @@
 const asyncHandler = require('../utils/asyncHandler');
 const ApiResponse = require('../utils/ApiResponse');
+const ApiError = require('../utils/ApiError');
 const restaurantService = require('../services/restaurant.service');
 
 const list = asyncHandler(async (req, res) => {
@@ -34,4 +35,15 @@ const remove = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, 'Restaurant deactivated'));
 });
 
-module.exports = { list, listMine, getById, create, update, remove };
+const uploadImage = asyncHandler(async (req, res) => {
+  if (!req.file) throw ApiError.badRequest('No file uploaded');
+  const restaurant = await restaurantService.uploadRestaurantImage(req.params.id, req.params.type, req.user, req.file);
+  res.status(201).json(new ApiResponse(201, 'Image uploaded', { restaurant }));
+});
+
+const deleteImage = asyncHandler(async (req, res) => {
+  const restaurant = await restaurantService.deleteRestaurantImage(req.params.id, req.params.type, req.user);
+  res.json(new ApiResponse(200, 'Image deleted', { restaurant }));
+});
+
+module.exports = { list, listMine, getById, create, update, remove, uploadImage, deleteImage };

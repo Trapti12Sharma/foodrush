@@ -14,4 +14,13 @@ export const restaurantService = {
   update: (id, payload) => api.put(`/restaurants/${id}`, payload).then((r) => r.data.restaurant),
   remove: (id) => api.delete(`/restaurants/${id}`),
   getDashboard: (id) => api.get(`/restaurants/${id}/dashboard`).then((r) => r.data),
+  // `type` is one of image | coverImage | logo. Uploads and persists in one request
+  // (see backend/src/routes/restaurant.routes.js) — the old image is only removed
+  // server-side once this succeeds.
+  uploadImage: (id, type, file) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    return api.post(`/restaurants/${id}/images/${type}`, formData).then((r) => r.data.restaurant);
+  },
+  deleteImage: (id, type) => api.delete(`/restaurants/${id}/images/${type}`).then((r) => r.data.restaurant),
 };

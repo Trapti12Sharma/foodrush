@@ -12,6 +12,8 @@ const {
   requireOwnerOrPermission,
   optionalAuth,
 } = require('../middleware/auth.middleware');
+const { uploadSingleImage } = require('../middleware/upload.middleware');
+const { uploadLimiter } = require('../middleware/rateLimiter');
 const { ROLES } = require('../utils/constants');
 const { PERMISSIONS } = require('../utils/permissions');
 
@@ -373,6 +375,73 @@ router.put(
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
  */
+/**
+ * @swagger
+ * /restaurants/{id}/images/{type}:
+ *   post:
+ *     summary: Upload (or replace) one of this restaurant's images (its own owner, or admin)
+ *     description: >
+ *       A single self-contained request: validates the file (real JPEG/PNG/WEBP bytes, max
+ *       MAX_UPLOAD_SIZE_MB, default 5MB), uploads it to Cloudinary (or local disk in
+ *       development), persists the new URL + Cloudinary public_id, and only THEN removes the
+ *       previous image for this slot — never the other way around, so a failed upload or a
+ *       failed save never loses the existing image.
+ *     tags: [Restaurants]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *       - { in: path, name: type, required: true, schema: { type: string, enum: [image, coverImage, logo] } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema: { type: object, required: [image], properties: { image: { type: string, format: binary } } }
+ *     responses:
+ *       201:
+ *         description: Uploaded — the updated restaurant
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { type: object, properties: { restaurant: { $ref: '#/components/schemas/Restaurant' } } } } }
+ *       400: { description: 'No file, not a real image, wrong type param, or file too large' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       429: { description: Too many uploads }
+ *       502: { description: Image storage provider unavailable }
+ */
+router.post(
+  '/:id/images/:type',
+  uploadLimiter,
+  authenticateUser,
+  requireOwnerOrPermission(PERMISSIONS.RESTAURANTS_MANAGE),
+  uploadSingleImage('image'),
+  restaurantController.uploadImage
+);
+
+/**
+ * @swagger
+ * /restaurants/{id}/images/{type}:
+ *   delete:
+ *     summary: Delete one of this restaurant's images (its own owner, or admin)
+ *     description: Deletes the Cloudinary asset first, and updates the restaurant record only once that succeeds — a genuine storage failure is reported as 502, never silently treated as done.
+ *     tags: [Restaurants]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *       - { in: path, name: type, required: true, schema: { type: string, enum: [image, coverImage, logo] } }
+ *     responses:
+ *       200: { description: Deleted — the updated restaurant }
+ *       400: { description: 'Wrong type param, or this restaurant has no image of that type' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       502: { description: Image storage provider could not delete the asset }
+ */
+router.delete(
+  '/:id/images/:type',
+  authenticateUser,
+  requireOwnerOrPermission(PERMISSIONS.RESTAURANTS_MANAGE),
+  restaurantController.deleteImage
+);
+
 router.delete(
   '/:id',
   authenticateUser,

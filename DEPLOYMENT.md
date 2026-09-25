@@ -124,6 +124,20 @@ What happens once it's on:
   restaurant owners and restaurant-management staff. Files must really be JPEG/PNG/WEBP (checked by content, not
   just the extension), up to `MAX_UPLOAD_SIZE_MB`.
 
+**Dedicated per-image endpoints (M13).** Alongside the general-purpose upload-then-attach flow above (used by the
+restaurant/food create and edit forms), `POST/DELETE /restaurants/:id/images/:type` (`type` is `image`, `coverImage`
+or `logo`) and `POST/DELETE /foods/:id/image` do the upload (or delete) and the database update in one request —
+the old image is only ever removed *after* the new one is safely persisted, never before, and a genuine Cloudinary
+failure is reported back rather than silently treated as success. Both a restaurant's own owner and any admin with
+the `restaurants:manage` permission may use them (same rule as the existing PUT/PATCH endpoints, no new permission
+was needed). `Restaurant`/`FoodItem` also store each image's Cloudinary `public_id` now (`imagePublicId`,
+`coverImagePublicId`, `logoPublicId` — always derived server-side from the uploaded/set URL, never accepted directly
+from a client), so a later replace/delete can remove the exact right asset without needing to re-derive one from the
+URL — reliable even when the uploader and the record's owner are different people (e.g. an admin editing on an
+owner's behalf), which the original ownership-from-URL heuristic could not guarantee. A restaurant/food record from
+before M13 simply has these fields as `null` until its image is next replaced or deleted through either flow; both
+handle a missing `public_id` gracefully.
+
 **Giving the seeded restaurants real pictures.** The demo catalog has no photos, and they can't be generated for
 you — supply your own (or properly licensed stock). Arrange them like this, named after the restaurant / dish:
 

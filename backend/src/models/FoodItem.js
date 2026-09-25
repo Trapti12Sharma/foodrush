@@ -54,6 +54,8 @@ const foodItemSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    // M13 — see Restaurant.js's identical field for why this exists and how it's set.
+    imagePublicId: { type: String, default: null },
     price: {
       type: Number,
       required: [true, 'Price is required'],
