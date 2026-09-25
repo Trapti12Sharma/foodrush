@@ -39,7 +39,7 @@ const listRestaurants = asyncHandler(async (req, res) => {
 });
 
 const approveRestaurant = asyncHandler(async (req, res) => {
-  const restaurant = await adminService.approveRestaurant(req.params.id);
+  const restaurant = await adminService.approveRestaurant(req.params.id, req.user);
   await auditService.record({
     req,
     action: 'restaurant.approve',
@@ -48,6 +48,18 @@ const approveRestaurant = asyncHandler(async (req, res) => {
     metadata: { name: restaurant.name },
   });
   res.json(new ApiResponse(200, 'Restaurant approved', { restaurant }));
+});
+
+const rejectRestaurantKyc = asyncHandler(async (req, res) => {
+  const restaurant = await adminService.rejectRestaurantKyc(req.params.id, req.user, req.body.reason);
+  await auditService.record({
+    req,
+    action: 'restaurant.kyc_reject',
+    entityType: 'Restaurant',
+    entityId: restaurant._id,
+    metadata: { name: restaurant.name, reason: req.body.reason },
+  });
+  res.json(new ApiResponse(200, 'Restaurant KYC rejected', { restaurant }));
 });
 
 const setRestaurantActive = asyncHandler(async (req, res) => {
@@ -332,6 +344,7 @@ module.exports = {
   setUserActive,
   listRestaurants,
   approveRestaurant,
+  rejectRestaurantKyc,
   setRestaurantActive,
   listOrders,
   listAuditLogs,

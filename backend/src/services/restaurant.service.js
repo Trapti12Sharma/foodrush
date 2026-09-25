@@ -5,8 +5,10 @@ const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { assertOwnerOrAdmin } = require('../utils/ownership');
 const { PERMISSIONS, hasPermission } = require('../utils/permissions');
 const storageService = require('./storage.service');
+const notificationService = require('./notification.service');
 const { normalizeSlots } = require('../utils/openingHours');
 const { parseCloudinaryUrl } = require('../utils/imageUrl');
+const { RESTAURANT_KYC_STATUS, RESTAURANT_KYC_TRANSITIONS, NOTIFICATION_TYPE } = require('../utils/constants');
 
 const SORT_MAP = {
   rating: '-rating',
@@ -247,6 +249,50 @@ async function deleteRestaurantImage(id, type, requester) {
   return restaurant;
 }
 
+function assertKycTransition(restaurant, nextStatus) {
+  const allowed = RESTAURANT_KYC_TRANSITIONS[restaurant.kycStatus] || [];
+  if (!allowed.includes(nextStatus)) {
+    throw ApiError.badRequest(`Cannot move a restaurant's KYC from "${restaurant.kycStatus}" to "${nextStatus}"`);
+  }
+}
+
+// M14 — the owner (or an admin on their behalf) submits the business-verification
+// documents a reviewer needs. Explicit allow-list transition (NOT_SUBMITTED ->
+// SUBMITTED, or REJECTED -> SUBMITTED to fix and resubmit, or VERIFIED ->
+// SUBMITTED e.g. to renew an expired licence) — never a raw status write. Never
+// touches isApproved/isActive: a restaurant that was already live stays live
+// while its paperwork is under a fresh review (see the model's own comment).
+async function submitKyc(id, requester, payload) {
+  const restaurant = await Restaurant.findById(id);
+  if (!restaurant) throw ApiError.notFound('Restaurant not found');
+  assertOwnerOrAdmin(restaurant.owner, requester, 'You can only submit KYC for your own restaurant');
+  assertKycTransition(restaurant, RESTAURANT_KYC_STATUS.SUBMITTED);
+
+  restaurant.kycDocuments = {
+    fssaiLicenseNumber: payload.fssaiLicenseNumber,
+    fssaiCertificateUrl: payload.fssaiCertificateUrl,
+    panNumber: payload.panNumber,
+    panCardUrl: payload.panCardUrl,
+    gstNumber: payload.gstNumber || '',
+    gstCertificateUrl: payload.gstCertificateUrl || '',
+    ownerIdentityProofUrl: payload.ownerIdentityProofUrl,
+  };
+  restaurant.kycStatus = RESTAURANT_KYC_STATUS.SUBMITTED;
+  restaurant.kycSubmittedAt = new Date();
+  restaurant.kycRejectionReason = null;
+  await restaurant.save();
+
+  // Nobody is assigned yet — every admin who can approve restaurants is told a
+  // submission needs review, never every admin (Part 16-style rule reused from M11/M12).
+  await notificationService.notifyStaff(PERMISSIONS.RESTAURANTS_APPROVE, {
+    type: NOTIFICATION_TYPE.RESTAURANT_KYC_SUBMITTED,
+    data: { restaurantId: restaurant._id, restaurantName: restaurant.name },
+    entityId: restaurant._id,
+  });
+
+  return restaurant;
+}
+
 // Soft delete: flips isActive off instead of removing the document, so existing
 // orders/reviews that reference this restaurant stay intact and queryable.
 async function deactivateRestaurant(id, requester) {
@@ -268,6 +314,7 @@ module.exports = {
   deactivateRestaurant,
   uploadRestaurantImage,
   deleteRestaurantImage,
+  submitKyc,
   canView,
   isPubliclyVisible,
   IMAGE_FIELDS,

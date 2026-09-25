@@ -1,6 +1,6 @@
 require('./setup');
 const request = require('supertest');
-const { app, registerAndLogin, uniqueEmail } = require('./helpers');
+const { app, registerAndLogin, uniqueEmail, submitRestaurantKyc } = require('./helpers');
 const User = require('../src/models/User');
 const Restaurant = require('../src/models/Restaurant');
 
@@ -44,6 +44,8 @@ describe('Admin APIs', () => {
     const pendingList = await admin.get('/api/admin/restaurants').query({ isApproved: 'false' });
     expect(pendingList.body.data.restaurants.map((r) => r._id)).toContain(restaurantId);
 
+    // M14 — approval requires KYC documents to have been submitted first.
+    await submitRestaurantKyc(owner, restaurantId).expect(200);
     const approveRes = await admin.patch(`/api/admin/restaurants/${restaurantId}/approve`);
     expect(approveRes.body.data.restaurant.isApproved).toBe(true);
 

@@ -4,7 +4,7 @@ const restaurantGeoController = require('../controllers/restaurantGeo.controller
 const { nearbyValidator, deliveryCheckValidator } = require('../validators/restaurantGeo.validator');
 const dashboardController = require('../controllers/dashboard.controller');
 const reviewController = require('../controllers/review.controller');
-const { createRestaurantValidator, updateRestaurantValidator } = require('../validators/restaurant.validator');
+const { createRestaurantValidator, updateRestaurantValidator, submitKycValidator } = require('../validators/restaurant.validator');
 const validate = require('../middleware/validate');
 const {
   authenticateUser,
@@ -447,6 +447,57 @@ router.delete(
   authenticateUser,
   requireOwnerOrPermission(PERMISSIONS.RESTAURANTS_MANAGE),
   restaurantController.remove
+);
+
+/**
+ * @swagger
+ * /restaurants/{id}/kyc/submit:
+ *   post:
+ *     summary: Submit (or resubmit) this restaurant's business-verification documents (its own owner, or admin)
+ *     description: >
+ *       Only valid from NOT_SUBMITTED, REJECTED (fix and resubmit) or VERIFIED (e.g. renewing an
+ *       expired licence) — never while a submission is already awaiting review. Uploads for the
+ *       document images go through the existing image pipeline first
+ *       (`POST /uploads/image?purpose=restaurantkyc`); this endpoint then records the resulting
+ *       URLs. Never touches `isApproved`/`isActive` — an already-live restaurant stays live while
+ *       a fresh KYC review is pending.
+ *     tags: [Restaurants]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [fssaiLicenseNumber, fssaiCertificateUrl, panNumber, panCardUrl, ownerIdentityProofUrl]
+ *             properties:
+ *               fssaiLicenseNumber: { type: string }
+ *               fssaiCertificateUrl: { type: string, description: 'URL from POST /uploads/image?purpose=restaurantkyc' }
+ *               panNumber: { type: string }
+ *               panCardUrl: { type: string }
+ *               ownerIdentityProofUrl: { type: string }
+ *               gstNumber: { type: string, description: 'Optional — not every restaurant is required to be GST-registered' }
+ *               gstCertificateUrl: { type: string }
+ *     responses:
+ *       200:
+ *         description: Submitted — kycStatus is now SUBMITTED
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { type: object, properties: { restaurant: { $ref: '#/components/schemas/Restaurant' } } } } }
+ *       400: { description: 'Cannot submit from the current KYC status (already awaiting review)' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       422: { $ref: '#/components/responses/ValidationError' }
+ */
+router.post(
+  '/:id/kyc/submit',
+  authenticateUser,
+  requireOwnerOrPermission(PERMISSIONS.RESTAURANTS_MANAGE),
+  submitKycValidator,
+  validate,
+  restaurantController.submitKyc
 );
 
 module.exports = router;

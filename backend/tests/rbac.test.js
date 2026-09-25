@@ -1,6 +1,6 @@
 require('./setup');
 const request = require('supertest');
-const { app, registerAndLogin, uniqueEmail, createUserWithRole, setupOrderable } = require('./helpers');
+const { app, registerAndLogin, uniqueEmail, createUserWithRole, setupOrderable, submitRestaurantKyc } = require('./helpers');
 const { ROLES } = require('../src/utils/constants');
 const { PERMISSIONS, ROLE_PERMISSIONS, STAFF_ROLES, getPermissions, hasPermission, isStaffRole } = require('../src/utils/permissions');
 const Restaurant = require('../src/models/Restaurant');
@@ -65,6 +65,8 @@ describe('admin routes are gated by permission, per role', () => {
     const { agent: manager } = await createUserWithRole('RESTAURANT_MANAGER');
 
     expect((await manager.get('/api/admin/users')).status).toBe(403);
+    // M14 — approval requires KYC documents to have been submitted first.
+    await submitRestaurantKyc(owner, id).expect(200);
     const approve = await manager.patch(`/api/admin/restaurants/${id}/approve`);
     expect(approve.status).toBe(200);
     expect((await Restaurant.findById(id)).isApproved).toBe(true);

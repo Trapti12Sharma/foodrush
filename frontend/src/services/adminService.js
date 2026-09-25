@@ -6,6 +6,7 @@ export const adminService = {
   setUserActive: (id, isActive) => api.patch(`/admin/users/${id}/status`, { isActive }).then((r) => r.data.user),
   listRestaurants: (params) => api.get('/admin/restaurants', { params }).then((r) => r.data),
   approveRestaurant: (id) => api.patch(`/admin/restaurants/${id}/approve`).then((r) => r.data.restaurant),
+  rejectRestaurantKyc: (id, reason) => api.patch(`/admin/restaurants/${id}/reject-kyc`, { reason }).then((r) => r.data.restaurant),
   setRestaurantActive: (id, isActive) =>
     api.patch(`/admin/restaurants/${id}/status`, { isActive }).then((r) => r.data.restaurant),
   listOrders: (params) => api.get('/admin/orders', { params }).then((r) => r.data),

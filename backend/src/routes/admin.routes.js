@@ -164,6 +164,10 @@ router.patch(
  *         name: isActive
  *         schema: { type: boolean }
  *       - in: query
+ *         name: kycStatus
+ *         schema: { type: string, enum: [NOT_SUBMITTED, SUBMITTED, VERIFIED, REJECTED] }
+ *         description: M14 — filter by business-verification review state
+ *       - in: query
  *         name: page
  *         schema: { type: integer, default: 1 }
  *       - in: query
@@ -191,7 +195,11 @@ router.get('/restaurants', requirePermission(PERMISSIONS.RESTAURANTS_READ_ALL), 
  * @swagger
  * /admin/restaurants/{id}/approve:
  *   patch:
- *     summary: Approve a restaurant, making it publicly visible (ADMIN only)
+ *     summary: Approve a restaurant's KYC, making it publicly visible (requires the restaurants:approve permission)
+ *     description: >
+ *       M14 — only valid once the restaurant's business-verification documents have actually been
+ *       submitted (kycStatus=SUBMITTED via POST /restaurants/{id}/kyc/submit); rejected with 400
+ *       otherwise. Sets kycStatus=VERIFIED and isApproved=true together, in one step.
  *     tags: [Admin]
  *     parameters:
  *       - in: path
@@ -204,11 +212,45 @@ router.get('/restaurants', requirePermission(PERMISSIONS.RESTAURANTS_READ_ALL), 
  *         content:
  *           application/json:
  *             schema: { type: object, properties: { data: { type: object, properties: { restaurant: { $ref: '#/components/schemas/Restaurant' } } } } }
+ *       400: { description: 'KYC has not been submitted (or was already reviewed) — cannot approve yet' }
  *       401: { $ref: '#/components/responses/Unauthorized' }
  *       403: { $ref: '#/components/responses/Forbidden' }
  *       404: { $ref: '#/components/responses/NotFound' }
  */
 router.patch('/restaurants/:id/approve', requirePermission(PERMISSIONS.RESTAURANTS_APPROVE), adminController.approveRestaurant);
+
+/**
+ * @swagger
+ * /admin/restaurants/{id}/reject-kyc:
+ *   patch:
+ *     summary: Reject a restaurant's submitted KYC documents (requires the restaurants:approve permission)
+ *     description: >
+ *       Only valid from kycStatus=SUBMITTED. A reason is required and shown back to the owner, who
+ *       may fix the documents and resubmit. Never touches isApproved/isActive — an already-live
+ *       restaurant whose KYC renewal is rejected stays live.
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object, required: [reason], properties: { reason: { type: string } } }
+ *     responses:
+ *       200: { description: KYC rejected }
+ *       400: { description: 'Not currently SUBMITTED' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       422: { $ref: '#/components/responses/ValidationError' }
+ */
+router.patch(
+  '/restaurants/:id/reject-kyc',
+  requirePermission(PERMISSIONS.RESTAURANTS_APPROVE),
+  rejectKycValidator,
+  validate,
+  adminController.rejectRestaurantKyc
+);
 
 /**
  * @swagger

@@ -55,6 +55,10 @@ const CONTENT = {
   [NOTIFICATION_TYPE.SETTLEMENT_PAID]: (d) => ({ title: 'Settlement paid', message: `Your settlement of ₹${d.netAmount} has been marked paid.` }),
   [NOTIFICATION_TYPE.SETTLEMENT_FAILED]: (d) => ({ title: 'Settlement issue', message: `There was an issue with your settlement payout${d.reason ? ` (${d.reason})` : ''}.` }),
 
+  [NOTIFICATION_TYPE.RESTAURANT_KYC_SUBMITTED]: (d) => ({ title: 'KYC submitted for review', message: `${d.restaurantName || 'A restaurant'} submitted business-verification documents for review.` }),
+  [NOTIFICATION_TYPE.RESTAURANT_KYC_VERIFIED]: (d) => ({ title: 'KYC verified', message: `Your restaurant's business documents have been verified.` }),
+  [NOTIFICATION_TYPE.RESTAURANT_KYC_REJECTED]: (d) => ({ title: 'KYC needs attention', message: `Your restaurant's KYC submission was rejected${d.reason ? ` (${d.reason})` : ''}. Please review and resubmit.` }),
+
   [NOTIFICATION_TYPE.ACCOUNT_SECURITY]: (d) => ({ title: 'Security alert', message: d.message || 'A security-relevant change was made to your account.' }),
   [NOTIFICATION_TYPE.SYSTEM]: (d) => ({ title: 'FoodRush', message: d.message || 'You have a new notification.' }),
 };

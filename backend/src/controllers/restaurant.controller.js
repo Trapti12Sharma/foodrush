@@ -46,4 +46,9 @@ const deleteImage = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, 'Image deleted', { restaurant }));
 });
 
-module.exports = { list, listMine, getById, create, update, remove, uploadImage, deleteImage };
+const submitKyc = asyncHandler(async (req, res) => {
+  const restaurant = await restaurantService.submitKyc(req.params.id, req.user, req.body);
+  res.json(new ApiResponse(200, 'KYC documents submitted for review', { restaurant }));
+});
+
+module.exports = { list, listMine, getById, create, update, remove, uploadImage, deleteImage, submitKyc };

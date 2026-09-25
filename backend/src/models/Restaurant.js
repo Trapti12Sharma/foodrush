@@ -1,5 +1,25 @@
 const mongoose = require('mongoose');
 const { isOpenNow } = require('../utils/openingHours');
+const { RESTAURANT_KYC_STATUS } = require('../utils/constants');
+
+// M14 — business-verification documents only, uploaded through the existing
+// Cloudinary/local-disk pipeline (storage.service.js via POST
+// /uploads/image?purpose=restaurant-kyc) exactly like every other image in this
+// app — ordinary https:// (or /uploads/...) URLs, never raw bytes in MongoDB.
+// GST is deliberately optional: GST registration is only mandatory above a
+// turnover threshold in India, so many small restaurants legitimately have none.
+const kycDocumentsSchema = new mongoose.Schema(
+  {
+    fssaiLicenseNumber: { type: String, trim: true, default: '' },
+    fssaiCertificateUrl: { type: String, default: '' },
+    panNumber: { type: String, trim: true, uppercase: true, default: '' },
+    panCardUrl: { type: String, default: '' },
+    gstNumber: { type: String, trim: true, uppercase: true, default: '' },
+    gstCertificateUrl: { type: String, default: '' },
+    ownerIdentityProofUrl: { type: String, default: '' },
+  },
+  { _id: false }
+);
 
 // A restaurant's position. Deliberately a sub-schema with NO default: a restaurant that has
 // not been given a location simply has none, instead of silently sitting at [0, 0]
@@ -147,6 +167,22 @@ const restaurantSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    // M14 — tracks business-paperwork review, entirely separate from
+    // isApproved/isActive above (see RESTAURANT_KYC_TRANSITIONS's own comment for
+    // why). New restaurants start NOT_SUBMITTED; a restaurant created before M14
+    // is backfilled by scripts/migrate-restaurant-kyc.js, never left inconsistent
+    // by this field's mere addition.
+    kycStatus: {
+      type: String,
+      enum: Object.values(RESTAURANT_KYC_STATUS),
+      default: RESTAURANT_KYC_STATUS.NOT_SUBMITTED,
+      index: true,
+    },
+    kycDocuments: { type: kycDocumentsSchema, default: () => ({}) },
+    kycRejectionReason: { type: String, default: null },
+    kycSubmittedAt: { type: Date, default: null },
+    kycReviewedAt: { type: Date, default: null },
+    kycReviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   },
   { timestamps: true }
 );

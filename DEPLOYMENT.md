@@ -421,6 +421,59 @@ fail the order/payment/refund/etc. operation that triggered it. This is
 covered by a dedicated test that mocks the email provider to throw and asserts
 the order API call still returns 201.
 
+## 11. Restaurant onboarding & KYC (M14)
+
+No new environment variables — this reuses the EXISTING Cloudinary configuration
+from section "Images (Cloudinary)" above (a new upload purpose, `restaurantkyc`,
+was added to the same `POST /uploads/image?purpose=` endpoint) and the existing
+notification infrastructure from section 10.
+
+**Deliberately decoupled from `isApproved`/`isActive`.** A restaurant's
+`kycStatus` (`NOT_SUBMITTED` → `SUBMITTED` → `VERIFIED`/`REJECTED`, with
+`REJECTED`/`VERIFIED` both able to go back to `SUBMITTED` for a resubmission)
+only tracks whether its business paperwork (FSSAI licence, PAN, optional GST,
+owner identity proof) has been reviewed. It never touches `isApproved` or
+`isActive` by itself — an already-live, order-accepting restaurant renewing an
+expiring FSSAI licence (or having that renewal rejected) is never silently
+taken offline by it. The one place the two connect is admin approval itself:
+`PATCH /admin/restaurants/:id/approve` now requires `kycStatus === SUBMITTED`
+(400 otherwise) and, in that single action, sets `isApproved: true` **and**
+`kycStatus: VERIFIED` together — mirroring how delivery-partner KYC approval
+already combines two status changes in one step.
+
+**API surface.**
+- `POST /restaurants/:id/kyc/submit` — the owner (or an admin on their behalf)
+  submits/resubmits documents. Requires `fssaiLicenseNumber`,
+  `fssaiCertificateUrl`, `panNumber`, `panCardUrl`, `ownerIdentityProofUrl`;
+  `gstNumber`/`gstCertificateUrl` are optional. Only valid from
+  `NOT_SUBMITTED`, `REJECTED`, or `VERIFIED` (never while already `SUBMITTED`
+  and awaiting review).
+- `PATCH /admin/restaurants/:id/reject-kyc` — requires a `reason`, only valid
+  from `SUBMITTED`, reuses the same validator shape as the existing
+  delivery-partner KYC rejection endpoint.
+- `GET /admin/restaurants` gained a `kycStatus` filter.
+
+**Notifications.** Submission notifies every admin/staff member holding the
+`restaurants:approve` permission (not a blanket broadcast to all admins);
+verification and rejection notify the restaurant's owner, rejection including
+the reason. All three are mandatory, in-app + socket only (no email template,
+no preference gate) — none of the existing preference buckets
+(order/payment/delivery/support) fit an owner-facing "your restaurant's KYC
+changed" event.
+
+**Backfilling existing restaurants.** Every restaurant created before M14 has
+no `kycStatus` field. Run the migration from `backend/`:
+
+```bash
+node scripts/migrate-restaurant-kyc.js            # dry run: shows what would change
+node scripts/migrate-restaurant-kyc.js --apply    # writes it
+```
+
+Already-approved restaurants are backfilled straight to `VERIFIED` (they were
+already live and trusted before this milestone existed); everything else
+starts at `NOT_SUBMITTED`. It only ever touches restaurants with no
+`kycStatus` yet, so it's safe to re-run.
+
 ## Payments
 
 Real online payments require a Razorpay account. Set `RAZORPAY_KEY_ID` and

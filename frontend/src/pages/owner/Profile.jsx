@@ -10,6 +10,7 @@ import PlaceSearch from '../../components/PlaceSearch';
 import { useDeliveryLocation } from '../../context/LocationContext';
 import { geoService } from '../../services/geoService';
 import { getCurrentPosition, LocationError, tidyAddress } from '../../utils/geolocation';
+import KycSection from './KycSection';
 
 export default function Profile() {
   const { selectedRestaurant, refresh } = useRestaurantOwner();
@@ -125,6 +126,10 @@ export default function Profile() {
       <p className="mt-1 text-sm text-gray-500">
         Status: {selectedRestaurant.isApproved ? 'Approved' : 'Pending admin approval'} (admin-controlled)
       </p>
+
+      <div className="mt-6 max-w-lg">
+        <KycSection restaurant={selectedRestaurant} onUpdated={refresh} />
+      </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="mt-6 max-w-lg space-y-4">
         <ImageUploadField label="Card image (shown in listings)" value={image} onChange={setImage} purpose="restaurant" />

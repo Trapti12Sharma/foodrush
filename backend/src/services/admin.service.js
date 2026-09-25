@@ -2,9 +2,10 @@ const User = require('../models/User');
 const Restaurant = require('../models/Restaurant');
 const Order = require('../models/Order');
 const ApiError = require('../utils/ApiError');
+const notificationService = require('./notification.service');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { escapeRegex } = require('../utils/regex');
-const { ORDER_STATUS } = require('../utils/constants');
+const { ORDER_STATUS, RESTAURANT_KYC_STATUS, NOTIFICATION_TYPE } = require('../utils/constants');
 const { PERMISSIONS, hasPermission, isStaffRole } = require('../utils/permissions');
 
 // Platform-wide stats (unscoped) — the admin equivalent of Phase 9's
@@ -91,6 +92,7 @@ async function listRestaurantsForAdmin(query) {
   if (query.search) filter.name = new RegExp(escapeRegex(query.search), 'i');
   if (query.isApproved !== undefined) filter.isApproved = query.isApproved === 'true';
   if (query.isActive !== undefined) filter.isActive = query.isActive === 'true';
+  if (query.kycStatus) filter.kycStatus = query.kycStatus;
 
   const [items, total] = await Promise.all([
     Restaurant.find(filter).sort('-createdAt').skip(skip).limit(limit).populate('owner', 'name email'),
@@ -99,11 +101,59 @@ async function listRestaurantsForAdmin(query) {
   return { items, pagination: buildPaginationMeta(total, page, limit) };
 }
 
-async function approveRestaurant(id) {
+// M14 — approving now also resolves the KYC review in the same action (mirrors
+// deliveryPartnerService.approveKyc combining kycStatus + accountStatus in one
+// step): a restaurant must have actually submitted its business documents
+// first. isApproved is otherwise unaffected in every other way — a restaurant
+// resubmitting KYC later (e.g. renewing a licence) never has this re-checked
+// against its already-live status; that only happens on THIS explicit action.
+async function approveRestaurant(id, admin) {
   const restaurant = await Restaurant.findById(id);
   if (!restaurant) throw ApiError.notFound('Restaurant not found');
+  if (restaurant.kycStatus !== RESTAURANT_KYC_STATUS.SUBMITTED) {
+    throw ApiError.badRequest(`This restaurant's KYC is "${restaurant.kycStatus}" — documents must be submitted (and not already reviewed) before it can be approved`);
+  }
   restaurant.isApproved = true;
+  restaurant.kycStatus = RESTAURANT_KYC_STATUS.VERIFIED;
+  restaurant.kycRejectionReason = null;
+  restaurant.kycReviewedAt = new Date();
+  restaurant.kycReviewedBy = admin ? admin._id : null;
   await restaurant.save();
+
+  await notificationService.notify({
+    recipient: restaurant.owner,
+    type: NOTIFICATION_TYPE.RESTAURANT_KYC_VERIFIED,
+    data: { restaurantId: restaurant._id, restaurantName: restaurant.name },
+    eventKey: `RESTAURANT:${restaurant._id}:KYC_VERIFIED:${restaurant.owner}`,
+  });
+
+  return restaurant;
+}
+
+// M14 — mirrors deliveryPartnerService.rejectKyc: only valid from SUBMITTED, a
+// reason is required and shown back to the owner. isApproved/isActive are
+// untouched — an already-live restaurant whose KYC renewal is rejected stays
+// live; only the paperwork trail records the rejection (see the model's own
+// comment on why these are deliberately decoupled).
+async function rejectRestaurantKyc(id, admin, reason) {
+  const restaurant = await Restaurant.findById(id);
+  if (!restaurant) throw ApiError.notFound('Restaurant not found');
+  if (restaurant.kycStatus !== RESTAURANT_KYC_STATUS.SUBMITTED) {
+    throw ApiError.badRequest(`Cannot reject KYC from status "${restaurant.kycStatus}"`);
+  }
+  restaurant.kycStatus = RESTAURANT_KYC_STATUS.REJECTED;
+  restaurant.kycRejectionReason = reason;
+  restaurant.kycReviewedAt = new Date();
+  restaurant.kycReviewedBy = admin ? admin._id : null;
+  await restaurant.save();
+
+  await notificationService.notify({
+    recipient: restaurant.owner,
+    type: NOTIFICATION_TYPE.RESTAURANT_KYC_REJECTED,
+    data: { restaurantId: restaurant._id, restaurantName: restaurant.name, reason },
+    eventKey: `RESTAURANT:${restaurant._id}:KYC_REJECTED:${restaurant.owner}:${restaurant.kycReviewedAt.getTime()}`,
+  });
+
   return restaurant;
 }
 
@@ -121,5 +171,6 @@ module.exports = {
   setUserActive,
   listRestaurantsForAdmin,
   approveRestaurant,
+  rejectRestaurantKyc,
   setRestaurantActive,
 };

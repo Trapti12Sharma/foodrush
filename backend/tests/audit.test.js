@@ -1,5 +1,5 @@
 require('./setup');
-const { registerAndLogin, uniqueEmail, createUserWithRole } = require('./helpers');
+const { registerAndLogin, uniqueEmail, createUserWithRole, submitRestaurantKyc } = require('./helpers');
 const AuditLog = require('../src/models/AuditLog');
 const auditService = require('../src/services/audit.service');
 const Restaurant = require('../src/models/Restaurant');
@@ -9,14 +9,15 @@ async function pendingRestaurant() {
   const res = await owner.post('/api/restaurants').send({
     name: 'Audit Place', cuisine: ['Test'], address: { addressLine: '1 St' }, city: 'Pune', deliveryTime: 20,
   });
-  return res.body.data.restaurant;
+  return { restaurant: res.body.data.restaurant, owner };
 }
 
 describe('audit logging', () => {
   it('records who approved a restaurant, with role, entity and request context', async () => {
-    const restaurant = await pendingRestaurant();
+    const { restaurant, owner } = await pendingRestaurant();
     const { agent, user } = await createUserWithRole('ADMIN');
 
+    await submitRestaurantKyc(owner, restaurant._id).expect(200); // M14 — approval requires this first
     await agent.patch(`/api/admin/restaurants/${restaurant._id}/approve`).expect(200);
 
     const entries = await AuditLog.find({ action: 'restaurant.approve' });
@@ -30,7 +31,7 @@ describe('audit logging', () => {
   });
 
   it('does not record anything when the action is rejected', async () => {
-    const restaurant = await pendingRestaurant();
+    const { restaurant } = await pendingRestaurant();
     const customer = await registerAndLogin({ name: 'C', email: uniqueEmail('au-cust'), role: 'CUSTOMER' });
     await customer.patch(`/api/admin/restaurants/${restaurant._id}/approve`).expect(403);
     expect(await AuditLog.countDocuments({})).toBe(0);
@@ -66,8 +67,9 @@ describe('audit logging', () => {
   });
 
   it('never fails the admin action just because the audit write failed', async () => {
-    const restaurant = await pendingRestaurant();
+    const { restaurant, owner } = await pendingRestaurant();
     const { agent } = await createUserWithRole('ADMIN');
+    await submitRestaurantKyc(owner, restaurant._id).expect(200); // M14 — approval requires this first
     const spy = jest.spyOn(AuditLog, 'create').mockRejectedValueOnce(new Error('db down'));
     const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -110,7 +112,8 @@ describe('audit logging', () => {
   it('gets a single audit log entry by id (SUPER_ADMIN only)', async () => {
     const { agent: admin } = await createUserWithRole('ADMIN');
     const { agent: superAdmin } = await createUserWithRole('SUPER_ADMIN');
-    const restaurant = await pendingRestaurant();
+    const { restaurant, owner } = await pendingRestaurant();
+    await submitRestaurantKyc(owner, restaurant._id).expect(200); // M14 — approval requires this first
     await admin.patch(`/api/admin/restaurants/${restaurant._id}/approve`);
     const entry = await AuditLog.findOne({ action: 'restaurant.approve' });
 

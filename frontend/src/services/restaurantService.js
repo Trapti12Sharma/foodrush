@@ -23,4 +23,7 @@ export const restaurantService = {
     return api.post(`/restaurants/${id}/images/${type}`, formData).then((r) => r.data.restaurant);
   },
   deleteImage: (id, type) => api.delete(`/restaurants/${id}/images/${type}`).then((r) => r.data.restaurant),
+  // M14 — submit (or resubmit) business-verification documents for admin review.
+  // Never touches isApproved/isActive itself.
+  submitKyc: (id, payload) => api.post(`/restaurants/${id}/kyc/submit`, payload).then((r) => r.data.restaurant),
 };

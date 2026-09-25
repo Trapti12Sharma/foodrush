@@ -11,6 +11,148 @@ const IMAGE_SLOTS = [
   { type: 'logo', label: 'Logo' },
 ];
 
+// Kept separate from isApproved/isActive on purpose — see admin.service.js#approveRestaurant.
+const KYC_STYLES = {
+  NOT_SUBMITTED: 'bg-gray-100 text-gray-500',
+  SUBMITTED: 'bg-blue-100 text-blue-700',
+  VERIFIED: 'bg-green-100 text-green-700',
+  REJECTED: 'bg-red-100 text-red-700',
+};
+const KYC_LABELS = {
+  NOT_SUBMITTED: 'KYC: not submitted',
+  SUBMITTED: 'KYC: awaiting review',
+  VERIFIED: 'KYC: verified',
+  REJECTED: 'KYC: rejected',
+};
+
+function KycBadge({ status }) {
+  const s = status || 'NOT_SUBMITTED';
+  return <span className={`rounded-full px-2 py-0.5 text-xs ${KYC_STYLES[s]}`}>{KYC_LABELS[s]}</span>;
+}
+
+const KYC_DOC_FIELDS = [
+  { key: 'fssaiLicenseNumber', label: 'FSSAI licence number', isUrl: false },
+  { key: 'fssaiCertificateUrl', label: 'FSSAI certificate', isUrl: true },
+  { key: 'panNumber', label: 'PAN number', isUrl: false },
+  { key: 'panCardUrl', label: 'PAN card', isUrl: true },
+  { key: 'gstNumber', label: 'GST number', isUrl: false },
+  { key: 'gstCertificateUrl', label: 'GST certificate', isUrl: true },
+  { key: 'ownerIdentityProofUrl', label: 'Owner identity proof', isUrl: true },
+];
+
+// Review modal: shows the submitted documents and lets an admin approve (which
+// atomically sets kycStatus -> VERIFIED and isApproved -> true) or reject with a
+// reason (kycStatus -> REJECTED only — isApproved/isActive are never touched by
+// either action outside of approve's first-time transition).
+function KycReviewModal({ restaurant, onClose, onUpdated }) {
+  const [busy, setBusy] = useState(false);
+  const [reason, setReason] = useState('');
+  const docs = restaurant.kycDocuments || {};
+  const canReview = restaurant.kycStatus === 'SUBMITTED';
+
+  async function approve() {
+    setBusy(true);
+    try {
+      const updated = await adminService.approveRestaurant(restaurant._id);
+      toast.success('Restaurant approved and KYC verified');
+      onUpdated(updated);
+      onClose();
+    } catch (err) {
+      toast.error(err.message || 'Could not approve restaurant');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reject() {
+    if (!reason.trim()) {
+      toast.error('Please give a reason for rejecting');
+      return;
+    }
+    setBusy(true);
+    try {
+      const updated = await adminService.rejectRestaurantKyc(restaurant._id, reason.trim());
+      toast.success('KYC rejected');
+      onUpdated(updated);
+      onClose();
+    } catch (err) {
+      toast.error(err.message || 'Could not reject KYC');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-gray-900">KYC review — {restaurant.name}</h2>
+          <KycBadge status={restaurant.kycStatus} />
+        </div>
+        {restaurant.kycStatus === 'REJECTED' && restaurant.kycRejectionReason && (
+          <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">Previous rejection reason: {restaurant.kycRejectionReason}</p>
+        )}
+
+        {restaurant.kycStatus === 'NOT_SUBMITTED' ? (
+          <p className="mt-4 text-sm text-gray-500">This restaurant hasn&apos;t submitted business-verification documents yet.</p>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {KYC_DOC_FIELDS.filter(({ key }) => docs[key]).map(({ key, label, isUrl }) => (
+              <div key={key}>
+                <p className="mb-1 text-xs font-medium text-gray-500">{label}</p>
+                {isUrl ? (
+                  <a href={docs[key]} target="_blank" rel="noreferrer" className="block">
+                    <img src={optimizedUrl(docs[key], { width: 320, height: 200 })} alt={label} className="h-32 w-full rounded-lg border border-gray-200 object-cover" />
+                  </a>
+                ) : (
+                  <p className="text-sm text-gray-800">{docs[key]}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {canReview && (
+          <div className="mt-5 space-y-3 border-t border-gray-100 pt-4">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600">Rejection reason (only needed to reject)</label>
+              <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={2}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                placeholder="e.g. FSSAI certificate image is unreadable"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={approve}
+                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              >
+                Approve
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={reject}
+                className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+              >
+                Reject
+              </button>
+            </div>
+          </div>
+        )}
+
+        <button type="button" onClick={onClose} className="mt-6 w-full rounded-lg border border-gray-200 py-2 text-sm text-gray-600 hover:bg-gray-50">
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // One upload/replace/remove control, wired directly to the dedicated
 // per-image endpoints (POST/DELETE /restaurants/:id/images/:type) — each
 // action persists immediately, no separate "Save" step, since an admin
@@ -117,20 +259,26 @@ export default function Restaurants() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [approvalFilter, setApprovalFilter] = useState('');
+  const [kycFilter, setKycFilter] = useState('');
   const [busyId, setBusyId] = useState(null);
   const [managingImages, setManagingImages] = useState(null);
+  const [reviewingKyc, setReviewingKyc] = useState(null);
 
   function load() {
     setLoading(true);
     adminService
-      .listRestaurants({ search: search || undefined, isApproved: approvalFilter || undefined, limit: 100 })
+      .listRestaurants({ search: search || undefined, isApproved: approvalFilter || undefined, kycStatus: kycFilter || undefined, limit: 100 })
       .then((res) => setRestaurants(res.restaurants))
       .catch((err) => toast.error(err.message || 'Could not load restaurants'))
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, [search, approvalFilter]);
+  useEffect(load, [search, approvalFilter, kycFilter]);
 
+  // Only meaningful once KYC has actually been submitted — the backend rejects
+  // an approve attempt otherwise (see admin.service.js#approveRestaurant), so
+  // the quick one-click button is only offered in that state; anything else
+  // goes through the review modal.
   async function approve(restaurant) {
     setBusyId(restaurant._id);
     try {
@@ -176,6 +324,17 @@ export default function Restaurants() {
             <option value="false">Pending approval</option>
             <option value="true">Approved</option>
           </select>
+          <select
+            value={kycFilter}
+            onChange={(e) => setKycFilter(e.target.value)}
+            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+          >
+            <option value="">Any KYC status</option>
+            <option value="NOT_SUBMITTED">KYC: not submitted</option>
+            <option value="SUBMITTED">KYC: awaiting review</option>
+            <option value="VERIFIED">KYC: verified</option>
+            <option value="REJECTED">KYC: rejected</option>
+          </select>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -206,13 +365,14 @@ export default function Restaurants() {
                   <p className="text-xs text-gray-400">
                     {restaurant.city} · Owner: {restaurant.owner?.name} ({restaurant.owner?.email})
                   </p>
-                  <div className="mt-1 flex gap-2">
+                  <div className="mt-1 flex flex-wrap gap-2">
                     <span className={`rounded-full px-2 py-0.5 text-xs ${restaurant.isApproved ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
                       {restaurant.isApproved ? 'Approved' : 'Pending approval'}
                     </span>
                     <span className={`rounded-full px-2 py-0.5 text-xs ${restaurant.isActive ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
                       {restaurant.isActive ? 'Active' : 'Disabled'}
                     </span>
+                    <KycBadge status={restaurant.kycStatus} />
                   </div>
                 </div>
               </div>
@@ -224,7 +384,14 @@ export default function Restaurants() {
                 >
                   Images
                 </button>
-                {!restaurant.isApproved && (
+                <button
+                  type="button"
+                  onClick={() => setReviewingKyc(restaurant)}
+                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                >
+                  Review KYC
+                </button>
+                {!restaurant.isApproved && restaurant.kycStatus === 'SUBMITTED' && (
                   <button
                     type="button"
                     disabled={busyId === restaurant._id}
@@ -258,6 +425,10 @@ export default function Restaurants() {
             setManagingImages(updated);
           }}
         />
+      )}
+
+      {reviewingKyc && (
+        <KycReviewModal restaurant={reviewingKyc} onClose={() => setReviewingKyc(null)} onUpdated={handleImageUpdated} />
       )}
     </div>
   );

@@ -58,4 +58,20 @@ const updateRestaurantValidator = [
   ...scheduleRules,
 ];
 
-module.exports = { createRestaurantValidator, updateRestaurantValidator };
+// M14 — every document a reviewer needs for a real business-verification decision,
+// matching the exact "a successful submission always represents a complete
+// submission" convention deliveryPartner.validator.js already uses for KYC. GST
+// stays optional (see the Restaurant model's own comment on kycDocumentsSchema).
+// isSafeImageUrl alone treats '' as valid (a normal, optional image field may be
+// cleared) — these documents are mandatory, so notEmpty() is checked first.
+const submitKycValidator = [
+  body('fssaiLicenseNumber').trim().notEmpty().withMessage('FSSAI license number is required').isLength({ max: 40 }),
+  body('fssaiCertificateUrl').trim().notEmpty().withMessage('FSSAI certificate is required').custom(isSafeImageUrl).withMessage('fssaiCertificateUrl must be an uploaded image or an https:// URL'),
+  body('panNumber').trim().notEmpty().withMessage('PAN number is required').isLength({ max: 20 }),
+  body('panCardUrl').trim().notEmpty().withMessage('PAN card image is required').custom(isSafeImageUrl).withMessage('panCardUrl must be an uploaded image or an https:// URL'),
+  body('ownerIdentityProofUrl').trim().notEmpty().withMessage('An identity proof is required').custom(isSafeImageUrl).withMessage('ownerIdentityProofUrl must be an uploaded image or an https:// URL'),
+  body('gstNumber').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
+  body('gstCertificateUrl').optional({ checkFalsy: true }).custom(isSafeImageUrl).withMessage('gstCertificateUrl must be an uploaded image or an https:// URL'),
+];
+
+module.exports = { createRestaurantValidator, updateRestaurantValidator, submitKycValidator };

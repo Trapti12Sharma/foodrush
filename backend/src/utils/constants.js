@@ -117,6 +117,30 @@ const DELIVERY_ACCOUNT_STATUS = Object.freeze({
   REJECTED: 'REJECTED',
 });
 
+// M14 — Restaurant Onboarding & KYC. Deliberately kept SEPARATE from
+// `isApproved`/`isActive` (restaurant.service.js / admin.service.js), which stay
+// the sole, sticky "may this restaurant take orders right now" switches — exactly
+// as they already worked in every prior milestone. kycStatus only tracks "has
+// this restaurant's business paperwork been reviewed": an admin's approve action
+// requires SUBMITTED first (see admin.service.js#approveRestaurant) and moves it
+// to VERIFIED in the same step, but nothing here ever flips isApproved/isActive
+// back off on its own — an admin's existing setRestaurantActive is still the only
+// way to take a live restaurant offline, so a routine KYC document renewal can
+// never silently interrupt an operating restaurant.
+const RESTAURANT_KYC_STATUS = Object.freeze({
+  NOT_SUBMITTED: 'NOT_SUBMITTED', // default for every new restaurant — no documents on file yet
+  SUBMITTED: 'SUBMITTED', // documents submitted, awaiting admin review
+  VERIFIED: 'VERIFIED',
+  REJECTED: 'REJECTED',
+});
+
+const RESTAURANT_KYC_TRANSITIONS = Object.freeze({
+  [RESTAURANT_KYC_STATUS.NOT_SUBMITTED]: [RESTAURANT_KYC_STATUS.SUBMITTED],
+  [RESTAURANT_KYC_STATUS.SUBMITTED]: [RESTAURANT_KYC_STATUS.VERIFIED, RESTAURANT_KYC_STATUS.REJECTED],
+  [RESTAURANT_KYC_STATUS.REJECTED]: [RESTAURANT_KYC_STATUS.SUBMITTED], // fix documents and resubmit
+  [RESTAURANT_KYC_STATUS.VERIFIED]: [RESTAURANT_KYC_STATUS.SUBMITTED], // e.g. renewing an expired FSSAI licence
+});
+
 // Server-authoritative — never trust a client-supplied availability value beyond
 // this enum, and never let a partner go ONLINE without re-checking the two
 // statuses above at the moment of the request (see deliveryPartner.service.js).
@@ -287,6 +311,11 @@ const NOTIFICATION_TYPE = Object.freeze({
   SETTLEMENT_PAID: 'SETTLEMENT_PAID',
   SETTLEMENT_FAILED: 'SETTLEMENT_FAILED',
 
+  // M14 — Restaurant Onboarding & KYC.
+  RESTAURANT_KYC_SUBMITTED: 'RESTAURANT_KYC_SUBMITTED',
+  RESTAURANT_KYC_VERIFIED: 'RESTAURANT_KYC_VERIFIED',
+  RESTAURANT_KYC_REJECTED: 'RESTAURANT_KYC_REJECTED',
+
   // Reserved for a future milestone — defined now so the enum is complete, not
   // wired to any trigger yet (matches the "define now, wire up later" precedent
   // already used for DELIVERY_KYC_STATUS.PENDING and DELIVERY_SETTLEMENT_STATUS.PROCESSING).
@@ -362,6 +391,8 @@ module.exports = {
   DELIVERY_ACCOUNT_STATUS,
   DELIVERY_AVAILABILITY,
   DELIVERY_VEHICLE_TYPES,
+  RESTAURANT_KYC_STATUS,
+  RESTAURANT_KYC_TRANSITIONS,
   DELIVERY_ASSIGNMENT_STATUS,
   ACTIVE_ASSIGNMENT_STATUSES,
   DELIVERY_EARNING_STATUS,
