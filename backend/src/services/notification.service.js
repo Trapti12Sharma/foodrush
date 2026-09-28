@@ -59,6 +59,11 @@ const CONTENT = {
   [NOTIFICATION_TYPE.RESTAURANT_KYC_VERIFIED]: (d) => ({ title: 'KYC verified', message: `Your restaurant's business documents have been verified.` }),
   [NOTIFICATION_TYPE.RESTAURANT_KYC_REJECTED]: (d) => ({ title: 'KYC needs attention', message: `Your restaurant's KYC submission was rejected${d.reason ? ` (${d.reason})` : ''}. Please review and resubmit.` }),
 
+  [NOTIFICATION_TYPE.REVIEW_APPROVED]: () => ({ title: 'Your review is live', message: 'Your review has been approved and is now visible to other customers.' }),
+  [NOTIFICATION_TYPE.REVIEW_REJECTED]: (d) => ({ title: 'Your review was not approved', message: `Your review could not be published${d.reason ? ` (${d.reason})` : ''}.` }),
+  [NOTIFICATION_TYPE.REVIEW_HIDDEN]: (d) => ({ title: 'Your review was hidden', message: `Your review is no longer visible to other customers${d.reason ? ` (${d.reason})` : ''}.` }),
+  [NOTIFICATION_TYPE.REVIEW_RESTORED]: () => ({ title: 'Your review is visible again', message: 'Your review has been restored and is visible to other customers again.' }),
+
   [NOTIFICATION_TYPE.ACCOUNT_SECURITY]: (d) => ({ title: 'Security alert', message: d.message || 'A security-relevant change was made to your account.' }),
   [NOTIFICATION_TYPE.SYSTEM]: (d) => ({ title: 'FoodRush', message: d.message || 'You have a new notification.' }),
 };

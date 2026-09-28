@@ -42,4 +42,11 @@ export const adminService = {
   closeSupportTicket: (id) => api.patch(`/admin/support/tickets/${id}/close`).then((r) => r.data.ticket),
   listAuditLogs: (params) => api.get('/admin/audit-logs', { params }).then((r) => r.data),
   getAuditLog: (id) => api.get(`/admin/audit-logs/${id}`).then((r) => r.data.log),
+  // M15 — Review Moderation & Trust System.
+  listReviews: (params) => api.get('/admin/reviews', { params }).then((r) => r.data),
+  getReview: (id) => api.get(`/admin/reviews/${id}`).then((r) => r.data),
+  approveReview: (id) => api.patch(`/admin/reviews/${id}/approve`).then((r) => r.data.review),
+  rejectReview: (id, reason) => api.patch(`/admin/reviews/${id}/reject`, { reason }).then((r) => r.data.review),
+  hideReview: (id, reason) => api.patch(`/admin/reviews/${id}/hide`, reason ? { reason } : {}).then((r) => r.data.review),
+  restoreReview: (id) => api.patch(`/admin/reviews/${id}/restore`).then((r) => r.data.review),
 };

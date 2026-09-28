@@ -23,6 +23,9 @@ const rejectKycValidator = [body('reason').trim().notEmpty().withMessage('A reje
 const suspendDeliveryPartnerValidator = [body('reason').optional({ checkFalsy: true }).trim().isLength({ max: 500 })];
 const assignOrderValidator = [body('deliveryPartnerId').optional({ checkFalsy: true }).isMongoId().withMessage('deliveryPartnerId must be a valid id')];
 const cancelAssignmentValidator = [body('reason').optional({ checkFalsy: true }).trim().isLength({ max: 500 })];
+// M15 — reject requires a reason (Phase 4); hiding an already-approved review does not.
+const rejectReviewValidator = [body('reason').trim().notEmpty().withMessage('A rejection reason is required').isLength({ max: 500 })];
+const hideReviewValidator = [body('reason').optional({ checkFalsy: true }).trim().isLength({ max: 500 })];
 
 const generateSettlementValidator = [
   body('deliveryPartnerId').isMongoId().withMessage('A valid deliveryPartnerId is required'),
@@ -1024,5 +1027,150 @@ router.patch(
  *       404: { $ref: '#/components/responses/NotFound' }
  */
 router.patch('/support/tickets/:id/close', requirePermission(PERMISSIONS.SUPPORT_TICKETS_MANAGE), adminController.closeSupportTicketAdmin);
+
+/**
+ * @swagger
+ * /admin/reviews:
+ *   get:
+ *     summary: List reviews for moderation (requires the reviews:moderate permission)
+ *     description: >
+ *       Unlike GET /restaurants/{id}/reviews (public, APPROVED-only), this
+ *       returns reviews in every moderationStatus, across every restaurant.
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: query
+ *         name: moderationStatus
+ *         schema: { type: string, enum: [PENDING, APPROVED, REJECTED, HIDDEN] }
+ *       - in: query
+ *         name: restaurant
+ *         schema: { type: string }
+ *       - in: query
+ *         name: reported
+ *         schema: { type: string, enum: ['true'] }
+ *         description: When "true", only reviews with reportCount > 0
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Matches the review text, or the reviewing customer's name/email
+ *       - { in: query, name: page, schema: { type: integer } }
+ *       - { in: query, name: limit, schema: { type: integer } }
+ *     responses:
+ *       200:
+ *         description: A page of reviews
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     reviews: { type: array, items: { $ref: '#/components/schemas/Review' } }
+ *                     pagination: { $ref: '#/components/schemas/Pagination' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+router.get('/reviews', requirePermission(PERMISSIONS.REVIEWS_MODERATE), adminController.listReviews);
+
+/**
+ * @swagger
+ * /admin/reviews/{id}:
+ *   get:
+ *     summary: Get one review with its report metadata (requires the reviews:moderate permission)
+ *     description: >
+ *       Includes each report's reason and timestamp, never the reporter's
+ *       identity — reporter privacy is never surfaced by any API response.
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Review and its reports }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+router.get('/reviews/:id', requirePermission(PERMISSIONS.REVIEWS_MODERATE), adminController.getReview);
+
+/**
+ * @swagger
+ * /admin/reviews/{id}/approve:
+ *   patch:
+ *     summary: Approve a PENDING review (requires the reviews:moderate permission)
+ *     description: Only valid from PENDING. Immediately recalculates the restaurant's rating and notifies the author.
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Approved }
+ *       400: { description: 'The review is not PENDING' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+router.patch('/reviews/:id/approve', requirePermission(PERMISSIONS.REVIEWS_MODERATE), adminController.approveReview);
+
+/**
+ * @swagger
+ * /admin/reviews/{id}/reject:
+ *   patch:
+ *     summary: Reject a PENDING review (requires the reviews:moderate permission)
+ *     description: Only valid from PENDING. A reason is required and shown back to the author; never counted toward the public rating.
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object, required: [reason], properties: { reason: { type: string, maxLength: 500 } } }
+ *     responses:
+ *       200: { description: Rejected }
+ *       400: { description: 'The review is not PENDING' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       422: { $ref: '#/components/responses/ValidationError' }
+ */
+router.patch('/reviews/:id/reject', requirePermission(PERMISSIONS.REVIEWS_MODERATE), rejectReviewValidator, validate, adminController.rejectReview);
+
+/**
+ * @swagger
+ * /admin/reviews/{id}/hide:
+ *   patch:
+ *     summary: Hide a previously-APPROVED review (requires the reviews:moderate permission)
+ *     description: Only valid from APPROVED — e.g. a review approved earlier that later turns out to violate policy. Immediately stops counting toward the public rating.
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema: { type: object, properties: { reason: { type: string, maxLength: 500 } } }
+ *     responses:
+ *       200: { description: Hidden }
+ *       400: { description: 'The review is not APPROVED' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+router.patch('/reviews/:id/hide', requirePermission(PERMISSIONS.REVIEWS_MODERATE), hideReviewValidator, validate, adminController.hideReview);
+
+/**
+ * @swagger
+ * /admin/reviews/{id}/restore:
+ *   patch:
+ *     summary: Restore a HIDDEN review back to APPROVED (requires the reviews:moderate permission)
+ *     description: Only valid from HIDDEN. Immediately resumes counting toward the public rating.
+ *     tags: [Admin]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Restored }
+ *       400: { description: 'The review is not HIDDEN' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+router.patch('/reviews/:id/restore', requirePermission(PERMISSIONS.REVIEWS_MODERATE), adminController.restoreReview);
 
 module.exports = router;

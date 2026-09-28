@@ -141,6 +141,35 @@ const RESTAURANT_KYC_TRANSITIONS = Object.freeze({
   [RESTAURANT_KYC_STATUS.VERIFIED]: [RESTAURANT_KYC_STATUS.SUBMITTED], // e.g. renewing an expired FSSAI licence
 });
 
+// M15 — Review Moderation & Trust System. Every new review starts PENDING —
+// never auto-approved — and only an APPROVED review counts toward a
+// restaurant's public rating (see review.service.js#recalculateRestaurantRating).
+// No generic transition table here on purpose (matching the DELIVERY_ASSIGNMENT_STATUS
+// precedent below): each admin action (approve/reject/hide/restore) checks its
+// own single required source status directly in review.service.js, since two
+// different actions (approve, restore) can both land on APPROVED and a shared
+// table can't tell them apart. The graph is:
+//   PENDING  -> APPROVED (approve) | REJECTED (reject, reason required)
+//   APPROVED -> HIDDEN (hide)
+//   HIDDEN   -> APPROVED (restore)
+//   REJECTED -> (admin-terminal; the author editing the review's content is the
+//                only way back to PENDING — see review.service.js#updateReview)
+const REVIEW_MODERATION_STATUS = Object.freeze({
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  HIDDEN: 'HIDDEN',
+});
+
+const REVIEW_REPORT_REASON = Object.freeze({
+  SPAM: 'SPAM',
+  ABUSIVE: 'ABUSIVE',
+  OFFENSIVE: 'OFFENSIVE',
+  FAKE: 'FAKE',
+  IRRELEVANT: 'IRRELEVANT',
+  OTHER: 'OTHER',
+});
+
 // Server-authoritative — never trust a client-supplied availability value beyond
 // this enum, and never let a partner go ONLINE without re-checking the two
 // statuses above at the moment of the request (see deliveryPartner.service.js).
@@ -316,6 +345,15 @@ const NOTIFICATION_TYPE = Object.freeze({
   RESTAURANT_KYC_VERIFIED: 'RESTAURANT_KYC_VERIFIED',
   RESTAURANT_KYC_REJECTED: 'RESTAURANT_KYC_REJECTED',
 
+  // M15 — Review Moderation & Trust System. Submission itself is deliberately
+  // silent (no staff notification) — reviews are far higher-volume than KYC
+  // submissions, and moderators work off the PENDING filter in the admin review
+  // queue instead, the same way new orders never push-notify staff either.
+  REVIEW_APPROVED: 'REVIEW_APPROVED',
+  REVIEW_REJECTED: 'REVIEW_REJECTED',
+  REVIEW_HIDDEN: 'REVIEW_HIDDEN',
+  REVIEW_RESTORED: 'REVIEW_RESTORED',
+
   // Reserved for a future milestone — defined now so the enum is complete, not
   // wired to any trigger yet (matches the "define now, wire up later" precedent
   // already used for DELIVERY_KYC_STATUS.PENDING and DELIVERY_SETTLEMENT_STATUS.PROCESSING).
@@ -393,6 +431,8 @@ module.exports = {
   DELIVERY_VEHICLE_TYPES,
   RESTAURANT_KYC_STATUS,
   RESTAURANT_KYC_TRANSITIONS,
+  REVIEW_MODERATION_STATUS,
+  REVIEW_REPORT_REASON,
   DELIVERY_ASSIGNMENT_STATUS,
   ACTIVE_ASSIGNMENT_STATUSES,
   DELIVERY_EARNING_STATUS,

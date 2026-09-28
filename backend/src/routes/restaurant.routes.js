@@ -214,6 +214,12 @@ router.get(
  * /restaurants/{id}/reviews:
  *   get:
  *     summary: List reviews for a restaurant
+ *     description: >
+ *       Public — always returns only APPROVED reviews (M15). A signed-in
+ *       caller additionally sees their OWN review inline, whatever its
+ *       moderationStatus, so they can see it awaiting review or why it was
+ *       rejected; nobody else's non-approved reviews or moderation metadata
+ *       are ever included.
  *     tags: [Reviews]
  *     security: []
  *     parameters:
@@ -241,7 +247,7 @@ router.get(
  *                     reviews: { type: array, items: { $ref: '#/components/schemas/Review' } }
  *                     pagination: { $ref: '#/components/schemas/Pagination' }
  */
-router.get('/:id/reviews', reviewController.listForRestaurant);
+router.get('/:id/reviews', optionalAuth, reviewController.listForRestaurant);
 
 /**
  * @swagger

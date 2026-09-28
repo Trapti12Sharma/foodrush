@@ -1,6 +1,16 @@
 require('./setup');
-const { registerAndLogin, uniqueEmail } = require('./helpers');
+const { registerAndLogin, uniqueEmail, createUserWithRole } = require('./helpers');
 const Restaurant = require('../src/models/Restaurant');
+
+// M15 — every new review starts PENDING and does not count toward the
+// restaurant's rating until an admin approves it; this helper does that
+// through the real API so tests below reflect the real end-to-end flow.
+async function approveAsAdmin(reviewId) {
+  const { agent: admin } = await createUserWithRole('ADMIN');
+  const res = await admin.patch(`/api/admin/reviews/${reviewId}/approve`);
+  if (res.status !== 200) throw new Error(`approve failed: ${JSON.stringify(res.body)}`);
+  return res.body.data.review;
+}
 
 async function setupDeliveredOrder(owner, customer) {
   const res = await owner.post('/api/restaurants').send({
@@ -48,15 +58,23 @@ describe('Reviews', () => {
     expect(reviewRes.status).toBe(400);
   });
 
-  it('accepts a review on a delivered order and updates the restaurant rating', async () => {
+  it('starts a new review PENDING, invisible to the rating, until an admin approves it', async () => {
     const owner = await registerAndLogin({ name: 'Owner', email: uniqueEmail('rev-owner2'), role: 'RESTAURANT_OWNER' });
     const customer = await registerAndLogin({ name: 'Cust', email: uniqueEmail('rev-cust2'), role: 'CUSTOMER' });
     const { restaurant, order } = await setupDeliveredOrder(owner, customer);
 
     const res = await customer.post('/api/reviews').send({ restaurant: restaurant._id, order: order._id, rating: 4, comment: 'Good' });
     expect(res.status).toBe(201);
+    expect(res.body.data.review.moderationStatus).toBe('PENDING');
 
-    const restaurantRes = await customer.get(`/api/restaurants/${restaurant._id}`);
+    // PENDING must not affect the public rating yet.
+    let restaurantRes = await customer.get(`/api/restaurants/${restaurant._id}`);
+    expect(restaurantRes.body.data.restaurant.rating).toBe(0);
+    expect(restaurantRes.body.data.restaurant.totalReviews).toBe(0);
+
+    await approveAsAdmin(res.body.data.review._id);
+
+    restaurantRes = await customer.get(`/api/restaurants/${restaurant._id}`);
     expect(restaurantRes.body.data.restaurant.rating).toBe(4);
     expect(restaurantRes.body.data.restaurant.totalReviews).toBe(1);
   });
@@ -80,11 +98,12 @@ describe('Reviews', () => {
     expect(res.status).toBe(403);
   });
 
-  it('resets the rating to 0 after the only review is deleted', async () => {
+  it('resets the rating to 0 after the only (approved) review is deleted', async () => {
     const owner = await registerAndLogin({ name: 'Owner', email: uniqueEmail('rev-owner5'), role: 'RESTAURANT_OWNER' });
     const customer = await registerAndLogin({ name: 'Cust', email: uniqueEmail('rev-cust5'), role: 'CUSTOMER' });
     const { restaurant, order } = await setupDeliveredOrder(owner, customer);
     const reviewRes = await customer.post('/api/reviews').send({ restaurant: restaurant._id, order: order._id, rating: 5 });
+    await approveAsAdmin(reviewRes.body.data.review._id);
     await customer.delete(`/api/reviews/${reviewRes.body.data.review._id}`);
     const restaurantRes = await customer.get(`/api/restaurants/${restaurant._id}`);
     expect(restaurantRes.body.data.restaurant.rating).toBe(0);

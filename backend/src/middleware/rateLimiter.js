@@ -87,4 +87,22 @@ const supportLimiter = rateLimit({
   },
 });
 
-module.exports = { apiLimiter, authLimiter, uploadLimiter, geoLimiter, otpLimiter, supportLimiter };
+// Guards against review-spam and report-spam (submitting many reviews or
+// reporting many reviews in a burst) — a real customer never needs anywhere
+// near this many in 15 minutes; a script hammering the endpoint does. The
+// per-(review,reporter) unique index (see ReviewReport model) is the real
+// duplicate-report guard; this is the same defense-in-depth role supportLimiter
+// plays alongside support ticket creation.
+const reviewLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isTest ? 100000 : 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many review requests. Please try again later.',
+    errors: [],
+  },
+});
+
+module.exports = { apiLimiter, authLimiter, uploadLimiter, geoLimiter, otpLimiter, supportLimiter, reviewLimiter };

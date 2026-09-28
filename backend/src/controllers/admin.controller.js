@@ -9,6 +9,7 @@ const deliveryPartnerService = require('../services/deliveryPartner.service');
 const deliveryAssignmentService = require('../services/deliveryAssignment.service');
 const deliverySettlementService = require('../services/deliverySettlement.service');
 const supportTicketService = require('../services/supportTicket.service');
+const reviewService = require('../services/review.service');
 const Order = require('../models/Order');
 
 const getDashboard = asyncHandler(async (req, res) => {
@@ -338,6 +339,65 @@ const closeSupportTicketAdmin = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, 'Support ticket closed', { ticket }));
 });
 
+// M15 — Review Moderation & Trust System.
+const listReviews = asyncHandler(async (req, res) => {
+  const { items, pagination } = await reviewService.listForAdmin(req.query);
+  res.json(new ApiResponse(200, 'Reviews fetched', { reviews: items, pagination }));
+});
+
+const getReview = asyncHandler(async (req, res) => {
+  const { review, reports } = await reviewService.getForAdmin(req.params.id);
+  res.json(new ApiResponse(200, 'Review fetched', { review, reports }));
+});
+
+const approveReview = asyncHandler(async (req, res) => {
+  const review = await reviewService.approveReview(req.params.id, req.user);
+  await auditService.record({
+    req,
+    action: 'review.approve',
+    entityType: 'Review',
+    entityId: review._id,
+    metadata: { restaurant: review.restaurant.toString() },
+  });
+  res.json(new ApiResponse(200, 'Review approved', { review }));
+});
+
+const rejectReview = asyncHandler(async (req, res) => {
+  const review = await reviewService.rejectReview(req.params.id, req.user, req.body.reason);
+  await auditService.record({
+    req,
+    action: 'review.reject',
+    entityType: 'Review',
+    entityId: review._id,
+    metadata: { restaurant: review.restaurant.toString(), reason: req.body.reason },
+  });
+  res.json(new ApiResponse(200, 'Review rejected', { review }));
+});
+
+const hideReview = asyncHandler(async (req, res) => {
+  const review = await reviewService.hideReview(req.params.id, req.user, req.body.reason);
+  await auditService.record({
+    req,
+    action: 'review.hide',
+    entityType: 'Review',
+    entityId: review._id,
+    metadata: { restaurant: review.restaurant.toString(), reason: req.body.reason || null },
+  });
+  res.json(new ApiResponse(200, 'Review hidden', { review }));
+});
+
+const restoreReview = asyncHandler(async (req, res) => {
+  const review = await reviewService.restoreReview(req.params.id, req.user);
+  await auditService.record({
+    req,
+    action: 'review.restore',
+    entityType: 'Review',
+    entityId: review._id,
+    metadata: { restaurant: review.restaurant.toString() },
+  });
+  res.json(new ApiResponse(200, 'Review restored', { review }));
+});
+
 module.exports = {
   getDashboard,
   listUsers,
@@ -375,4 +435,10 @@ module.exports = {
   addSupportTicketMessage,
   resolveSupportTicket,
   closeSupportTicketAdmin,
+  listReviews,
+  getReview,
+  approveReview,
+  rejectReview,
+  hideReview,
+  restoreReview,
 };

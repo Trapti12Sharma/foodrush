@@ -45,6 +45,7 @@ import AdminDeliveryPartners from './pages/admin/DeliveryPartners';
 import AdminDeliveryAssignments from './pages/admin/DeliveryAssignments';
 import AdminDeliverySettlements from './pages/admin/DeliverySettlements';
 import AdminSupportTickets from './pages/admin/SupportTickets';
+import AdminReviews from './pages/admin/Reviews';
 import AdminAuditLogs from './pages/admin/AuditLogs';
 import Profile from './pages/Profile';
 import ForgotPassword from './pages/ForgotPassword';
@@ -176,6 +177,7 @@ function App() {
                 <Route path="delivery-assignments" element={<AdminDeliveryAssignments />} />
                 <Route path="delivery-settlements" element={<AdminDeliverySettlements />} />
                 <Route path="support-tickets" element={<AdminSupportTickets />} />
+                <Route path="reviews" element={<AdminReviews />} />
                 <Route path="audit-logs" element={<AdminAuditLogs />} />
               </Route>
 

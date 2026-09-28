@@ -474,6 +474,84 @@ already live and trusted before this milestone existed); everything else
 starts at `NOT_SUBMITTED`. It only ever touches restaurants with no
 `kycStatus` yet, so it's safe to re-run.
 
+## 12. Review moderation & trust (M15)
+
+No new environment variables — this reuses the existing `reviews:moderate`
+permission (already held by SUPER_ADMIN, ADMIN and RESTAURANT_MANAGER), the
+M12 notification service and the M11 audit log. No new permission was created.
+
+**Every review is moderated before it is public.** A review is still created
+exactly as before (only the customer whose own order it is, only once that
+order is DELIVERED, one review per order), but it now starts
+`moderationStatus: "PENDING"` and is **not** public and **not** counted in the
+restaurant's `rating`/`totalReviews` until an admin approves it. The states:
+
+```
+PENDING  --approve--> APPROVED --hide-----> HIDDEN
+   |                      ^                   |
+   |                      +-----restore-------+
+   +--reject---> REJECTED   (admin-terminal)
+```
+
+Only `APPROVED` reviews feed the public rating. `REJECTED` is terminal for
+admin actions — the author editing their review's content is the only way back
+into `PENDING` (any edit to rating/comment/images resets moderation, so
+approved text can't be swapped for something unreviewed after the fact).
+
+**Who sees what.** `GET /restaurants/:id/reviews` is still public and still
+unauthenticated-friendly, but returns only `APPROVED` rows — plus, for a
+signed-in caller, their *own* review whatever its status, so they can see it
+awaiting review or read why it was rejected. `moderatedBy`, `reportCount` and
+`reportedAt` are never returned by that endpoint to anyone; `moderationReason`
+only to the review's own author. The restaurant-owner reviews page uses the
+same public endpoint, so an owner sees approved reviews only, with no
+moderation metadata and no moderation controls.
+
+**Admin APIs** (all require `reviews:moderate`):
+- `GET /admin/reviews` — every status/restaurant, with `moderationStatus`,
+  `restaurant`, `reported=true` and `search` (review text or customer
+  name/email) filters.
+- `GET /admin/reviews/:id` — the review plus each report's reason and
+  timestamp.
+- `PATCH /admin/reviews/:id/approve` | `/reject` (reason required) | `/hide`
+  (reason optional) | `/restore`.
+
+Each transition is an **atomic conditional update** (the required source status
+is part of the query filter), so two moderators acting on the same review at
+once can only ever have one winner — the loser gets a 400, never a lost update
+or a corrupted rating.
+
+**Reporting.** `POST /reviews/:id/report` with a `reason` of `SPAM`,
+`ABUSIVE`, `OFFENSIVE`, `FAKE`, `IRRELEVANT` or `OTHER`. One report per
+customer per review (enforced by a unique index — a second attempt is a 409),
+you cannot report your own review, and both review creation and reporting sit
+behind a dedicated rate limiter. **Reporter identity is never returned by any
+API response, including the admin ones** — admins see reasons, counts and
+timings only.
+
+**Notifications & audit.** The author is notified on approve / reject (with the
+reason) / hide / restore — in-app and socket only, no email template and no
+preference gate. Submission itself is deliberately silent: reviews are far
+higher-volume than KYC submissions, so moderators work the `PENDING` filter in
+the admin queue rather than getting a push per review. Audit entries are
+written for `review.create`, `review.report`, `review.approve`,
+`review.reject`, `review.hide` and `review.restore`.
+
+**Backfilling existing reviews.** Every review written before M15 was already
+fully public and already counted toward its restaurant's rating, so it must
+not be retroactively de-listed. Run the migration from `backend/`:
+
+```bash
+node scripts/migrate-review-moderation.js            # dry run: shows what would change
+node scripts/migrate-review-moderation.js --apply    # writes it
+```
+
+It sets `moderationStatus: "APPROVED"` on every review that has no
+`moderationStatus` field at all, leaves anything that already has one alone,
+and is safe to re-run. No rating recalculation is needed afterward: the set of
+reviews counted does not change, only the explicit status field catches up to
+what was already true.
+
 ## Payments
 
 Real online payments require a Razorpay account. Set `RAZORPAY_KEY_ID` and

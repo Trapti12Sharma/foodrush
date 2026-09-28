@@ -1,5 +1,6 @@
 const { body } = require('express-validator');
 const { isSafeImageUrl } = require('../utils/imageUrl');
+const { REVIEW_REPORT_REASON } = require('../utils/constants');
 
 const reviewImages = body('images')
   .optional()
@@ -23,4 +24,8 @@ const updateReviewValidator = [
   reviewImages,
 ];
 
-module.exports = { createReviewValidator, updateReviewValidator };
+const reportReviewValidator = [
+  body('reason').isIn(Object.values(REVIEW_REPORT_REASON)).withMessage(`reason must be one of: ${Object.values(REVIEW_REPORT_REASON).join(', ')}`),
+];
+
+module.exports = { createReviewValidator, updateReviewValidator, reportReviewValidator };
