@@ -300,19 +300,26 @@ export default function Staff() {
                       )}
                     </td>
                     <td className="px-4 py-3">
+                      {/* An expired invite is called out separately from a
+                          pending one: the first needs resending, the second only
+                          needs waiting. An account created directly (bootstrap
+                          or seed script) has a working password and no
+                          outstanding invite, so it reads Active. */}
                       {!member.isActive ? (
                         <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs text-gray-600">Deactivated</span>
-                      ) : member.hasAcceptedInvite ? (
-                        <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700">Active</span>
-                      ) : (
+                      ) : member.inviteExpired ? (
+                        <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-700">Invite expired</span>
+                      ) : member.invitePending ? (
                         <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">Invite pending</span>
+                      ) : (
+                        <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700">Active</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-3">
                         {member.isActive && (
                           <button onClick={() => resend(member)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-brand-700">
-                            <Mail size={14} /> {member.hasAcceptedInvite ? 'Send reset link' : 'Resend invite'}
+                            <Mail size={14} /> {member.invitePending ? 'Resend invite' : 'Send reset link'}
                           </button>
                         )}
                         {!isSelf && (

@@ -150,14 +150,54 @@ describe('M17 staff console — listing', () => {
     expect((await agent.get('/api/admin/staff?search=nobodybythisname')).body.data.items).toHaveLength(0);
   });
 
+  // Regression: hasAcceptedInvite was originally Boolean(passwordChangedAt), so
+  // any account created directly with a working password — the bootstrap script,
+  // the seed script, or a promoted self-registration — was shown as "Invite
+  // pending" forever despite being able to log in. Found by running the console
+  // against a bootstrap-created super admin, not by any test.
+  it('does not claim a pending invite for an account created with a real password', async () => {
+    const { agent } = await superAdmin('direct-sa');
+    const direct = await User.create({
+      name: 'Bootstrapped Admin',
+      email: uniqueEmail('direct-admin'),
+      password: 'password123',
+      role: 'ADMIN',
+    });
+
+    const row = (await agent.get(`/api/admin/staff?search=${encodeURIComponent(direct.email)}`)).body.data.items[0];
+
+    expect(row.invitePending).toBe(false); // it can be logged into right now
+    expect(row.inviteExpired).toBe(false);
+    expect(row.hasAcceptedInvite).toBe(true);
+  });
+
+  it('marks an expired, never-accepted invite as expired rather than merely pending', async () => {
+    const { agent } = await superAdmin('expired-sa');
+    const email = uniqueEmail('expired-hire');
+    await agent.post('/api/admin/staff').send({ name: 'Lapsed Hire', email, role: 'ADMIN' }).expect(201);
+    // Push the invite window into the past, as the passage of a week would.
+    await User.updateOne({ email }, { $set: { passwordResetExpires: new Date(Date.now() - 1000) } });
+
+    const row = (await agent.get(`/api/admin/staff?search=${encodeURIComponent(email)}`)).body.data.items[0];
+
+    expect(row.invitePending).toBe(true);
+    expect(row.inviteExpired).toBe(true); // needs resending, not just waiting
+  });
+
   it('marks an account that has never set its own password as a pending invite', async () => {
     const { agent } = await superAdmin('pending-sa');
     const email = uniqueEmail('pending-agent');
     await agent.post('/api/admin/staff').send({ name: 'New Hire', email, role: 'SUPPORT_AGENT' }).expect(201);
 
     const row = (await agent.get('/api/admin/staff?search=New Hire')).body.data.items[0];
+    expect(row.invitePending).toBe(true);
     expect(row.hasAcceptedInvite).toBe(false);
+    expect(row.inviteExpired).toBe(false); // freshly issued, so pending but not dead
     expect(row.isActive).toBe(true); // active, but not yet accepted — two different things
+    // The booleans are derived from the credential fields; those fields must not
+    // themselves be in the response.
+    expect(row).not.toHaveProperty('passwordResetTokenHash');
+    expect(row).not.toHaveProperty('passwordResetExpires');
   });
 });
 
@@ -526,7 +566,9 @@ describe('M17 staff console — re-sending an invite', () => {
     expect((await theirAgent.get('/api/admin/staff')).status).toBe(403);
 
     // And the console now shows the invite as accepted.
-    expect((await agent.get(`/api/admin/staff?search=${encodeURIComponent(email)}`)).body.data.items[0].hasAcceptedInvite).toBe(true);
+    const acceptedRow = (await agent.get(`/api/admin/staff?search=${encodeURIComponent(email)}`)).body.data.items[0];
+    expect(acceptedRow.hasAcceptedInvite).toBe(true);
+    expect(acceptedRow.invitePending).toBe(false);
   });
 
   it('refuses to send a working link to a deactivated account', async () => {

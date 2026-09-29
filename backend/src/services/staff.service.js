@@ -54,6 +54,27 @@ const ASSIGNABLE_ROLES = STAFF_ROLES;
 // than half-handled.
 const NON_CONVERTIBLE_ROLES = Object.freeze([ROLES.RESTAURANT_OWNER, ROLES.DELIVERY_PARTNER]);
 
+// Derived rather than stored, so it cannot drift from the credential fields it
+// describes. Returns both flags so the console can say "expired" rather than
+// silently showing a dead invite as pending — a distinction that matters,
+// because an expired one needs resending and a pending one does not.
+//
+// `user` may come from a query that did not select the credential fields, in
+// which case passwordResetTokenHash is undefined and this reports no outstanding
+// invite. listStaff selects them explicitly. The hash itself is NEVER returned —
+// only these two booleans are derived from it.
+function inviteState(user) {
+  const hasSetOwnPassword = Boolean(user.passwordChangedAt);
+  const hasOutstandingToken = Boolean(user.passwordResetTokenHash);
+  const invitePending = !hasSetOwnPassword && hasOutstandingToken;
+  const expiresAt = user.passwordResetExpires ? new Date(user.passwordResetExpires).getTime() : 0;
+  return {
+    hasAcceptedInvite: !invitePending,
+    invitePending,
+    inviteExpired: invitePending && expiresAt < Date.now(),
+  };
+}
+
 function serializeStaff(user) {
   return {
     _id: user._id,
@@ -65,10 +86,21 @@ function serializeStaff(user) {
     isActive: user.isActive,
     avatar: user.avatar || '',
     lastPasswordChangeAt: user.passwordChangedAt || null,
-    // Whether this person has ever set a password of their own. A brand-new
-    // invite has not, so the console can show "invite pending" rather than
-    // implying an active account that simply never logs in.
-    hasAcceptedInvite: Boolean(user.passwordChangedAt),
+    // Invite state, for the console to distinguish an account that cannot yet be
+    // logged into from one that simply has not been used lately.
+    //
+    // Deliberately NOT `Boolean(passwordChangedAt)`. That was the first version,
+    // and running it showed it to be wrong: passwordChangedAt is only set when
+    // someone CHANGES a password, so an account created with a known password —
+    // by scripts/bootstrap-super-admin.js, by the seed script, or by
+    // self-registration before being promoted — has a working login and a null
+    // passwordChangedAt, and was being shown as "Invite pending" forever.
+    //
+    // An invite is outstanding only if the person has never set their own
+    // password AND an invite token was actually issued to them. Both conditions
+    // are needed: the token alone would also match an ordinary password reset,
+    // and the missing timestamp alone matches every directly-created account.
+    ...inviteState(user),
     createdAt: user.createdAt,
   };
 }
@@ -107,7 +139,10 @@ async function listStaff(query) {
   }
 
   const [items, total] = await Promise.all([
-    User.find(filter).sort('-createdAt').skip(skip).limit(limit),
+    // The credential fields are select:false and are pulled in ONLY so
+    // inviteState can derive its two booleans from them. Neither the token hash
+    // nor its expiry ever reaches serializeStaff's output.
+    User.find(filter).select('+passwordResetTokenHash +passwordResetExpires').sort('-createdAt').skip(skip).limit(limit),
     User.countDocuments(filter),
   ]);
 

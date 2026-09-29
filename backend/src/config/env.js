@@ -4,7 +4,7 @@
 //
 // Messages name the variable and the rule only — never the value, so a secret
 // can't leak into logs through a validation error.
-const { parseOrigins } = require('./cors');
+const { parseOrigins, toOrigin } = require('./cors');
 const { PROVIDERS } = require('../services/email.service');
 
 const PLACEHOLDER_SECRETS = new Set(['replace_with_a_long_random_string', 'changeme', 'secret', 'your_jwt_secret']);
@@ -58,8 +58,15 @@ function validateEnv(env = process.env) {
     (isProd ? errors : warnings).push('CLIENT_URL (or CLIENT_URLS) is not set — the frontend origin will not be allowed by CORS.');
   } else {
     const parsed = parseOrigins(env);
-    if (parsed.length < configuredOrigins.length) {
-      errors.push('CLIENT_URL / CLIENT_URLS contains an entry that is not a valid http(s) URL.');
+    // M18 — validate each entry individually. This used to compare
+    // parseOrigins().length against configuredOrigins.length, but parseOrigins
+    // DE-DUPLICATES, so listing the same origin in both CLIENT_URL and
+    // CLIENT_URLS made a valid configuration look like it contained a malformed
+    // one and the server refused to boot — pointing at a typo that did not
+    // exist. Naming the offending value also beats saying only that one exists.
+    const invalid = configuredOrigins.filter((value) => !toOrigin(value));
+    if (invalid.length > 0) {
+      errors.push(`CLIENT_URL / CLIENT_URLS contains an entry that is not a valid http(s) URL: ${invalid.map((v) => JSON.stringify(String(v).trim())).join(', ')}.`);
     }
     if (isProd) {
       parsed
