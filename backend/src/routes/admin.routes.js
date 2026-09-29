@@ -1,6 +1,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const adminController = require('../controllers/admin.controller');
+const analyticsController = require('../controllers/analytics.controller');
 const validate = require('../middleware/validate');
 const { authenticateUser, requirePermission } = require('../middleware/auth.middleware');
 const { supportLimiter } = require('../middleware/rateLimiter');
@@ -1172,5 +1173,574 @@ router.patch('/reviews/:id/hide', requirePermission(PERMISSIONS.REVIEWS_MODERATE
  *       404: { $ref: '#/components/responses/NotFound' }
  */
 router.patch('/reviews/:id/restore', requirePermission(PERMISSIONS.REVIEWS_MODERATE), adminController.restoreReview);
+
+// ---------------------------------------------------------------------------
+// M16 — Analytics & Reporting.
+//
+// Each slice requires the permission that ALREADY governs that data domain
+// rather than one blanket analytics permission, and no new permission was
+// created: overview/sales/orders use DASHBOARD_VIEW (exactly the audience the
+// pre-existing GET /admin/dashboard already shows platform revenue and order
+// counts to, so this is no privilege expansion), customers use USERS_READ,
+// restaurants/food use RESTAURANTS_READ_ALL, delivery uses
+// DELIVERY_ASSIGNMENTS_MANAGE, payments use REFUNDS_MANAGE and coupons use
+// COUPONS_MANAGE.
+//
+// Every endpoint takes the same date-range query contract, parsed by the one
+// shared utils/dateRange.js: `preset` (today | yesterday | last7days |
+// last30days | thismonth | lastmonth | alltime | custom), or startDate/endDate
+// for a custom range. Ranges are half-open [start, end) and always UTC.
+// ---------------------------------------------------------------------------
+
+/**
+ * @swagger
+ * components:
+ *   parameters:
+ *     AnalyticsPreset:
+ *       in: query
+ *       name: preset
+ *       schema:
+ *         type: string
+ *         enum: [today, yesterday, last7days, last30days, thismonth, lastmonth, alltime, custom]
+ *         default: last30days
+ *       description: >
+ *         Date window to measure. Defaults to last30days (or custom when
+ *         startDate/endDate are supplied). All windows are UTC and half-open —
+ *         start inclusive, end exclusive.
+ *     AnalyticsStartDate:
+ *       in: query
+ *       name: startDate
+ *       schema: { type: string, example: '2026-03-01' }
+ *       description: Required with preset=custom. YYYY-MM-DD (midnight UTC) or a full ISO timestamp.
+ *     AnalyticsEndDate:
+ *       in: query
+ *       name: endDate
+ *       schema: { type: string, example: '2026-03-31' }
+ *       description: >
+ *         Required with preset=custom. A bare YYYY-MM-DD means "through the end
+ *         of that day"; a full ISO timestamp is taken literally.
+ *   responses:
+ *     AnalyticsBadRange:
+ *       description: Invalid date range (unknown preset, unparseable date, missing custom bound, or startDate on/after endDate)
+ *       content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
+ */
+
+/**
+ * @swagger
+ * /admin/analytics/overview:
+ *   get:
+ *     summary: Platform KPI overview (requires the dashboard:view permission)
+ *     description: >
+ *       Headline figures for the range. Every money figure reuses the same
+ *       definitions as /admin/analytics/sales, so the two can never disagree:
+ *       grossSales is the sum of totalAmount over orders that actually reached
+ *       DELIVERED (including ones later refunded), refunds counts only
+ *       COMPLETED refunds on those orders, and netSales = grossSales − refunds.
+ *     tags: [Analytics]
+ *     parameters:
+ *       - $ref: '#/components/parameters/AnalyticsPreset'
+ *       - $ref: '#/components/parameters/AnalyticsStartDate'
+ *       - $ref: '#/components/parameters/AnalyticsEndDate'
+ *     responses:
+ *       200:
+ *         description: Overview KPIs
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     range:
+ *                       type: object
+ *                       properties:
+ *                         preset: { type: string }
+ *                         start: { type: string, format: date-time, nullable: true }
+ *                         end: { type: string, format: date-time, nullable: true }
+ *                         timezone: { type: string, example: UTC }
+ *                     summary:
+ *                       type: object
+ *                       properties:
+ *                         totalOrders: { type: integer }
+ *                         fulfilledOrders: { type: integer, description: Orders that reached DELIVERED }
+ *                         cancelledOrders: { type: integer }
+ *                         rejectedOrders: { type: integer }
+ *                         refundedOrders: { type: integer }
+ *                         grossSales: { type: number }
+ *                         discounts: { type: number, description: Already deducted from totalAmount — informational, never subtracted again }
+ *                         refunds: { type: number, description: COMPLETED refunds on fulfilled orders only }
+ *                         netSales: { type: number, description: grossSales − refunds }
+ *                         averageOrderValue: { type: number }
+ *                         totalRestaurants: { type: integer }
+ *                         activeRestaurants: { type: integer }
+ *                         activeDeliveryPartners: { type: integer }
+ *                         totalCustomers: { type: integer }
+ *                         newCustomers: { type: integer }
+ *                         activeCustomers: { type: integer }
+ *       400: { $ref: '#/components/responses/AnalyticsBadRange' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+router.get('/analytics/overview', requirePermission(PERMISSIONS.DASHBOARD_VIEW), analyticsController.getOverview);
+
+/**
+ * @swagger
+ * /admin/analytics/sales:
+ *   get:
+ *     summary: Sales summary and daily trend (requires the dashboard:view permission)
+ *     description: >
+ *       summary holds the totals; trend holds one row per UTC day in the range,
+ *       including days with no activity (a missing day in a series reads as a
+ *       different date, not as zero). Sales are attributed to the order's
+ *       creation date, matching the pre-existing dashboard trend.
+ *     tags: [Analytics]
+ *     parameters:
+ *       - $ref: '#/components/parameters/AnalyticsPreset'
+ *       - $ref: '#/components/parameters/AnalyticsStartDate'
+ *       - $ref: '#/components/parameters/AnalyticsEndDate'
+ *     responses:
+ *       200:
+ *         description: Sales summary plus a per-day trend
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     summary:
+ *                       type: object
+ *                       properties:
+ *                         orders: { type: integer, description: Fulfilled orders contributing to these figures }
+ *                         grossSales: { type: number }
+ *                         discounts: { type: number }
+ *                         refunds: { type: number }
+ *                         refundedOrderCount: { type: integer }
+ *                         netSales: { type: number }
+ *                         averageOrderValue: { type: number }
+ *                         itemsSubtotal: { type: number }
+ *                         deliveryFees: { type: number }
+ *                         tax: { type: number }
+ *                     trend:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           date: { type: string, example: '2026-03-14' }
+ *                           orders: { type: integer }
+ *                           gross: { type: number }
+ *                           discounts: { type: number }
+ *                           refunds: { type: number }
+ *                           net: { type: number }
+ *       400: { $ref: '#/components/responses/AnalyticsBadRange' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+router.get('/analytics/sales', requirePermission(PERMISSIONS.DASHBOARD_VIEW), analyticsController.getSales);
+
+/**
+ * @swagger
+ * /admin/analytics/orders:
+ *   get:
+ *     summary: Order status breakdown, rates and trend (requires the dashboard:view permission)
+ *     description: >
+ *       completionRate and cancellationRate are null — not 0 — when there are no
+ *       orders in the range, so "no data" is never rendered as "0%".
+ *     tags: [Analytics]
+ *     parameters:
+ *       - $ref: '#/components/parameters/AnalyticsPreset'
+ *       - $ref: '#/components/parameters/AnalyticsStartDate'
+ *       - $ref: '#/components/parameters/AnalyticsEndDate'
+ *     responses:
+ *       200:
+ *         description: Order analytics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     summary:
+ *                       type: object
+ *                       properties:
+ *                         totalOrders: { type: integer }
+ *                         fulfilledOrders: { type: integer }
+ *                         cancelledOrders: { type: integer }
+ *                         rejectedOrders: { type: integer }
+ *                         refundPendingOrders: { type: integer }
+ *                         refundedOrders: { type: integer }
+ *                         inProgressOrders: { type: integer }
+ *                         completionRate: { type: number, nullable: true }
+ *                         cancellationRate: { type: number, nullable: true }
+ *                     byStatus:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           status: { type: string }
+ *                           count: { type: integer }
+ *                     trend:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           date: { type: string }
+ *                           orders: { type: integer }
+ *       400: { $ref: '#/components/responses/AnalyticsBadRange' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+router.get('/analytics/orders', requirePermission(PERMISSIONS.DASHBOARD_VIEW), analyticsController.getOrders);
+
+/**
+ * @swagger
+ * /admin/analytics/customers:
+ *   get:
+ *     summary: Customer counts and repeat behaviour (requires the users:read permission)
+ *     description: >
+ *       Counts only accounts whose role is CUSTOMER — staff, restaurant owners
+ *       and delivery partners are never included. "Active" means the customer
+ *       placed at least one order in the range that was not cancelled or
+ *       rejected; "repeat" means at least two such orders. Averages are null,
+ *       not 0, when there are no active customers. No customer names, emails or
+ *       any other PII are returned — these are counts only.
+ *     tags: [Analytics]
+ *     parameters:
+ *       - $ref: '#/components/parameters/AnalyticsPreset'
+ *       - $ref: '#/components/parameters/AnalyticsStartDate'
+ *       - $ref: '#/components/parameters/AnalyticsEndDate'
+ *     responses:
+ *       200:
+ *         description: Customer analytics (aggregate counts only)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     summary:
+ *                       type: object
+ *                       properties:
+ *                         totalCustomers: { type: integer, description: All-time, not range-limited }
+ *                         newCustomers: { type: integer, description: Registered within the range }
+ *                         activeCustomers: { type: integer }
+ *                         repeatCustomers: { type: integer }
+ *                         ordersFromActiveCustomers: { type: integer }
+ *                         averageOrdersPerActiveCustomer: { type: number, nullable: true }
+ *                         averageSpendPerActiveCustomer: { type: number, nullable: true }
+ *                         repeatCustomerRate: { type: number, nullable: true }
+ *       400: { $ref: '#/components/responses/AnalyticsBadRange' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+router.get('/analytics/customers', requirePermission(PERMISSIONS.USERS_READ), analyticsController.getCustomers);
+
+/**
+ * @swagger
+ * /admin/analytics/restaurants:
+ *   get:
+ *     summary: Per-restaurant performance table (requires the restaurants:read_all permission)
+ *     description: >
+ *       Factual metrics per restaurant, sorted by a whitelisted metric. There is
+ *       deliberately no composite "best restaurant" score — sorting by order
+ *       count or sales is a fact; a quality ranking would be an opinion.
+ *     tags: [Analytics]
+ *     parameters:
+ *       - $ref: '#/components/parameters/AnalyticsPreset'
+ *       - $ref: '#/components/parameters/AnalyticsStartDate'
+ *       - $ref: '#/components/parameters/AnalyticsEndDate'
+ *       - in: query
+ *         name: sort
+ *         schema:
+ *           type: string
+ *           enum: [grossSales, orders, fulfilledOrders, averageOrderValue, rating, reviewCount]
+ *           default: grossSales
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+ *     responses:
+ *       200:
+ *         description: Restaurant analytics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     summary:
+ *                       type: object
+ *                       properties:
+ *                         totalRestaurants: { type: integer }
+ *                         activeRestaurants: { type: integer }
+ *                         restaurantsWithOrders: { type: integer }
+ *                     sortedBy: { type: string }
+ *                     breakdown:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           restaurantId: { type: string }
+ *                           name: { type: string }
+ *                           city: { type: string }
+ *                           rating: { type: number }
+ *                           reviewCount: { type: integer }
+ *                           orders: { type: integer }
+ *                           fulfilledOrders: { type: integer }
+ *                           cancelledOrders: { type: integer }
+ *                           grossSales: { type: number }
+ *                           discounts: { type: number }
+ *                           averageOrderValue: { type: number }
+ *       400: { $ref: '#/components/responses/AnalyticsBadRange' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+router.get('/analytics/restaurants', requirePermission(PERMISSIONS.RESTAURANTS_READ_ALL), analyticsController.getRestaurants);
+
+/**
+ * @swagger
+ * /admin/analytics/food:
+ *   get:
+ *     summary: Menu-item quantities and sales across all restaurants (requires the restaurants:read_all permission)
+ *     description: >
+ *       Built from the frozen item snapshots on FULFILLED orders only — cart
+ *       additions, pending orders and cancelled orders never count as sales.
+ *       Item money uses the same formula the customer was charged,
+ *       (unit price + addons) × quantity. Per-item ratings are NOT returned:
+ *       reviews in this schema attach to a restaurant and an order, never to a
+ *       menu item, so a per-dish rating cannot be computed from real data.
+ *     tags: [Analytics]
+ *     parameters:
+ *       - $ref: '#/components/parameters/AnalyticsPreset'
+ *       - $ref: '#/components/parameters/AnalyticsStartDate'
+ *       - $ref: '#/components/parameters/AnalyticsEndDate'
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+ *     responses:
+ *       200:
+ *         description: Food analytics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     summary:
+ *                       type: object
+ *                       properties:
+ *                         itemsSold: { type: integer }
+ *                         distinctItems: { type: integer }
+ *                     breakdown:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           foodId: { type: string }
+ *                           name: { type: string }
+ *                           quantity: { type: integer }
+ *                           sales: { type: number }
+ *                           orderCount: { type: integer, description: Distinct orders containing the item }
+ *                     note: { type: string }
+ *       400: { $ref: '#/components/responses/AnalyticsBadRange' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+router.get('/analytics/food', requirePermission(PERMISSIONS.RESTAURANTS_READ_ALL), analyticsController.getFood);
+
+/**
+ * @swagger
+ * /admin/analytics/delivery:
+ *   get:
+ *     summary: Delivery operations, rider earnings and settlement totals (requires the delivery_assignments:manage permission)
+ *     description: >
+ *       averageCompletionMinutes is measured as completedAt − assignedAt across
+ *       COMPLETED assignments that carry BOTH timestamps, and is null when none
+ *       do — never estimated. measuredCompletions says how many assignments the
+ *       average is actually based on. Earnings are bucketed by DeliveryEarning.earnedAt;
+ *       assignments and settlements by their own createdAt. Rider rows carry an
+ *       operational name and city only — no phone, address or KYC document data.
+ *     tags: [Analytics]
+ *     parameters:
+ *       - $ref: '#/components/parameters/AnalyticsPreset'
+ *       - $ref: '#/components/parameters/AnalyticsStartDate'
+ *       - $ref: '#/components/parameters/AnalyticsEndDate'
+ *     responses:
+ *       200:
+ *         description: Delivery analytics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     summary:
+ *                       type: object
+ *                       properties:
+ *                         assignmentsCreated: { type: integer }
+ *                         accepted: { type: integer }
+ *                         completed: { type: integer }
+ *                         cancelled: { type: integer }
+ *                         rejected: { type: integer }
+ *                         expired: { type: integer }
+ *                         activeDeliveryPartners: { type: integer }
+ *                         averageCompletionMinutes: { type: number, nullable: true }
+ *                         measuredCompletions: { type: integer }
+ *                     earnings:
+ *                       type: object
+ *                       properties:
+ *                         earningRecords: { type: integer }
+ *                         grossEarnings: { type: number }
+ *                         netEarnings: { type: number }
+ *                         settledEarnings: { type: number }
+ *                         pendingEarnings: { type: number }
+ *                     settlements:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           status: { type: string }
+ *                           count: { type: integer }
+ *                           netAmount: { type: number }
+ *                     byAssignmentStatus:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           status: { type: string }
+ *                           count: { type: integer }
+ *                     topDeliveryPartners:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           deliveryPartnerId: { type: string }
+ *                           name: { type: string }
+ *                           city: { type: string }
+ *                           deliveries: { type: integer }
+ *                           netEarnings: { type: number }
+ *       400: { $ref: '#/components/responses/AnalyticsBadRange' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+router.get('/analytics/delivery', requirePermission(PERMISSIONS.DELIVERY_ASSIGNMENTS_MANAGE), analyticsController.getDelivery);
+
+/**
+ * @swagger
+ * /admin/analytics/payments:
+ *   get:
+ *     summary: Online payment, COD and refund analytics (requires the refunds:manage permission)
+ *     description: >
+ *       Payment rows are one per ONLINE ATTEMPT, not per order, so paidOrders
+ *       counts DISTINCT orders holding a PAID attempt — a customer who failed
+ *       once and retried successfully is one paid order, not two. Attempt counts
+ *       are reported separately and labelled as attempts. Refunds are broken down
+ *       by their real Refund status; only `completed` represents money actually
+ *       returned, and a cancelled order is never assumed to have been refunded.
+ *     tags: [Analytics]
+ *     parameters:
+ *       - $ref: '#/components/parameters/AnalyticsPreset'
+ *       - $ref: '#/components/parameters/AnalyticsStartDate'
+ *       - $ref: '#/components/parameters/AnalyticsEndDate'
+ *     responses:
+ *       200:
+ *         description: Payment and refund analytics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     online:
+ *                       type: object
+ *                       properties:
+ *                         paidOrders: { type: integer, description: Distinct orders with a PAID attempt }
+ *                         paidAmount: { type: number }
+ *                         totalAttempts: { type: integer }
+ *                         createdAttempts: { type: integer }
+ *                         paidAttempts: { type: integer }
+ *                         failedAttempts: { type: integer }
+ *                     cod:
+ *                       type: object
+ *                       properties:
+ *                         orders: { type: integer }
+ *                         amount: { type: number }
+ *                     refunds:
+ *                       type: object
+ *                       properties:
+ *                         total: { type: integer }
+ *                         totalAmount: { type: number }
+ *                         completed: { type: integer }
+ *                         completedAmount: { type: number }
+ *                         pending: { type: integer }
+ *                         processing: { type: integer }
+ *                         failed: { type: integer }
+ *       400: { $ref: '#/components/responses/AnalyticsBadRange' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+router.get('/analytics/payments', requirePermission(PERMISSIONS.REFUNDS_MANAGE), analyticsController.getPayments);
+
+/**
+ * @swagger
+ * /admin/analytics/coupons:
+ *   get:
+ *     summary: Coupon redemptions and discount totals (requires the coupons:manage permission)
+ *     description: >
+ *       Read from CouponUsage, which holds one row per (coupon, order) with a
+ *       unique index on order — so a retried order write can never inflate a
+ *       redemption count. This milestone only reports on coupons; it changes
+ *       nothing about how they work.
+ *     tags: [Analytics]
+ *     parameters:
+ *       - $ref: '#/components/parameters/AnalyticsPreset'
+ *       - $ref: '#/components/parameters/AnalyticsStartDate'
+ *       - $ref: '#/components/parameters/AnalyticsEndDate'
+ *     responses:
+ *       200:
+ *         description: Coupon analytics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     summary:
+ *                       type: object
+ *                       properties:
+ *                         redemptions: { type: integer }
+ *                         discountGiven: { type: number }
+ *                         distinctCustomers: { type: integer }
+ *                         averageDiscountPerRedemption: { type: number, nullable: true }
+ *                     breakdown:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           couponId: { type: string }
+ *                           code: { type: string }
+ *                           discountType: { type: string }
+ *                           redemptions: { type: integer }
+ *                           discount: { type: number }
+ *       400: { $ref: '#/components/responses/AnalyticsBadRange' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ */
+router.get('/analytics/coupons', requirePermission(PERMISSIONS.COUPONS_MANAGE), analyticsController.getCoupons);
 
 module.exports = router;

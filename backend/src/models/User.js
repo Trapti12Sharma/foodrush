@@ -59,6 +59,10 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// M16 — analytics counts customers (role === CUSTOMER) in total and those who
+// registered inside a date range; this serves both from one index.
+userSchema.index({ role: 1, createdAt: -1 });
+
 // `addresses` and `favorites` are intentionally not embedded arrays of ids —
 // they're derived via virtual populate from the Address/Favorite collections so
 // there is a single source of truth and no array to keep in sync on every write.

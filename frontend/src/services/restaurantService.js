@@ -14,6 +14,10 @@ export const restaurantService = {
   update: (id, payload) => api.put(`/restaurants/${id}`, payload).then((r) => r.data.restaurant),
   remove: (id) => api.delete(`/restaurants/${id}`),
   getDashboard: (id) => api.get(`/restaurants/${id}/dashboard`).then((r) => r.data),
+  // M16 — date-ranged analytics for one restaurant the caller owns. `params` is
+  // { preset } or { preset: 'custom', startDate, endDate }, plus an optional
+  // `limit` for how many top menu items to return.
+  getAnalytics: (id, params) => api.get(`/restaurants/${id}/analytics`, { params }).then((r) => r.data),
   // `type` is one of image | coverImage | logo. Uploads and persists in one request
   // (see backend/src/routes/restaurant.routes.js) — the old image is only removed
   // server-side once this succeeds.

@@ -64,5 +64,8 @@ const paymentSchema = new mongoose.Schema(
 );
 
 paymentSchema.index({ order: 1, createdAt: -1 });
+// M16 — analytics counts attempts by status within a date range, and
+// deduplicates PAID attempts down to distinct orders.
+paymentSchema.index({ status: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Payment', paymentSchema);

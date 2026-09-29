@@ -33,5 +33,7 @@ const couponUsageSchema = new mongoose.Schema(
 );
 
 couponUsageSchema.index({ coupon: 1, user: 1 });
+// M16 — coupon analytics filters redemptions by date range, then groups by coupon.
+couponUsageSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model('CouponUsage', couponUsageSchema);

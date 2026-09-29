@@ -3,6 +3,7 @@ const restaurantController = require('../controllers/restaurant.controller');
 const restaurantGeoController = require('../controllers/restaurantGeo.controller');
 const { nearbyValidator, deliveryCheckValidator } = require('../validators/restaurantGeo.validator');
 const dashboardController = require('../controllers/dashboard.controller');
+const analyticsController = require('../controllers/analytics.controller');
 const reviewController = require('../controllers/review.controller');
 const { createRestaurantValidator, updateRestaurantValidator, submitKycValidator } = require('../validators/restaurant.validator');
 const validate = require('../middleware/validate');
@@ -207,6 +208,88 @@ router.get(
   authenticateUser,
   requireOwnerOrPermission(PERMISSIONS.RESTAURANTS_READ_ALL),
   dashboardController.getRestaurantDashboard
+);
+
+/**
+ * @swagger
+ * /restaurants/{id}/analytics:
+ *   get:
+ *     summary: Date-ranged analytics for one restaurant (M16 — its own owner only)
+ *     description: >
+ *       The date-ranged counterpart to /restaurants/{id}/dashboard, which stays
+ *       unchanged. Scoped to a single restaurant: ownership is re-derived from
+ *       the authenticated user against the database, so the id in the path is
+ *       only a lookup key — a forged one returns 403, never another owner's
+ *       figures. Money definitions are identical to the admin analytics
+ *       endpoints (grossSales over orders that reached DELIVERED, refunds =
+ *       COMPLETED refunds on those orders, netSales = grossSales − refunds), so
+ *       an owner and an admin looking at the same restaurant see the same
+ *       numbers. lifetimeRating/lifetimeReviewCount are the restaurant's
+ *       all-time public figures; reviewsInRange/averageRatingInRange cover only
+ *       APPROVED reviews created inside the selected range. No customer names,
+ *       emails or addresses are included.
+ *     tags: [Analytics]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *       - $ref: '#/components/parameters/AnalyticsPreset'
+ *       - $ref: '#/components/parameters/AnalyticsStartDate'
+ *       - $ref: '#/components/parameters/AnalyticsEndDate'
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 10, minimum: 1, maximum: 100 }
+ *         description: How many top menu items to return.
+ *     responses:
+ *       200:
+ *         description: Owner-scoped analytics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     range: { type: object }
+ *                     restaurant:
+ *                       type: object
+ *                       properties:
+ *                         id: { type: string }
+ *                         name: { type: string }
+ *                     summary:
+ *                       type: object
+ *                       properties:
+ *                         orders: { type: integer, description: Fulfilled orders behind the money figures }
+ *                         grossSales: { type: number }
+ *                         discounts: { type: number }
+ *                         refunds: { type: number }
+ *                         netSales: { type: number }
+ *                         averageOrderValue: { type: number }
+ *                         totalOrders: { type: integer }
+ *                         fulfilledOrders: { type: integer }
+ *                         cancelledOrders: { type: integer }
+ *                         rejectedOrders: { type: integer }
+ *                         completionRate: { type: number, nullable: true }
+ *                         cancellationRate: { type: number, nullable: true }
+ *                         lifetimeRating: { type: number }
+ *                         lifetimeReviewCount: { type: integer }
+ *                         reviewsInRange: { type: integer }
+ *                         averageRatingInRange: { type: number, nullable: true }
+ *                     trend: { type: array, items: { type: object } }
+ *                     byStatus: { type: array, items: { type: object } }
+ *                     topItems: { type: array, items: { type: object } }
+ *       400: { $ref: '#/components/responses/AnalyticsBadRange' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { description: Not this owner's restaurant }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ */
+router.get(
+  '/:id/analytics',
+  authenticateUser,
+  requireOwnerOrPermission(PERMISSIONS.RESTAURANTS_READ_ALL),
+  analyticsController.getRestaurantAnalytics
 );
 
 /**

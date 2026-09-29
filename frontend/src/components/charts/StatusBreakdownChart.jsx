@@ -6,15 +6,24 @@ import { ORDER_STATUS_LABELS } from '../OrderStatusBadge';
 // "critical", pending genuinely needs attention ("warning"). The remaining
 // active-fulfillment statuses are ordinary progress, so they get the neutral
 // categorical slot-1 blue rather than borrowing a status color they don't earn.
+// Keys are the UPPERCASE ORDER_STATUS values the API actually returns. They were
+// lowercase here (pending/confirmed/...), left over from before order statuses
+// were uppercased and PLACED replaced PENDING, which meant every bar resolved to
+// backgroundColor: undefined and rendered colourless — and REFUND_PENDING/
+// REFUNDED had no entry at all. Refund states get their own amber-to-neutral
+// treatment: money going back is not a fulfilment failure like a cancellation,
+// but it is not a clean delivery either.
 const COLOR_BY_STATUS = {
-  pending: '#fab219',
-  confirmed: '#2a78d6',
-  preparing: '#2a78d6',
-  ready_for_pickup: '#2a78d6',
-  out_for_delivery: '#2a78d6',
-  delivered: '#0ca30c',
-  cancelled: '#d03b3b',
-  rejected: '#d03b3b',
+  PLACED: '#fab219',
+  CONFIRMED: '#2a78d6',
+  PREPARING: '#2a78d6',
+  READY_FOR_PICKUP: '#2a78d6',
+  OUT_FOR_DELIVERY: '#2a78d6',
+  DELIVERED: '#0ca30c',
+  CANCELLED: '#d03b3b',
+  REJECTED: '#d03b3b',
+  REFUND_PENDING: '#b07d1a',
+  REFUNDED: '#8a7f6d',
 };
 
 const LEGEND = [
@@ -22,6 +31,7 @@ const LEGEND = [
   { label: 'In progress', color: '#2a78d6' },
   { label: 'Delivered', color: '#0ca30c' },
   { label: 'Cancelled / rejected', color: '#d03b3b' },
+  { label: 'Refunded', color: '#8a7f6d' },
 ];
 
 export default function StatusBreakdownChart({ data }) {

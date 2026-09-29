@@ -51,5 +51,8 @@ const refundSchema = new mongoose.Schema(
 );
 
 refundSchema.index({ order: 1, createdAt: -1 });
+// M16 — analytics reads refunds by status within a date range (only COMPLETED
+// refunds count as money returned), which this serves directly.
+refundSchema.index({ status: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Refund', refundSchema);

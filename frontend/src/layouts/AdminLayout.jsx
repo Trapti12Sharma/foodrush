@@ -1,9 +1,10 @@
 import { Outlet, NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, Store, ClipboardList, Tag, Bike, Navigation, Wallet, LifeBuoy, ScrollText, Star } from 'lucide-react';
+import { LayoutDashboard, BarChart3, Users, Store, ClipboardList, Tag, Bike, Navigation, Wallet, LifeBuoy, ScrollText, Star } from 'lucide-react';
 import NotificationBell from '../components/NotificationBell';
 
 const NAV_ITEMS = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/admin/users', label: 'Users', icon: Users },
   { to: '/admin/restaurants', label: 'Restaurants', icon: Store },
   { to: '/admin/orders', label: 'Orders', icon: ClipboardList },

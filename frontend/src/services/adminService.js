@@ -42,6 +42,19 @@ export const adminService = {
   closeSupportTicket: (id) => api.patch(`/admin/support/tickets/${id}/close`).then((r) => r.data.ticket),
   listAuditLogs: (params) => api.get('/admin/audit-logs', { params }).then((r) => r.data),
   getAuditLog: (id) => api.get(`/admin/audit-logs/${id}`).then((r) => r.data.log),
+  // M16 -- Analytics & Reporting. `params` carries the shared date-range contract:
+  // { preset } or { preset: 'custom', startDate, endDate }. Each slice is gated by
+  // the permission that governs that data domain, so a staff role may legitimately
+  // get 403 on some of these while succeeding on others.
+  getAnalyticsOverview: (params) => api.get('/admin/analytics/overview', { params }).then((r) => r.data),
+  getAnalyticsSales: (params) => api.get('/admin/analytics/sales', { params }).then((r) => r.data),
+  getAnalyticsOrders: (params) => api.get('/admin/analytics/orders', { params }).then((r) => r.data),
+  getAnalyticsCustomers: (params) => api.get('/admin/analytics/customers', { params }).then((r) => r.data),
+  getAnalyticsRestaurants: (params) => api.get('/admin/analytics/restaurants', { params }).then((r) => r.data),
+  getAnalyticsFood: (params) => api.get('/admin/analytics/food', { params }).then((r) => r.data),
+  getAnalyticsDelivery: (params) => api.get('/admin/analytics/delivery', { params }).then((r) => r.data),
+  getAnalyticsPayments: (params) => api.get('/admin/analytics/payments', { params }).then((r) => r.data),
+  getAnalyticsCoupons: (params) => api.get('/admin/analytics/coupons', { params }).then((r) => r.data),
   // M15 — Review Moderation & Trust System.
   listReviews: (params) => api.get('/admin/reviews', { params }).then((r) => r.data),
   getReview: (id) => api.get(`/admin/reviews/${id}`).then((r) => r.data),

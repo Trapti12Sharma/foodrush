@@ -37,6 +37,7 @@ import DeliverySupport from './pages/delivery/Support';
 import Support from './pages/Support';
 import OwnerSupport from './pages/owner/Support';
 import AdminDashboard from './pages/admin/Dashboard';
+import AdminAnalytics from './pages/admin/Analytics';
 import AdminUsers from './pages/admin/Users';
 import AdminRestaurants from './pages/admin/Restaurants';
 import AdminOrders from './pages/admin/Orders';
@@ -169,6 +170,7 @@ function App() {
                 }
               >
                 <Route path="dashboard" element={<AdminDashboard />} />
+                <Route path="analytics" element={<AdminAnalytics />} />
                 <Route path="users" element={<AdminUsers />} />
                 <Route path="restaurants" element={<AdminRestaurants />} />
                 <Route path="orders" element={<AdminOrders />} />

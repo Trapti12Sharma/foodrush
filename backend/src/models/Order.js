@@ -215,5 +215,12 @@ const orderSchema = new mongoose.Schema(
 
 orderSchema.index({ user: 1, createdAt: -1 });
 orderSchema.index({ restaurant: 1, createdAt: -1 });
+// M16 — analytics. Every analytics pipeline filters on a createdAt range, either
+// platform-wide (served by the first index) or additionally by status, e.g. the
+// fulfilled-sales and status-breakdown aggregations (served by the second).
+// The pre-existing { restaurant, createdAt } index above already covers the
+// owner-scoped variants, so no third analytics index is needed.
+orderSchema.index({ createdAt: -1 });
+orderSchema.index({ orderStatus: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Order', orderSchema);
