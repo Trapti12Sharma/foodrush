@@ -81,9 +81,25 @@ userSchema.virtual('favorites', {
 userSchema.set('toJSON', { virtuals: true });
 userSchema.set('toObject', { virtuals: true });
 
+// M18 — cost 12 in every real environment, which is the whole point of bcrypt:
+// it must be slow. Under NODE_ENV=test only, the cost drops to 4.
+//
+// This is a test-speed change, not a security trade-off, because nothing in the
+// test database is a real credential: the suite creates hundreds of throwaway
+// users, and at cost 12 each one costs roughly a quarter-second of pure CPU. The
+// Phase 0 audit flagged the suite's runtime and suggested exactly this. The
+// hashing PATH is unchanged, so every test still exercises real bcrypt hashing
+// and real comparison — only the work factor differs, and no test asserts on it.
+//
+// The check is an exact match on 'test' and the fallback is the strong cost, so
+// every other value — production, development, staging, or NODE_ENV unset
+// entirely — gets 12. The weak cost is reachable only by explicitly declaring a
+// test environment, never by forgetting to declare one.
+const BCRYPT_COST = process.env.NODE_ENV === 'test' ? 4 : 12;
+
 userSchema.pre('save', async function hashPassword(next) {
   if (!this.isModified('password')) return next();
-  this.password = await bcrypt.hash(this.password, 12);
+  this.password = await bcrypt.hash(this.password, BCRYPT_COST);
   next();
 });
 

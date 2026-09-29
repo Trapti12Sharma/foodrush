@@ -11,7 +11,8 @@
     "bootstrap:admin": "node scripts/bootstrap-super-admin.js",
     "import:images": "node scripts/import-images.js",
     "migrate:order-statuses": "node scripts/migrate-order-statuses.js",
-    "test": "jest --runInBand --forceExit"
+    "smoke": "node scripts/smoke-test.js",
+    "test": "jest --runInBand"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
