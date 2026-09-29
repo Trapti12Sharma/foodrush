@@ -90,8 +90,10 @@ write mode, so it is safe to point at production. It verifies health/config/docs
 the public config exposes nothing credential-shaped, that security headers are present and
 `x-powered-by` is suppressed, that rate limiting is active, that an unknown route 404s without
 leaking a stack trace, and — the part that earns its keep — that twelve endpoints which must
-never be public still refuse an anonymous caller, that a forged bearer token is rejected, and
-that registration cannot self-assign `SUPER_ADMIN`. With credentials it additionally checks the
+never be public still refuse an anonymous caller, that a forged bearer token is rejected, that
+registration cannot self-assign `SUPER_ADMIN`, and that the Razorpay webhook rejects an
+unsigned request (a `404` there means the route is not mounted and Razorpay would retry
+forever; a `200` would mean anyone could forge payment events). With credentials it additionally checks the
 session cookie is `HttpOnly` (plus `Secure` and `SameSite=None` over HTTPS) and that the
 account's role is genuinely enforced. Exits non-zero if any required check fails, so it can gate
 a deploy.
@@ -616,15 +618,88 @@ what was already true.
 
 ## Payments
 
-Real online payments require a Razorpay account. Set `RAZORPAY_KEY_ID` and
-`RAZORPAY_KEY_SECRET` and the app will accept `ONLINE` as a payment method up
-to the point of actually creating a Razorpay order — `payment.service.js`'s
-`createRazorpayOrder()` is an intentional `501 NOT IMPLEMENTED` (a real
-Razorpay order-creation call can't be verified without a live account); the
-signature-verification half of the flow (`POST /orders/:id/verify-payment`)
-*is* fully implemented and tested. Without those two env vars, only Cash on
-Delivery is offered — the frontend's checkout page disables the Online option
-automatically (`GET /api/config`), rather than presenting a dead end.
+Online payments are a real Razorpay integration end to end — order creation,
+signature verification, webhooks and refunds. It calls Razorpay's REST API
+directly over HTTPS with Basic Auth (the same style as the Google Maps proxy)
+rather than adding the `razorpay` npm package.
+
+Without `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`, only Cash on Delivery is
+offered: the checkout page disables the Online option from `GET /api/config`
+rather than presenting a dead end. COD is fully functional with no Razorpay
+account at all.
+
+### Required configuration
+
+| Variable | Where to get it |
+|---|---|
+| `RAZORPAY_KEY_ID` | Razorpay Dashboard → Settings → API Keys |
+| `RAZORPAY_KEY_SECRET` | shown **once** when you generate the key pair |
+| `RAZORPAY_WEBHOOK_SECRET` | you choose it when creating the webhook (below) |
+
+Test-mode keys (`rzp_test_…`) work exactly the same way; nothing in the code
+branches on test vs live.
+
+### The webhook — manual dashboard setup, and easy to miss
+
+**This step is not optional for production.** Without it, a payment that
+succeeds at the bank but whose browser never returns (tab closed, network
+dropped, app backgrounded on mobile) leaves an order stuck unpaid even though
+the customer was charged. The webhook is what closes that gap.
+
+In the Razorpay Dashboard → Settings → Webhooks → Add New Webhook:
+
+- **URL:** `https://<your-backend>/api/payments/webhook`
+  (for example `https://foodrush-backend.onrender.com/api/payments/webhook`)
+- **Secret:** any long random string — set the *same* value as
+  `RAZORPAY_WEBHOOK_SECRET` on Render
+- **Active events:** `payment.captured`, `payment.failed`, `refund.processed`
+
+Every other event type is accepted and ignored. The endpoint returns `200`
+once the signature verifies, even for an event it ignores, because anything
+else makes Razorpay retry a webhook that was never going to be acted on.
+
+Two implementation details worth knowing if you ever move the route:
+
+- The webhook is mounted **before** the JSON body parser (`src/app.js`), because
+  Razorpay's signature is computed over the exact raw bytes. Parsing first would
+  make every signature fail.
+- Both signature checks (webhook and the browser's `verify-payment` callback)
+  use `crypto.timingSafeEqual`, and a request with no `RAZORPAY_WEBHOOK_SECRET`
+  configured is rejected rather than waved through.
+
+### Duplicate webhooks are expected, and handled
+
+Razorpay retries a webhook until it gets a `2xx`, so the same `payment.captured`
+can arrive several times — and it can race the browser's own `verify-payment`
+call for the same payment. Both paths converge safely:
+
+- the `Payment` attempt is only advanced if it is not already `PAID`;
+- the `Order` is updated with a conditional write that will not match an order
+  already marked paid;
+- both paths build the same notification `eventKey` from the Razorpay payment
+  id, so one real payment produces one notification and one email, never two.
+
+You do not need to configure anything for this — it is worth knowing only
+because seeing several deliveries for one payment in the Razorpay dashboard is
+normal, not a bug.
+
+### Refunds: one per order
+
+`POST /admin/orders/:id/refund` accepts an optional `amount`, and that amount is
+passed through to Razorpay — so a *single* partial refund does work. What is
+**not** supported is more than one refund against the same order: the service is
+deliberately idempotent, and a second call returns the existing refund rather
+than issuing another (that guard is what stops a cancellation path running twice
+from refunding twice). So "refund ₹100 now, ₹50 later" is not possible; the
+first refund is the only one.
+
+The admin UI offers full refunds only. Refunds are also triggered automatically
+when a paid order is cancelled or rejected.
+
+A refund moves the order off `DELIVERED` to `REFUND_PENDING`/`REFUNDED`, which
+is why analytics counts a delivered-then-refunded order in gross sales and
+subtracts the refund once, rather than letting the sale silently vanish from a
+past period.
 
 ## Troubleshooting
 

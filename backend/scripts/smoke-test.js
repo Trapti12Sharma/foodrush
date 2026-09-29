@@ -229,6 +229,29 @@ async function runPublicChecks() {
     return '401';
   });
 
+  // M22 — the Razorpay webhook is the single most misconfigurable part of a
+  // deployment, and its failure mode is silent: miss it and a payment that
+  // succeeds at the bank but whose browser never returns leaves the order
+  // unpaid, with nothing in the logs to suggest why.
+  //
+  // An unsigned POST is a safe probe precisely because it must be REJECTED —
+  // the signature check runs before anything is read or written, so this
+  // creates nothing even against production. A 400 proves three things at once:
+  // the route is mounted, the raw-body parser is ahead of it (a JSON parser
+  // would make every signature fail), and unsigned callers cannot get in.
+  // A 404 means the route is missing; a 200 would mean it accepts unsigned
+  // events, which would be a serious finding.
+  await check('the payment webhook rejects an unsigned request', async () => {
+    const res = await http('/api/payments/webhook', {
+      method: 'POST',
+      body: { event: 'payment.captured', payload: {} },
+    });
+    assert(res.status !== 404, 'the webhook route is not mounted — Razorpay would get a 404 and retry forever');
+    assert(res.status !== 200, 'the webhook accepted an UNSIGNED request — anyone could forge payment events');
+    assert(res.status === 400, `expected 400, got ${res.status}`);
+    return '400 (signature required)';
+  });
+
   await check('registration cannot self-assign a staff role', async () => {
     // Uses an address that is invalid on purpose, so this cannot create an account
     // even if the role check were missing: the validator rejects the role, and the
