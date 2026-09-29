@@ -73,6 +73,52 @@ a bare origin, so a stray space or trailing slash pasted into the dashboard is t
 `GET /health` returns `200` when the database is connected and `503` when it is not — point
 Render's health check or an uptime monitor at it. (`GET /api/health` is unchanged.)
 
+### Post-deploy smoke test (M18)
+
+The Jest suite runs against a local test database and so can tell you nothing about a
+deployment. `npm run smoke` checks a **running** one:
+
+```bash
+cd backend
+npm run smoke -- --url https://foodrush-backend.onrender.com
+# optionally also verify login, cookie hardening and role enforcement:
+npm run smoke -- --url https://... --email you@yourdomain.com --password '...'
+```
+
+It is **strictly read-only** — it never creates, updates or deletes anything, and there is no
+write mode, so it is safe to point at production. It verifies health/config/docs respond, that
+the public config exposes nothing credential-shaped, that security headers are present and
+`x-powered-by` is suppressed, that rate limiting is active, that an unknown route 404s without
+leaking a stack trace, and — the part that earns its keep — that twelve endpoints which must
+never be public still refuse an anonymous caller, that a forged bearer token is rejected, and
+that registration cannot self-assign `SUPER_ADMIN`. With credentials it additionally checks the
+session cookie is `HttpOnly` (plus `Secure` and `SameSite=None` over HTTPS) and that the
+account's role is genuinely enforced. Exits non-zero if any required check fails, so it can gate
+a deploy.
+
+Because it is read-only it **cannot** prove an order can be placed, a payment taken, a rider
+dispatched or an email delivered; it says so in its own output. Exercise those against a staging
+deployment before trusting a release.
+
+### First boot: a window where geo features fail silently
+
+Mongoose builds indexes in the **background** after connecting. On a brand-new database — a
+first deploy, or a restore into an empty cluster — there is a short window where the
+`2dsphere` indexes do not exist yet, and geo queries behave differently from every other query:
+a missing ordinary index merely makes a query slow, but a missing `2dsphere` makes `$geoNear`
+**throw**.
+
+Rider dispatch catches that error deliberately (no unavailable rider may block a restaurant's
+status change), so the symptom is not an error page. It is orders quietly receiving no rider
+offers, and nearby-restaurant search quietly returning nothing, while the logs show
+`Dispatch failed for order …: $geoNear requires a 2d or 2dsphere index`.
+
+The window is small and closes on its own once the indexes finish building. If you are deploying
+to a fresh database, check that log line before concluding dispatch is broken, and re-test geo
+features a minute after first boot. (The test suite now waits for indexes explicitly; the server
+does not. Making startup block on index readiness would close this window at the cost of a few
+seconds of cold start on every deploy — a deliberate trade-off, not currently made.)
+
 ### Creating the real super admin
 
 The public demo `ADMIN` account should not be your production admin. From `backend/`, with
@@ -296,24 +342,40 @@ Each completed delivery (the exact moment `DeliveryAssignment` reaches
 `COMPLETED` — the same single hook both the OTP-verify path and the
 restaurant/admin manual-completion fallback funnel through) creates one
 `DeliveryEarning` row for the rider who delivered it. This is a **server-side
-calculation only**: the amount is derived from `DELIVERY_BASE_EARNING` plus
-`DELIVERY_PER_KM_RATE × Order.deliveryDistanceKm` (the same real distance
-computed once at order placement in M5 — never a fresh GPS/Maps lookup, never
-invented). If the order has no reliable distance, the earning falls back to
-base-only rather than guessing one. A configured `DELIVERY_MIN_EARNING` floor
-and optional `DELIVERY_MAX_EARNING` ceiling are applied last. A client can
-never influence the amount — any `amount`/`netAmount` sent in a request body
-is ignored.
+calculation only**: the amount is a base rate plus a per-km rate applied to
+`Order.deliveryDistanceKm` (the same real distance computed once at order
+placement in M5 — never a fresh GPS/Maps lookup, never invented). If the order
+has no reliable distance, the earning falls back to base-only rather than
+guessing one. A floor and an optional ceiling are applied last, with any
+incentives added before the floor. A client can never influence the amount —
+any `amount`/`netAmount` sent in a request body is ignored.
+
+> **Changed in M17 — these are no longer runtime settings.** The four
+> `DELIVERY_*` variables below are now **seed values only**. They are read
+> exactly once, when the platform settings row is first created, and ignored on
+> every boot after that. The live rates are edited by a SUPER_ADMIN at
+> `/admin/settings` (or `PATCH /api/admin/settings`) and stored in the database,
+> so changing a rate no longer needs a redeploy.
+>
+> The practical consequence: **editing one of these in Render after the first
+> boot will appear to do nothing.** That is intended behaviour, not a fault. To
+> change rider pay on a running deployment, use the admin Settings screen. The
+> tax rate has never had an environment variable and is editable on the same
+> screen; before M17 it was hardcoded at 5%.
 
 Optional environment variables (all have safe defaults; none are required to
-deploy):
+deploy). Seed values only — see the note above:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `DELIVERY_BASE_EARNING` | `20` | Flat amount (₹) earned per completed delivery. |
-| `DELIVERY_PER_KM_RATE` | `6` | Amount (₹) earned per km of `Order.deliveryDistanceKm`. |
-| `DELIVERY_MIN_EARNING` | `20` | Floor applied to the final net amount. |
-| `DELIVERY_MAX_EARNING` | unset (no cap) | Optional ceiling applied to the final net amount. |
+| `DELIVERY_BASE_EARNING` | `20` | Seeds the flat amount (₹) earned per completed delivery. |
+| `DELIVERY_PER_KM_RATE` | `6` | Seeds the amount (₹) earned per km of `Order.deliveryDistanceKm`. |
+| `DELIVERY_MIN_EARNING` | `20` | Seeds the floor applied to the final net amount. |
+| `DELIVERY_MAX_EARNING` | unset (no cap) | Seeds the optional ceiling applied to the final net amount. |
+
+Rider incentives (M17) have no environment variable at all — they exist only in
+platform settings, and both rules (long-distance and peak-hour) ship **disabled**,
+so an untouched deployment pays exactly what it did before M17.
 
 Earning lifecycle: `PENDING` (created, unsettled) → `SETTLED` (moved there
 only when its settlement is marked `PAID`). Settlement lifecycle (admin-only,
