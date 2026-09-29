@@ -1,6 +1,7 @@
 import { Outlet, NavLink } from 'react-router-dom';
-import { LayoutDashboard, BarChart3, Users, Store, ClipboardList, Tag, Bike, Navigation, Wallet, LifeBuoy, ScrollText, Star } from 'lucide-react';
+import { LayoutDashboard, BarChart3, Users, Store, ClipboardList, Tag, Bike, Navigation, Wallet, LifeBuoy, ScrollText, Star, SlidersHorizontal, UserCog } from 'lucide-react';
 import NotificationBell from '../components/NotificationBell';
+import { useAuth } from '../context/AuthContext';
 
 const NAV_ITEMS = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -15,15 +16,28 @@ const NAV_ITEMS = [
   { to: '/admin/delivery-settlements', label: 'Settlements', icon: Wallet },
   { to: '/admin/support-tickets', label: 'Support', icon: LifeBuoy },
   { to: '/admin/audit-logs', label: 'Audit logs', icon: ScrollText },
+  // M17 — the two super-admin-only screens. `permission` is the permission the
+  // endpoints behind the link actually require, so the sidebar shows a staff
+  // member only what they can use instead of links that 403 on arrival. Hiding a
+  // link is a convenience, never the boundary: the API re-checks on every call.
+  { to: '/admin/staff', label: 'Team', icon: UserCog, permission: 'admins:manage' },
+  { to: '/admin/settings', label: 'Settings', icon: SlidersHorizontal, permission: 'settings:manage' },
 ];
 
 export default function AdminLayout() {
+  const { user } = useAuth();
+  // The backend puts the role's permission list on the user object (see
+  // User.toJSON), so this filter uses the same table the API enforces rather than
+  // a hardcoded role check that could drift from it.
+  const permissions = user?.permissions || [];
+  const navItems = NAV_ITEMS.filter((item) => !item.permission || permissions.includes(item.permission));
+
   return (
     <div className="mx-auto flex max-w-6xl gap-6 px-4 py-6">
       <aside className="w-56 shrink-0 border-r border-gray-200 bg-white p-4">
         <p className="mb-4 text-sm font-semibold text-gray-900">Admin</p>
         <nav className="space-y-1">
-          {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+          {navItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}

@@ -48,6 +48,8 @@ import AdminDeliverySettlements from './pages/admin/DeliverySettlements';
 import AdminSupportTickets from './pages/admin/SupportTickets';
 import AdminReviews from './pages/admin/Reviews';
 import AdminAuditLogs from './pages/admin/AuditLogs';
+import AdminSettings from './pages/admin/Settings';
+import AdminStaff from './pages/admin/Staff';
 import Profile from './pages/Profile';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
@@ -181,6 +183,13 @@ function App() {
                 <Route path="support-tickets" element={<AdminSupportTickets />} />
                 <Route path="reviews" element={<AdminReviews />} />
                 <Route path="audit-logs" element={<AdminAuditLogs />} />
+                {/* M17 — reachable by every ADMIN_PANEL_ROLE like the routes above,
+                    but the endpoints behind them require settings:manage /
+                    admins:manage (SUPER_ADMIN only). The nav hides the links for
+                    everyone else; a staff member who types the URL gets the page
+                    with a permission error from the API rather than data. */}
+                <Route path="settings" element={<AdminSettings />} />
+                <Route path="staff" element={<AdminStaff />} />
               </Route>
 
               <Route path="*" element={<NotFound />} />

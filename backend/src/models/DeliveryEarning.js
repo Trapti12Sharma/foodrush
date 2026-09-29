@@ -47,10 +47,12 @@ const deliveryEarningSchema = new mongoose.Schema(
     // case distanceAmount is 0 and this stays null (never a guessed value).
     distanceKm: { type: Number, default: null },
     distanceAmount: { type: Number, required: true, min: 0 },
-    // Always 0 in this milestone (no surge/incentive rules exist yet) — the
-    // field exists so a future milestone can populate it without a schema
-    // change, exactly like DeliveryAssignment.rejectionReason-style forward
-    // declarations elsewhere in this codebase.
+    // M17 populates this: the sum of whichever admin-configured incentive rules
+    // this delivery qualified for (long-distance and/or peak-hour — see
+    // deliveryEarning.service.js#calculateIncentive and
+    // PlatformSetting.delivery.incentives). Both rules are off by default, so
+    // this stays 0 until an admin enables one. The amount is snapshotted here,
+    // never recomputed, so changing a rule later never rewrites a past payslip.
     incentiveAmount: { type: Number, default: 0, min: 0 },
     // base + distance + incentive, BEFORE the configured floor/ceiling clamp.
     grossAmount: { type: Number, required: true, min: 0 },

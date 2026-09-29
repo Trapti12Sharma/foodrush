@@ -4,6 +4,7 @@ const Restaurant = require('../models/Restaurant');
 const ApiError = require('../utils/ApiError');
 const couponService = require('./coupon.service');
 const pricing = require('./pricing.service');
+const platformSettingService = require('./platformSetting.service');
 const { MAX_NOTE_LENGTH } = require('../validators/cart.validator');
 
 const POPULATE_PATHS = [
@@ -91,7 +92,10 @@ async function applyCatalogPricing(cart, restaurant) {
     else cart.couponCode = null; // coupon no longer valid for this cart — drop it rather than show a stale discount
   }
 
-  Object.assign(cart, pricing.computeTotals({ subtotal, deliveryFee: restaurant.deliveryFee, discount }));
+  // M17 — the tax rate is admin-configurable, read once per recalculation so a
+  // cart's tax and total always come from the same rate.
+  const taxRate = await platformSettingService.getTaxRate();
+  Object.assign(cart, pricing.computeTotals({ subtotal, deliveryFee: restaurant.deliveryFee, discount, taxRate }));
 }
 
 async function finalize(cart) {
@@ -227,6 +231,7 @@ async function applyCoupon(userId, code) {
     subtotal: cart.subtotal,
     deliveryFee: cart.deliveryFee,
     discount: discountAmount,
+    taxRate: await platformSettingService.getTaxRate(),
   }).total;
 
   return finalize(cart);

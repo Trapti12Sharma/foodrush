@@ -527,6 +527,64 @@ const options = {
             createdAt: { type: 'string', format: 'date-time' },
           },
         },
+        PlatformSetting: {
+          type: 'object',
+          description:
+            'M17 — the singleton, SUPER_ADMIN-editable money rules. Read by pricing.service.js (order totals) and deliveryEarning.service.js (rider pay). Editing a value changes what happens NEXT: orders and earnings snapshot their own amounts, so nothing already recorded is re-priced. A platform commission rate is deliberately absent until restaurant payouts exist to subtract it from.',
+          properties: {
+            _id: { type: 'string' },
+            pricing: {
+              type: 'object',
+              properties: {
+                taxRate: { type: 'number', default: 0.05, minimum: 0, maximum: 0.5, description: 'Fraction, not a percentage — 0.05 is 5%. Capped at 0.5 so a mistyped percentage cannot overcharge every customer at once.' },
+              },
+            },
+            delivery: {
+              type: 'object',
+              properties: {
+                baseEarning: { type: 'number', description: 'Flat INR a rider earns per completed delivery. Seeded from DELIVERY_BASE_EARNING on first read, then authoritative.' },
+                perKmRate: { type: 'number', description: "Paid per km of the order's server-computed delivery distance; contributes nothing when that distance is unknown." },
+                minEarning: { type: 'number', description: 'Floor, applied after incentives are added' },
+                maxEarning: { type: 'number', nullable: true, description: 'Ceiling, applied last. null means no cap (the default); 0 is a real cap of zero and is not the same thing.' },
+                incentives: {
+                  type: 'object',
+                  description: 'Both rules are off by default, so an untouched deployment pays exactly what it did before M17. They ADD rather than multiply, so a long late delivery earns both and a rider can read their own payslip.',
+                  properties: {
+                    longDistance: {
+                      type: 'object',
+                      properties: {
+                        enabled: { type: 'boolean', default: false },
+                        thresholdKm: { type: 'number', default: 5 },
+                        bonusAmount: { type: 'number', default: 0, description: 'Flat INR bonus once the delivery is at least thresholdKm. Never paid for an order whose distance is unknown.' },
+                      },
+                    },
+                    peakHour: {
+                      type: 'object',
+                      properties: {
+                        enabled: { type: 'boolean', default: false },
+                        bonusAmount: { type: 'number', default: 0, description: 'Flat INR bonus when the delivery COMPLETED inside a window — the hours the rider was actually working, not when the order was placed.' },
+                        windows: {
+                          type: 'array',
+                          description: 'UTC hours, half-open [startHour, endHour). May wrap past midnight (22 to 2 means 22:00-01:59). startHour equal to endHour is rejected.',
+                          items: {
+                            type: 'object',
+                            properties: {
+                              startHour: { type: 'integer', minimum: 0, maximum: 23 },
+                              endHour: { type: 'integer', minimum: 0, maximum: 23 },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            version: { type: 'integer', description: 'Optimistic-concurrency token. Send it back on a PATCH; a mismatch is a 409. A no-op save does not bump it.' },
+            updatedBy: { type: 'string', nullable: true, description: 'User id of the super admin who last changed a value' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
       },
     },
     tags: [

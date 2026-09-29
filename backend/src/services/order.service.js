@@ -16,6 +16,7 @@ const notificationService = require('./notification.service');
 const { isOpenNow } = require('../utils/openingHours');
 const { nextOrderNumber } = require('../utils/orderNumber');
 const pricing = require('./pricing.service');
+const platformSettingService = require('./platformSetting.service');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const {
   ORDER_STATUS, ORDER_STATUS_TRANSITIONS, PAYMENT_METHODS, PAYMENT_STATUS, PAYMENT_ATTEMPT_STATUS, ROLES, NOTIFICATION_TYPE,
@@ -110,7 +111,11 @@ async function createOrder(user, { addressId, paymentMethod }) {
     }
   }
 
-  const { tax, total: totalAmount } = pricing.computeTotals({ subtotal, deliveryFee: restaurant.deliveryFee, discount });
+  // M17 — the configurable tax rate, read once here. The resulting tax and
+  // totalAmount are then frozen onto the order, so a later rate change never
+  // alters what this customer was charged.
+  const taxRate = await platformSettingService.getTaxRate();
+  const { tax, total: totalAmount } = pricing.computeTotals({ subtotal, deliveryFee: restaurant.deliveryFee, discount, taxRate });
 
   if (!Object.values(PAYMENT_METHODS).includes(paymentMethod)) {
     throw ApiError.badRequest('Invalid payment method');

@@ -99,7 +99,11 @@ function validateDeliveryOtpConfig(env, errors) {
   }
 }
 
-// All optional — deliveryEarning.service.js has sensible defaults when unset.
+// All optional. Since M17 these are SEED values only: PlatformSetting reads them
+// the first time the settings row is created and never again, after which a
+// SUPER_ADMIN edits the live rates at /admin/settings. Validating them still
+// matters — a malformed seed would otherwise become a malformed stored rate on a
+// brand-new deployment, where nobody has opened the settings screen yet.
 // Only rejects a genuinely nonsensical value (never a business-rule opinion).
 function validateDeliveryEarningConfig(env, errors) {
   const positiveIfSet = (key) => {

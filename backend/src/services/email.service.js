@@ -246,12 +246,34 @@ function settlementFailedEmail({ name, reason }) {
   };
 }
 
+// M17 — a staff invite. Distinct from passwordResetEmail because the recipient
+// has no password to reset: they are being told an account now exists and asked
+// to set one. Naming the role and the inviter matters for a security email —
+// someone who was not expecting to be made a DELIVERY_MANAGER should be able to
+// tell at a glance that something is wrong.
+function staffInviteEmail({ name, role, inviteUrl, expiresInDays, invitedBy }) {
+  return {
+    subject: 'You have been added to the FoodRush team',
+    text:
+      `Hi ${name},\n\n${invitedBy} has created a FoodRush staff account for you with the role ${role}. ` +
+      `Set your password using the link below within ${expiresInDays} days:\n\n${inviteUrl}\n\n` +
+      'The link can only be used once. If you were not expecting this, do not use it — reply to this email or contact your administrator.',
+    html:
+      `<p>Hi ${escapeHtml(name)},</p>` +
+      `<p>${escapeHtml(invitedBy)} has created a FoodRush staff account for you with the role <strong>${escapeHtml(role)}</strong>. Set your password using the button below within ${expiresInDays} days.</p>` +
+      `<p><a href="${escapeHtml(inviteUrl)}" style="background:#ea580c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Set your password</a></p>` +
+      `<p style="color:#666;font-size:13px">If the button doesn't work, paste this link into your browser:<br>${escapeHtml(inviteUrl)}</p>` +
+      '<p style="color:#666;font-size:13px">The link can only be used once. If you were not expecting this, do not use it — contact your administrator.</p>',
+  };
+}
+
 module.exports = {
   PROVIDERS,
   getProvider,
   isEmailConfigured,
   sendMail,
   passwordResetEmail,
+  staffInviteEmail,
   passwordChangedEmail,
   orderDeliveredEmail,
   orderPlacedEmail,

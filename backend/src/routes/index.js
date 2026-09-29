@@ -12,6 +12,13 @@ router.use('/orders', require('./order.routes'));
 router.use('/coupons', require('./coupon.routes'));
 router.use('/config', require('./config.routes'));
 router.use('/admin', require('./admin.routes'));
+// M17 — platform settings and the super-admin staff console are separate concerns
+// with their own permissions, so they get their own routers on the shared /admin
+// prefix rather than growing admin.routes.js further (the same split
+// deliveryEarning.routes.js already uses under /delivery-partners). None of their
+// paths overlap admin.routes.js, so mount order is not significant.
+router.use('/admin', require('./adminSettings.routes'));
+router.use('/admin', require('./adminStaff.routes'));
 router.use('/reviews', require('./review.routes'));
 router.use('/favorites', require('./favorite.routes'));
 router.use('/uploads', require('./upload.routes'));

@@ -5,7 +5,8 @@ const ApiError = require('../utils/ApiError');
 const notificationService = require('./notification.service');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { escapeRegex } = require('../utils/regex');
-const { ORDER_STATUS, RESTAURANT_KYC_STATUS, NOTIFICATION_TYPE } = require('../utils/constants');
+const staffService = require('./staff.service');
+const { ROLES, ORDER_STATUS, RESTAURANT_KYC_STATUS, NOTIFICATION_TYPE } = require('../utils/constants');
 const { PERMISSIONS, hasPermission, isStaffRole } = require('../utils/permissions');
 
 // Platform-wide stats (unscoped) — the admin equivalent of Phase 9's
@@ -81,8 +82,21 @@ async function setUserActive(id, isActive, actor) {
   if (actor && isStaffRole(user.role) && !hasPermission(actor, PERMISSIONS.ADMINS_MANAGE)) {
     throw ApiError.forbidden('Only a super admin can change the status of a staff account');
   }
+  // M17 — the same last-super-admin rule the staff console applies to a role
+  // change or a revoke. Without it, this endpoint was the remaining way to leave
+  // the platform with nobody holding settings:manage/admins:manage: deactivating
+  // the sole super admin passed every check above (it is not a self-change, and
+  // the actor does hold ADMINS_MANAGE). Only deactivation can lock anyone out, so
+  // reactivating is not gated.
+  if (!isActive) await staffService.assertNotLastSuperAdmin(user, 'deactivating their account');
+
+  const previous = { isActive: user.isActive };
   user.isActive = isActive;
   await user.save();
+  // Closes the concurrent-demotion window described in staff.service.js: two
+  // simultaneous deactivations of the last two super admins would each see one
+  // remaining. The loser is rolled back and gets a 409.
+  if (!isActive && user.role === ROLES.SUPER_ADMIN) await staffService.assertSuperAdminSurvived(user, previous);
   return user;
 }
 

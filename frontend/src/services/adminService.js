@@ -42,7 +42,7 @@ export const adminService = {
   closeSupportTicket: (id) => api.patch(`/admin/support/tickets/${id}/close`).then((r) => r.data.ticket),
   listAuditLogs: (params) => api.get('/admin/audit-logs', { params }).then((r) => r.data),
   getAuditLog: (id) => api.get(`/admin/audit-logs/${id}`).then((r) => r.data.log),
-  // M16 -- Analytics & Reporting. `params` carries the shared date-range contract:
+  // M16 — Analytics & Reporting. `params` carries the shared date-range contract:
   // { preset } or { preset: 'custom', startDate, endDate }. Each slice is gated by
   // the permission that governs that data domain, so a staff role may legitimately
   // get 403 on some of these while succeeding on others.
@@ -62,4 +62,22 @@ export const adminService = {
   rejectReview: (id, reason) => api.patch(`/admin/reviews/${id}/reject`, { reason }).then((r) => r.data.review),
   hideReview: (id, reason) => api.patch(`/admin/reviews/${id}/hide`, reason ? { reason } : {}).then((r) => r.data.review),
   restoreReview: (id) => api.patch(`/admin/reviews/${id}/restore`).then((r) => r.data.review),
+
+  // M17 — platform settings and the super-admin staff console. Both are gated by
+  // permissions only SUPER_ADMIN holds (settings:manage / admins:manage), so every
+  // other staff role gets a 403 here by design; the nav hides the pages rather
+  // than letting someone walk into an error.
+  //
+  // updateSettings takes the whole patch INCLUDING `version` — the optimistic
+  // concurrency token read from the last GET. The caller must pass the version it
+  // rendered, not a remembered one, or a concurrent edit goes undetected.
+  getSettings: () => api.get('/admin/settings').then((r) => r.data.settings),
+  updateSettings: (payload) => api.patch('/admin/settings', payload).then((r) => r.data.settings),
+
+  getRoleMatrix: () => api.get('/admin/roles').then((r) => r.data),
+  listStaff: (params) => api.get('/admin/staff', { params }).then((r) => r.data),
+  createStaff: (payload) => api.post('/admin/staff', payload).then((r) => r.data.staff),
+  updateStaffRole: (id, role) => api.patch(`/admin/staff/${id}/role`, { role }).then((r) => r.data.staff),
+  revokeStaff: (id) => api.patch(`/admin/staff/${id}/revoke`).then((r) => r.data.staff),
+  resendStaffInvite: (id) => api.post(`/admin/staff/${id}/resend-invite`).then((r) => r.data.staff),
 };
