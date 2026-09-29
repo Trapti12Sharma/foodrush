@@ -305,6 +305,15 @@ const options = {
             moderationStatus: { type: 'string', enum: ['PENDING', 'APPROVED', 'REJECTED', 'HIDDEN'], description: 'M15. Only visible in full to the review author and moderation staff — the public listing only ever returns APPROVED rows for everyone else.' },
             moderationReason: { type: 'string', nullable: true, description: "Only present when this is the requester's own review." },
             reportCount: { type: 'integer', description: 'Admin-only field (GET /admin/reviews); never returned to a non-moderator.' },
+            reply: {
+              type: 'object',
+              nullable: true,
+              description: "M21 — the restaurant's public answer, or null. Written only by the restaurant's owner; `repliedBy` is internal and stripped from public responses.",
+              properties: {
+                text: { type: 'string', maxLength: 1000 },
+                repliedAt: { type: 'string', format: 'date-time' },
+              },
+            },
             createdAt: { type: 'string', format: 'date-time' },
           },
         },

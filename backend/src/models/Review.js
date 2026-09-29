@@ -1,6 +1,22 @@
 const mongoose = require('mongoose');
 const { REVIEW_MODERATION_STATUS } = require('../utils/constants');
 
+// M21 — the restaurant's public answer to a review. Embedded on the review
+// rather than given its own collection because a review has at most one reply
+// and a reply has no life of its own: it is never listed, queried or moderated
+// independently, and it dies with the review it answers.
+//
+// `repliedBy` records WHICH user wrote it (an owner may own several
+// restaurants) so the audit trail names a person, not just a restaurant.
+const reviewReplySchema = new mongoose.Schema(
+  {
+    text: { type: String, required: true, trim: true, maxlength: 1000 },
+    repliedAt: { type: Date, default: Date.now },
+    repliedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  },
+  { _id: false }
+);
+
 const reviewSchema = new mongoose.Schema(
   {
     user: {
@@ -60,6 +76,14 @@ const reviewSchema = new mongoose.Schema(
     // reports can't lose an increment.
     reportCount: { type: Number, default: 0, min: 0 },
     reportedAt: { type: Date, default: null }, // most recent report, if any
+
+    // M21 — null until the restaurant answers. Unlike the review itself this is
+    // NOT moderated: it is the restaurant's own voice on a review that has
+    // already been approved, and gating every reply behind a queue would make
+    // answering a customer take a day. Staff holding reviews:moderate can
+    // delete an abusive one (see review.service.js#deleteReply), which is the
+    // remedy that actually matters.
+    reply: { type: reviewReplySchema, default: null },
   },
   { timestamps: true }
 );

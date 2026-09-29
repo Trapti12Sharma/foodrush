@@ -63,6 +63,10 @@ const CONTENT = {
   [NOTIFICATION_TYPE.REVIEW_REJECTED]: (d) => ({ title: 'Your review was not approved', message: `Your review could not be published${d.reason ? ` (${d.reason})` : ''}.` }),
   [NOTIFICATION_TYPE.REVIEW_HIDDEN]: (d) => ({ title: 'Your review was hidden', message: `Your review is no longer visible to other customers${d.reason ? ` (${d.reason})` : ''}.` }),
   [NOTIFICATION_TYPE.REVIEW_RESTORED]: () => ({ title: 'Your review is visible again', message: 'Your review has been restored and is visible to other customers again.' }),
+  [NOTIFICATION_TYPE.REVIEW_REPLIED]: (d) => ({
+    title: 'A restaurant replied to your review',
+    message: `${d.restaurantName || 'The restaurant'} has responded to the review you left.`,
+  }),
 
   [NOTIFICATION_TYPE.ACCOUNT_SECURITY]: (d) => ({ title: 'Security alert', message: d.message || 'A security-relevant change was made to your account.' }),
   [NOTIFICATION_TYPE.SYSTEM]: (d) => ({ title: 'FoodRush', message: d.message || 'You have a new notification.' }),

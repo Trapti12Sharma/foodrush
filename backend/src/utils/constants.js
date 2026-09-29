@@ -354,6 +354,11 @@ const NOTIFICATION_TYPE = Object.freeze({
   REVIEW_HIDDEN: 'REVIEW_HIDDEN',
   REVIEW_RESTORED: 'REVIEW_RESTORED',
 
+  // M21 — the restaurant answered this customer's review. Mandatory and in-app
+  // only, like the four above: no email template and no preference field, since
+  // none of the existing buckets (order/payment/delivery/support) describes it.
+  REVIEW_REPLIED: 'REVIEW_REPLIED',
+
   // Reserved for a future milestone — defined now so the enum is complete, not
   // wired to any trigger yet (matches the "define now, wire up later" precedent
   // already used for DELIVERY_KYC_STATUS.PENDING and DELIVERY_SETTLEMENT_STATUS.PROCESSING).

@@ -268,6 +268,20 @@ export default function ReviewsSection({ restaurantId, onReviewChange }) {
                 </div>
                 {review.comment && <p className="mt-2 text-sm text-gray-600">{review.comment}</p>}
                 {isMine && <OwnModerationNote review={review} />}
+
+                {/* M21 — the restaurant's public answer, indented under the review
+                    it answers so it reads as a reply rather than a second review. */}
+                {review.reply && (
+                  <div className="mt-3 rounded-lg border-l-2 border-brand-200 bg-brand-50/40 py-2 pl-3">
+                    <p className="text-xs font-semibold text-brand-700">
+                      Response from the restaurant
+                      {review.reply.repliedAt && (
+                        <span className="ml-2 font-normal text-gray-400">{new Date(review.reply.repliedAt).toLocaleDateString()}</span>
+                      )}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-700">{review.reply.text}</p>
+                  </div>
+                )}
               </div>
             );
           })}

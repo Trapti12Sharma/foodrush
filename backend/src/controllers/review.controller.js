@@ -42,4 +42,36 @@ const reportReview = asyncHandler(async (req, res) => {
   res.status(201).json(new ApiResponse(201, 'Review reported'));
 });
 
-module.exports = { createReview, listForRestaurant, updateReview, deleteReview, reportReview };
+// M21 — create-or-replace, so an owner fixing a typo uses the same call as
+// writing the reply in the first place. PUT rather than POST for exactly that
+// reason: it is idempotent, and a double-submit leaves one reply, not two.
+const replyToReview = asyncHandler(async (req, res) => {
+  const review = await reviewService.replyToReview(req.user, req.params.id, req.body.text);
+  await auditService.record({
+    req,
+    action: 'review.reply',
+    entityType: 'Review',
+    entityId: review._id,
+    metadata: { restaurant: review.restaurant._id.toString() },
+  });
+  res.json(new ApiResponse(200, 'Reply published', { review }));
+});
+
+const deleteReply = asyncHandler(async (req, res) => {
+  const review = await reviewService.deleteReply(req.user, req.params.id);
+  await auditService.record({
+    req,
+    action: 'review.reply_delete',
+    entityType: 'Review',
+    entityId: review._id,
+    // Records whether this was the restaurant retracting its own words or a
+    // moderator removing them, which is the distinction that matters later.
+    metadata: {
+      restaurant: review.restaurant._id.toString(),
+      byModerator: review.restaurant.owner.toString() !== req.user._id.toString(),
+    },
+  });
+  res.json(new ApiResponse(200, 'Reply removed', { review }));
+});
+
+module.exports = { createReview, listForRestaurant, updateReview, deleteReview, reportReview, replyToReview, deleteReply };

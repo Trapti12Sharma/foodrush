@@ -67,6 +67,11 @@ function toPublicView(review, viewerId) {
   delete plain.reportCount;
   delete plain.reportedAt;
   if (!isOwner) delete plain.moderationReason;
+  // M21 — the reply's TEXT and timestamp are public (that is the point of it),
+  // but which staff account typed it is internal bookkeeping: the reply speaks
+  // for the restaurant, not for a named individual, and customers have no use
+  // for an owner's user id.
+  if (plain.reply) delete plain.reply.repliedBy;
   return plain;
 }
 
@@ -217,6 +222,87 @@ async function createReport(user, reviewId, reason) {
   return Review.findByIdAndUpdate(reviewId, { $inc: { reportCount: 1 }, $set: { reportedAt: new Date() } }, { new: true });
 }
 
+// ---------------------------------------------------------------------------
+// M21 — RESTAURANT REPLIES
+//
+// A reply is the restaurant's own public voice, which drives two authorization
+// decisions that differ from the rest of this file:
+//
+//   WRITING is restricted to the restaurant's actual owner — NOT to staff
+//   holding restaurants:manage, even though those staff may edit the
+//   restaurant's profile and could submit its KYC (M14). Editing a profile is
+//   administration; publishing words under a restaurant's name to its customers
+//   is speech, and nobody should be able to put words in a business's mouth.
+//
+//   DELETING is allowed to the owner OR to staff holding reviews:moderate,
+//   because replies are deliberately not queued for moderation (see the model)
+//   and removing an abusive one has to be possible without waiting for the
+//   owner who wrote it.
+//
+// Only an APPROVED review can be replied to. A PENDING or REJECTED review is not
+// public, so a reply to one would be a reply to nobody; a HIDDEN review has been
+// pulled from display and should not gain new public content.
+// ---------------------------------------------------------------------------
+async function loadReviewForReply(reviewId) {
+  const review = await Review.findById(reviewId).populate('restaurant', 'owner name');
+  if (!review) throw ApiError.notFound('Review not found');
+  if (!review.restaurant) throw ApiError.notFound('The restaurant for this review no longer exists');
+  return review;
+}
+
+function assertIsRestaurantOwner(review, user) {
+  // Compared against the restaurant loaded from the database, never against
+  // anything the caller supplied.
+  if (review.restaurant.owner.toString() !== user._id.toString()) {
+    throw ApiError.forbidden('You can only reply to reviews of your own restaurant');
+  }
+}
+
+async function replyToReview(user, reviewId, text) {
+  const review = await loadReviewForReply(reviewId);
+  assertIsRestaurantOwner(review, user);
+
+  if (review.moderationStatus !== REVIEW_MODERATION_STATUS.APPROVED) {
+    throw ApiError.badRequest(
+      `Cannot reply to a review that is "${review.moderationStatus}" — only an approved, publicly visible review can be replied to`
+    );
+  }
+
+  const isFirstReply = !review.reply;
+  review.reply = { text: text.trim(), repliedAt: new Date(), repliedBy: user._id };
+  await review.save();
+
+  // Only the first reply notifies. Editing a reply is the restaurant correcting
+  // its own wording, which is not an event the customer needs pushed at them
+  // again — and re-notifying on every edit would make the bell a typo feed.
+  if (isFirstReply) {
+    await notificationService.notify({
+      recipient: review.user,
+      type: NOTIFICATION_TYPE.REVIEW_REPLIED,
+      data: { reviewId: review._id, restaurantId: review.restaurant._id, restaurantName: review.restaurant.name },
+      eventKey: `REVIEW:${review._id}:REPLIED:${review.user}`,
+    });
+  }
+
+  return review;
+}
+
+async function deleteReply(user, reviewId) {
+  const review = await loadReviewForReply(reviewId);
+
+  const isOwner = review.restaurant.owner.toString() === user._id.toString();
+  const isModerator = hasPermission(user, PERMISSIONS.REVIEWS_MODERATE);
+  if (!isOwner && !isModerator) {
+    throw ApiError.forbidden('You can only remove a reply on your own restaurant');
+  }
+
+  if (!review.reply) throw ApiError.notFound('This review has no reply to remove');
+
+  review.reply = null;
+  await review.save();
+  return review;
+}
+
 // Admin moderation queue — every status, every restaurant, unlike the public
 // listing above. `search` matches the review text itself or the reviewing
 // customer's name/email (resolved to a set of ids first, mirroring
@@ -268,6 +354,8 @@ async function getForAdmin(reviewId) {
 
 module.exports = {
   createReview,
+  replyToReview,
+  deleteReply,
   listForRestaurant,
   updateReview,
   deleteReview,
