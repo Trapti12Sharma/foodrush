@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Review = require('../models/Review');
 const ReviewReport = require('../models/ReviewReport');
 const Order = require('../models/Order');
@@ -12,16 +13,35 @@ const notificationService = require('./notification.service');
 
 // Only APPROVED reviews are public trust signals (Phase 5) — a review sitting in
 // PENDING, or one that was REJECTED/HIDDEN, must never move a restaurant's
-// rating. A plain find() (rather than an aggregation $match) lets Mongoose cast
-// restaurantId against the schema's ObjectId field automatically, exactly as
-// before M15 — an aggregate here would silently match zero documents whenever
-// restaurantId arrives as a string.
+// rating.
+//
+// M23 — this averages in the DATABASE rather than in Node. It previously did
+// `find().select('rating')` and reduced the array, which pulled every approved
+// review of that restaurant into memory on a hot path: it runs on every review
+// edit, delete, approve, reject, hide and restore. At a few dozen reviews that
+// is invisible; at fifty thousand it is fifty thousand documents marshalled to
+// compute one average.
+//
+// The original comment warned that an aggregation would "silently match zero
+// documents whenever restaurantId arrives as a string", because $match does not
+// apply Mongoose's schema casting the way find() does. That warning was right —
+// it is the same trap that made M16's analytics report zero sales — and the
+// answer is to cast explicitly rather than to avoid aggregation. Every current
+// caller passes an ObjectId; the cast is what keeps that from mattering.
 async function recalculateRestaurantRating(restaurantId) {
-  const reviews = await Review.find({ restaurant: restaurantId, moderationStatus: REVIEW_MODERATION_STATUS.APPROVED }).select('rating');
-  const count = reviews.length;
-  const avgRating = count ? reviews.reduce((sum, r) => sum + r.rating, 0) / count : 0;
+  const id = restaurantId instanceof mongoose.Types.ObjectId
+    ? restaurantId
+    : new mongoose.Types.ObjectId(String(restaurantId));
 
-  await Restaurant.findByIdAndUpdate(restaurantId, {
+  const [agg] = await Review.aggregate([
+    { $match: { restaurant: id, moderationStatus: REVIEW_MODERATION_STATUS.APPROVED } },
+    { $group: { _id: null, count: { $sum: 1 }, average: { $avg: '$rating' } } },
+  ]);
+
+  const count = agg ? agg.count : 0;
+  const avgRating = agg ? agg.average : 0;
+
+  await Restaurant.findByIdAndUpdate(id, {
     rating: Math.round(avgRating * 10) / 10,
     totalReviews: count,
   });

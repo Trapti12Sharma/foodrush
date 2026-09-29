@@ -63,6 +63,25 @@ afterEach(async () => {
 // connect would otherwise throw here and mask the real error, and wrapped in
 // try/catch because a teardown failure must never turn a passing run red — a
 // leaked connection is a resource problem, not a test result.
+//
+// M23 — THE EXPLICIT TIMEOUT IS THE POINT, not decoration. jest.config.js sets
+// testTimeout: 20000, and that ceiling applies to HOOKS as well as tests. So on
+// a machine slow enough for tests to time out, this teardown could be killed
+// mid-disconnect by the very same ceiling — and then the connection it exists to
+// close stays open. With --forceExit removed (correctly, in M18, because it was
+// masking the original leak) there is nothing left to kill the process, so the
+// run hangs indefinitely instead of finishing dirty: a full jest parent and
+// worker were found alive 31 minutes after printing their summary, holding
+// 956 MB. In CI that burns a runner's entire timeout budget.
+//
+// Reproduced deterministically with `--testTimeout=1`, which makes this hook
+// fail with "Exceeded timeout of 1 ms for a hook" at this exact line.
+//
+// A disconnect takes milliseconds; 30 s is not an expectation, it is headroom
+// for a stalled machine, so that cleanup is the one thing that does NOT get cut
+// short exactly when it matters most.
+const TEARDOWN_TIMEOUT_MS = 30000;
+
 afterAll(async () => {
   if (mongoose.connection.readyState !== 0) {
     try {
@@ -71,6 +90,6 @@ afterAll(async () => {
       console.error('Test teardown: mongoose.disconnect() failed:', err.message);
     }
   }
-});
+}, TEARDOWN_TIMEOUT_MS);
 
 module.exports = { TEST_MONGODB_URI };
