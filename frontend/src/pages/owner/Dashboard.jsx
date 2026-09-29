@@ -152,7 +152,8 @@ export default function Dashboard() {
             {analytics.topItems.length === 0 ? (
               <p className="py-6 text-center text-sm text-gray-400">Nothing was sold in this range.</p>
             ) : (
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
                 <thead className="text-left text-xs uppercase text-gray-400">
                   <tr>
                     <th className="pb-2">Item</th>
@@ -171,7 +172,8 @@ export default function Dashboard() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
             )}
           </div>
         </>

@@ -7,6 +7,7 @@ import { CartProvider } from './context/CartContext';
 import { FavoritesProvider } from './context/FavoritesContext';
 import { LocationProvider } from './context/LocationContext';
 import LocationPicker from './components/LocationPicker';
+import ErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ADMIN_PANEL_ROLES } from './constants/roles';
 import MainLayout from './layouts/MainLayout';
@@ -80,6 +81,12 @@ function App() {
           <LocationProvider>
           <Toaster position="top-center" toastOptions={{ duration: 3000 }} />
           <LocationPicker />
+          {/* M19 — sits INSIDE the providers and OUTSIDE Routes on purpose. Inside,
+              so a render error in any page is caught rather than blanking the app;
+              outside Routes, so the fallback survives the failure of whichever
+              route threw. It also wraps Suspense, which is what catches a failed
+              lazy-chunk import after a deploy (see ErrorBoundary's chunk case). */}
+          <ErrorBoundary>
           <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route element={<MainLayout />}>
@@ -213,6 +220,7 @@ function App() {
             </Route>
           </Routes>
           </Suspense>
+          </ErrorBoundary>
           </LocationProvider>
         </FavoritesProvider>
       </CartProvider>

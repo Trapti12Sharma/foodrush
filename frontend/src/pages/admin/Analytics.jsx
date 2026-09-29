@@ -154,7 +154,8 @@ export default function Analytics() {
                 (restaurants.data.breakdown.length === 0 ? (
                   <p className="py-6 text-center text-sm text-gray-400">No restaurant had orders in this range.</p>
                 ) : (
-                  <table className="w-full text-sm">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
                     <thead className="text-left text-xs uppercase text-gray-400">
                       <tr>
                         <th className="pb-2">Restaurant</th>
@@ -179,7 +180,8 @@ export default function Analytics() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
+                    </table>
+                  </div>
                 ))}
             </Section>
 
@@ -188,7 +190,8 @@ export default function Analytics() {
                 (food.data.breakdown.length === 0 ? (
                   <p className="py-6 text-center text-sm text-gray-400">No items were sold in this range.</p>
                 ) : (
-                  <table className="w-full text-sm">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
                     <thead className="text-left text-xs uppercase text-gray-400">
                       <tr>
                         <th className="pb-2">Item</th>
@@ -207,7 +210,8 @@ export default function Analytics() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
+                    </table>
+                  </div>
                 ))}
             </Section>
           </div>
