@@ -681,7 +681,17 @@ describe('Analytics — overview consistency & privacy', () => {
       expect(body).not.toMatch(/@example\.com/);
       expect(body).not.toMatch(/"phone"/);
       expect(body).not.toMatch(/"deliveryAddress"/);
-      expect(body).not.toMatch(/"password/i);
+      // M18 — the three above are load-bearing: analytics must never emit a
+      // customer email, phone or delivery address, and none of those strings
+      // appears in a legitimate analytics field name. The checks below replaced
+      // a blunt /"password/i, which would have tripped the day a slice
+      // legitimately returned something like "passwordChangedAt" in a
+      // user-shaped projection — an assertion that fails on correct code teaches
+      // you to loosen it, which is how a real leak gets through later. These are
+      // what a credential actually leaking would look like.
+      expect(body).not.toMatch(/\$2[aby]\$\d{2}\$/); // a bcrypt hash, under any key
+      expect(body).not.toMatch(/"password"/);
+      expect(body).not.toMatch(/passwordResetTokenHash/);
     }
   });
 });

@@ -3,6 +3,7 @@ const CouponUsage = require('../models/CouponUsage');
 const ApiError = require('../utils/ApiError');
 const { DISCOUNT_TYPES } = require('../utils/constants');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
+const { escapeRegex } = require('../utils/regex');
 
 // Pure validation + discount calculation, reused by the standalone "validate this
 // code" endpoint and cart.service's apply/recalculate paths. Does NOT increment
@@ -120,7 +121,13 @@ async function createCoupon(payload) {
 async function listCoupons(query) {
   const { page, limit, skip } = parsePagination(query);
   const filter = {};
-  if (query.search) filter.code = new RegExp(query.search.trim().toUpperCase());
+  // M18 — escaped, like every other search in this codebase. Unescaped, a staff
+  // member searching for something like "(a+)+$" would hand the regex engine a
+  // catastrophically backtracking pattern, and because Node is single-threaded
+  // that is not a slow query, it is the whole API hanging. Coupon codes are
+  // alphanumeric, so no legitimate search ever needs a metacharacter to keep its
+  // special meaning. Still unanchored, so this remains a substring match.
+  if (query.search) filter.code = new RegExp(escapeRegex(query.search.trim().toUpperCase()));
   if (query.isActive !== undefined) filter.isActive = query.isActive === 'true';
   if (query.restaurant) filter.restaurant = query.restaurant;
 
