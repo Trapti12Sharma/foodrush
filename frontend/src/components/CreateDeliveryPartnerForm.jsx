@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { LocateFixed, CheckCircle2 } from 'lucide-react';
+import toast from '@/utils/toast';
 import ImageUploadField from './ImageUploadField';
 
 const VEHICLE_TYPES = ['BICYCLE', 'SCOOTER', 'MOTORCYCLE', 'CAR'];
@@ -25,6 +27,32 @@ export default function CreateDeliveryPartnerForm({ onSubmit, submitting }) {
     return (url) => setDocuments((prev) => ({ ...prev, [field]: url }));
   }
 
+  // Where the rider is based. Without a location a rider is invisible to
+  // dispatch — orders are matched to riders with a geo query, and a document
+  // with no coordinates is never returned by it, however close the rider is.
+  const [baseLocation, setBaseLocation] = useState(null);
+  const [locating, setLocating] = useState(false);
+
+  function useMyLocation() {
+    if (!navigator.geolocation) {
+      toast.error('This browser cannot share your location');
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setBaseLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+        setLocating(false);
+        toast.success('Location captured');
+      },
+      () => {
+        setLocating(false);
+        toast.error('Could not get your location — check browser permissions');
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
   const missingRequiredDocs =
     !documents.identityProofUrl || !documents.profilePhotoUrl || (needsVehicleDocs && (!documents.drivingLicenceUrl || !documents.vehicleRegistrationUrl));
 
@@ -41,6 +69,7 @@ export default function CreateDeliveryPartnerForm({ onSubmit, submitting }) {
       drivingLicenceExpiry: needsVehicleDocs ? values.drivingLicenceExpiry : undefined,
       emergencyContact: { name: values.emergencyContactName, phone: values.emergencyContactPhone },
       documents,
+      ...(baseLocation || {}),
     });
   }
 
@@ -128,6 +157,31 @@ export default function CreateDeliveryPartnerForm({ onSubmit, submitting }) {
           <label className="mb-1 block text-sm font-medium text-gray-700">Emergency contact phone (optional)</label>
           <input {...register('emergencyContactPhone')} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
         </div>
+      </div>
+
+      <div className="space-y-2 rounded-lg border border-gray-200 bg-gray-50/60 p-3">
+        <p className="text-sm font-medium text-gray-700">Where you&apos;ll ride from</p>
+        <p className="text-xs text-gray-400">
+          Restaurants are matched to the nearest rider, so we need a starting point. You can update it any time by
+          turning on location sharing from your dashboard.
+        </p>
+        <button
+          type="button"
+          onClick={useMyLocation}
+          disabled={locating}
+          className="flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:underline disabled:opacity-60"
+        >
+          <LocateFixed size={14} /> {locating ? 'Getting your location…' : 'Use my current location'}
+        </button>
+        {baseLocation ? (
+          <p className="flex items-center gap-1 text-xs font-medium text-green-700">
+            <CheckCircle2 size={13} /> Location captured — you can be matched to nearby orders
+          </p>
+        ) : (
+          <p className="text-xs text-amber-400">
+            No location set yet — without one you won&apos;t be offered deliveries until you share your location.
+          </p>
+        )}
       </div>
 
       <button

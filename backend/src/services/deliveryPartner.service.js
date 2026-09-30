@@ -44,8 +44,20 @@ async function createProfile(user, payload) {
   if (existing) throw ApiError.conflict('You already have a delivery partner profile');
 
   const data = pickFields(payload, CREATE_FIELDS);
+
+  // Seed the rider's position from sign-up when they gave us one. currentLocation
+  // is not in CREATE_FIELDS (clients must not be able to set arbitrary geo state
+  // through the generic field-pick), so it is built explicitly here from the
+  // validated latitude/longitude. Live sharing later overwrites it; until then
+  // this is what makes a brand-new rider visible to dispatch at all.
+  const { latitude, longitude } = payload;
+  const hasStartingPoint = typeof latitude === 'number' && typeof longitude === 'number';
+
   return DeliveryPartner.create({
     ...data,
+    ...(hasStartingPoint
+      ? { currentLocation: { type: 'Point', coordinates: [longitude, latitude] }, lastLocationAt: new Date() }
+      : {}),
     user: user._id,
     // The create validator requires every document a reviewer needs for this
     // vehicle type, so a successful create always represents a complete

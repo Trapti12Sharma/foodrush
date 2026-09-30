@@ -67,6 +67,13 @@ const createDeliveryPartnerValidator = [
   body('vehicleNumber').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
   requiredTextUnlessBicycle('drivingLicenceNumber', 'A driving licence number'),
   validDateUnlessBicycle('drivingLicenceExpiry', 'A driving licence expiry date'),
+  // Where the rider is based. Optional, but without it they are invisible to
+  // dispatch: findEligibleRiders uses $geoNear, and $geoNear only ever returns
+  // documents that actually carry the geo field — a rider with no location is
+  // skipped no matter how close they are. Capturing it at sign-up means a rider
+  // can be dispatched before they have ever switched on live location sharing.
+  body('latitude').optional({ nullable: true, checkFalsy: true }).isFloat({ min: -90, max: 90 }).withMessage('Enter a valid latitude').toFloat(),
+  body('longitude').optional({ nullable: true, checkFalsy: true }).isFloat({ min: -180, max: 180 }).withMessage('Enter a valid longitude').toFloat(),
   body('emergencyContact.name').optional({ checkFalsy: true }).trim().isLength({ max: 100 }),
   body('emergencyContact.phone').optional({ checkFalsy: true }).trim().matches(PHONE_RULE).withMessage('Enter a valid emergency contact number'),
   documentUrlRule('documents.identityProofUrl', 'An identity document photo', { required: true }),
