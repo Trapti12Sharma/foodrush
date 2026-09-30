@@ -14,6 +14,7 @@ import MainLayout from './layouts/MainLayout';
 
 import Home from './pages/Home';
 import PartnerWithUs from './pages/PartnerWithUs';
+import DeliverWithUs from './pages/DeliverWithUs';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import RestaurantListing from './pages/RestaurantListing';
@@ -110,13 +111,19 @@ function App() {
           <ErrorBoundary>
           <Suspense fallback={<RouteFallback />}>
           <Routes>
+            {/* Auth screens sit OUTSIDE MainLayout so they render without the
+                storefront chrome — a nav bar offering search, restaurants and a
+                cart is just a set of ways to wander off mid-sign-in. Each of
+                these pages carries its own FoodRush wordmark linking home. */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+
             <Route element={<MainLayout />}>
               <Route path="/" element={<Home />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/partner-with-us" element={<PartnerWithUs />} />
+              <Route path="/deliver-with-us" element={<DeliverWithUs />} />
               <Route path="/restaurants" element={<RestaurantListing />} />
               <Route path="/restaurants/:id" element={<RestaurantDetail />} />
               <Route path="/search" element={<Search />} />

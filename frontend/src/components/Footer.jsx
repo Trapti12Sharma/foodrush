@@ -34,6 +34,11 @@ export default function Footer() {
                   Onboard your restaurant
                 </Link>
               </li>
+              <li>
+                <Link to="/deliver-with-us" className="font-medium text-brand-600 hover:underline">
+                  Become a delivery partner
+                </Link>
+              </li>
             </ul>
             <p className="mt-3 text-sm text-gray-500">An original, independent food-delivery platform. Not affiliated with any other delivery brand.</p>
           </div>

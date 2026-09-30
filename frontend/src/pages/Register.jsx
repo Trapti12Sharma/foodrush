@@ -1,11 +1,20 @@
 import { useForm } from 'react-hook-form';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from '@/utils/toast';
 import { useAuth } from '../context/AuthContext';
+import { landingPathFor } from '../constants/roles';
+
+const SIGNUP_ROLES = ['CUSTOMER', 'RESTAURANT_OWNER', 'DELIVERY_PARTNER'];
 
 export default function Register() {
   const { register: registerUser } = useAuth();
   const navigate = useNavigate();
+  // Lets the "Deliver with us" / "Partner with us" pages drop people straight
+  // into the right kind of sign-up. Ignored unless it names a real signup role,
+  // so a hand-edited URL can't ask for, say, an admin account.
+  const [searchParams] = useSearchParams();
+  const requestedRole = searchParams.get('role');
+  const defaultRole = SIGNUP_ROLES.includes(requestedRole) ? requestedRole : 'CUSTOMER';
   const {
     register,
     handleSubmit,
@@ -16,9 +25,12 @@ export default function Register() {
   async function onSubmit(values) {
     try {
       const { confirmPassword, ...payload } = values;
-      await registerUser(payload);
+      const newUser = await registerUser(payload);
       toast.success('Account created — welcome to FoodRush!');
-      navigate('/', { replace: true });
+      // Customers land on the storefront; owners and riders go straight to the
+      // console where their next step (create a restaurant / submit rider
+      // details) actually lives.
+      navigate(landingPathFor(newUser), { replace: true });
     } catch (err) {
       toast.error(err.message || 'Could not create your account');
     }
@@ -66,7 +78,7 @@ export default function Register() {
             <label className="mb-1 block text-sm font-medium text-gray-700">I want to</label>
             <select
               {...register('role')}
-              defaultValue="CUSTOMER"
+              defaultValue={defaultRole}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
             >
               <option value="CUSTOMER">Order food</option>
