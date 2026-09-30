@@ -57,11 +57,14 @@ export default function Orders() {
     load();
     const timer = setInterval(() => {
       if (!selectedRestaurant) return;
+      // Skip while the tab is in the background — see NewOrderAlert: the API's
+      // per-IP budget is shared across every open tab.
+      if (typeof document !== 'undefined' && document.hidden) return;
       orderService
         .list({ restaurant: selectedRestaurant._id, status: statusFilter || undefined, limit: 100 })
         .then((res) => setOrders(res.orders))
         .catch(() => {});
-    }, 20000);
+    }, 30000);
     return () => clearInterval(timer);
   }, [selectedRestaurant, statusFilter]);
 

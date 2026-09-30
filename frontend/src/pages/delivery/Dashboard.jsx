@@ -6,9 +6,12 @@ import { deliveryPartnerService } from '../../services/deliveryPartnerService';
 import { deliveryAssignmentService } from '../../services/deliveryAssignmentService';
 import { deliveryEarningService } from '../../services/deliveryEarningService';
 import { useLocationSharing } from '../../hooks/useLocationSharing';
+import NewDeliveryOfferAlert from '../../components/NewDeliveryOfferAlert';
 
 // No push notifications yet (Socket.IO is a later milestone) — the dashboard polls
-// for new offers while it's open. A rider must have the app/tab open to see one.
+// for new offers while it's open. A rider must have the app/tab open to see one,
+// but NewDeliveryOfferAlert chimes when one lands, so the tab doesn't have to be
+// the thing they're looking at.
 const OFFERS_POLL_MS = 15000;
 
 function useCountdown(expiresAt) {
@@ -384,6 +387,14 @@ export default function Dashboard() {
 
   return (
     <div>
+      {/* Chimes and interrupts on a new offer. Fed from the `offers` this page
+          already polls, so it costs no extra requests. Only while the rider is
+          online and not already mid-delivery — the same condition under which
+          offers are shown at all. */}
+      {isOnline && !currentDelivery && (
+        <NewDeliveryOfferAlert offers={offers} onAccept={handleAccept} onReject={handleReject} busyId={respondingId} />
+      )}
+
       <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
 
       {currentDelivery && <CurrentDeliveryCard assignment={currentDelivery} onDelivered={handleDelivered} />}

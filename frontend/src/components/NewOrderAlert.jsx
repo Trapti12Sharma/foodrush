@@ -3,58 +3,15 @@ import { BellRing, Clock } from 'lucide-react';
 import toast from '@/utils/toast';
 import { useRestaurantOwner } from '../context/RestaurantOwnerContext';
 import { orderService } from '../services/orderService';
+import useAlertChime from '../hooks/useAlertChime';
 
-const POLL_MS = 15000;
+// 30s, not 15s. The API allows ~20 requests/minute per IP, and a restaurant
+// laptop typically has several tabs open; two pollers at 15s plus ordinary page
+// loads were enough to start drawing 429s, which surface as empty lists because
+// every load path treats a failed request as "nothing to show".
+const POLL_MS = 30000;
 const PREP_OPTIONS = [15, 20, 30, 45, 60];
 const DEFAULT_PREP_MINUTES = 30;
-
-// A repeating two-tone chime for as long as an order is waiting to be answered.
-// Synthesised with the Web Audio API rather than shipping an audio file: no asset
-// to load (so it can never be the thing that fails), and no autoplay of a media
-// element. Browsers still refuse to start audio until the page has been
-// interacted with, so every call is defensive — a silent alert is a degraded
-// alert, but a thrown error would take the whole dialog down with it.
-function useOrderAlarm(active) {
-  const ctxRef = useRef(null);
-
-  useEffect(() => {
-    if (!active) return undefined;
-
-    function chime() {
-      try {
-        if (!ctxRef.current) {
-          const Ctx = window.AudioContext || window.webkitAudioContext;
-          if (!Ctx) return;
-          ctxRef.current = new Ctx();
-        }
-        const ctx = ctxRef.current;
-        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-
-        const startedAt = ctx.currentTime;
-        [880, 1174].forEach((frequency, i) => {
-          const offset = i * 0.18;
-          const oscillator = ctx.createOscillator();
-          const gain = ctx.createGain();
-          oscillator.type = 'sine';
-          oscillator.frequency.value = frequency;
-          // Ramped rather than switched, so it reads as a chime instead of a click.
-          gain.gain.setValueAtTime(0.0001, startedAt + offset);
-          gain.gain.exponentialRampToValueAtTime(0.2, startedAt + offset + 0.02);
-          gain.gain.exponentialRampToValueAtTime(0.0001, startedAt + offset + 0.16);
-          oscillator.connect(gain).connect(ctx.destination);
-          oscillator.start(startedAt + offset);
-          oscillator.stop(startedAt + offset + 0.18);
-        });
-      } catch {
-        /* Audio is a nicety; the visual alert is the real notification. */
-      }
-    }
-
-    chime();
-    const timer = setInterval(chime, 2500);
-    return () => clearInterval(timer);
-  }, [active]);
-}
 
 // Full-screen interrupt for orders the kitchen hasn't answered yet. Mounted once by
 // the restaurant-owner layout, so it follows the owner across every page of their
@@ -70,10 +27,13 @@ export default function NewOrderAlert({ onHandled }) {
   const handledRef = useRef(new Set());
 
   const current = pending[0] || null;
-  useOrderAlarm(Boolean(current));
+  useAlertChime(Boolean(current));
 
   const poll = useCallback(() => {
     if (!selectedRestaurant) return;
+    // A backgrounded tab still runs its timers. Polling one nobody is looking at
+    // spends the shared rate-limit budget that the visible tab needs.
+    if (typeof document !== 'undefined' && document.hidden) return;
     orderService
       .list({ restaurant: selectedRestaurant._id, status: 'PLACED', limit: 20 })
       .then((res) => setPending((res.orders || []).filter((o) => !handledRef.current.has(o._id))))

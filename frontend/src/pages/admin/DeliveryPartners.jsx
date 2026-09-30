@@ -28,6 +28,7 @@ export default function DeliveryPartners() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [kycFilter, setKycFilter] = useState('');
+  const [loadError, setLoadError] = useState(null);
   const [accountFilter, setAccountFilter] = useState('');
   const [busyId, setBusyId] = useState(null);
   const [detail, setDetail] = useState(null);
@@ -38,10 +39,19 @@ export default function DeliveryPartners() {
 
   function load() {
     setLoading(true);
+    setLoadError(null);
     adminService
       .listDeliveryPartners({ search: search || undefined, kycStatus: kycFilter || undefined, accountStatus: accountFilter || undefined, limit: 100 })
-      .then((res) => setPartners(res.deliveryPartners))
-      .catch((err) => toast.error(err.message || 'Could not load delivery partners'))
+      .then((res) => setPartners(res.deliveryPartners || []))
+      .catch((err) => {
+        // A failed request used to leave `partners` at [] and render "No delivery
+        // partners found." — telling an admin that nobody has applied when in
+        // fact the server was never successfully asked. A rate-limit (429) or a
+        // permissions error then looks identical to an empty queue.
+        setPartners([]);
+        setLoadError(err.status === 429 ? 'Too many requests — the list will load again shortly.' : err.message || 'Could not load delivery partners');
+        toast.error(err.message || 'Could not load delivery partners');
+      })
       .finally(() => setLoading(false));
   }
 
@@ -214,7 +224,21 @@ export default function DeliveryPartners() {
               </div>
             </div>
           ))}
-          {partners.length === 0 && <p className="p-6 text-center text-sm text-gray-400">No delivery partners found.</p>}
+          {partners.length === 0 &&
+            (loadError ? (
+              <div className="p-6 text-center">
+                <p className="text-sm font-medium text-red-400">{loadError}</p>
+                <button
+                  type="button"
+                  onClick={load}
+                  className="mt-3 rounded-lg border border-gray-300 px-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Try again
+                </button>
+              </div>
+            ) : (
+              <p className="p-6 text-center text-sm text-gray-400">No delivery partners found.</p>
+            ))}
         </div>
       )}
 
