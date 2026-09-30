@@ -15,7 +15,7 @@ export default function CategoryForm({ initialValues, onSubmit, onCancel, submit
   }
 
   return (
-    <form onSubmit={handleSubmit(submit)} className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
+    <form onSubmit={handleSubmit(submit)} className="space-y-3 rounded-xl border border-gray-200 bg-surface p-4">
       <ImageUploadField label="Category image (optional)" value={image} onChange={setImage} purpose="category" />
       <div>
         <label className="mb-1 block text-xs font-medium text-gray-600">Category name</label>

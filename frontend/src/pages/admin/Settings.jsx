@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { Plus, Trash2, RotateCcw } from 'lucide-react';
 import { adminService } from '../../services/adminService';
 
@@ -23,7 +23,7 @@ const PRESET_SAMPLE_SUBTOTAL = 500;
 
 function Section({ title, description, children }) {
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-5">
+    <section className="rounded-xl border border-gray-200 bg-surface p-5">
       <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
       {description && <p className="mt-1 text-xs text-gray-500">{description}</p>}
       <div className="mt-4 space-y-4">{children}</div>

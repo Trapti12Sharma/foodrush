@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { CheckCircle2, LocateFixed, Loader2 } from 'lucide-react';
 import { useDeliveryLocation } from '../context/LocationContext';
 import { geoService } from '../services/geoService';
@@ -66,7 +66,7 @@ export default function AddressForm({ initialValues, onSubmit, onCancel, submitt
   }
 
   return (
-    <form onSubmit={handleSubmit(submit)} className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
+    <form onSubmit={handleSubmit(submit)} className="space-y-3 rounded-xl border border-gray-200 bg-surface p-4">
       <div className="space-y-2">
         <PlaceSearch onSelect={fillFromPlace} enabled={locationSearchEnabled} placeholder="Search to find your address" />
         <button

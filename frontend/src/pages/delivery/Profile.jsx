@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { useDeliveryPartner } from '../../context/DeliveryPartnerContext';
 import { deliveryPartnerService } from '../../services/deliveryPartnerService';
 import ImageUploadField from '../../components/ImageUploadField';

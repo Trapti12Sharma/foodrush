@@ -1,10 +1,11 @@
 import { Outlet, NavLink } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { LayoutDashboard, ClipboardList, UtensilsCrossed, FolderTree, Store, Star, LifeBuoy } from 'lucide-react';
 import { RestaurantOwnerProvider, useRestaurantOwner } from '../context/RestaurantOwnerContext';
 import { restaurantService } from '../services/restaurantService';
 import CreateRestaurantForm from '../components/CreateRestaurantForm';
 import NotificationBell from '../components/NotificationBell';
+import NewOrderAlert from '../components/NewOrderAlert';
 import { useState } from 'react';
 
 const NAV_ITEMS = [
@@ -49,7 +50,7 @@ function Sidebar() {
   const { restaurants, selectedId, setSelectedId, selectedRestaurant } = useRestaurantOwner();
 
   return (
-    <aside className="w-full shrink-0 rounded-xl border border-gray-200 bg-white p-4 md:w-56 md:rounded-none md:border-0 md:border-r">
+    <aside className="w-full shrink-0 rounded-xl border border-gray-200 bg-surface p-4 md:w-56 md:rounded-none md:border-0 md:border-r">
       {restaurants.length > 1 ? (
         <select
           value={selectedId || ''}
@@ -104,6 +105,9 @@ function LayoutInner() {
         </div>
         <Outlet />
       </div>
+      {/* Mounted at the layout level so an incoming order interrupts the owner
+          wherever they are in the console, not just on the Orders page. */}
+      <NewOrderAlert />
     </div>
   );
 }

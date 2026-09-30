@@ -57,7 +57,7 @@ export default function DeliveryTracker({ orderId, onDelivered }) {
       : null;
 
   return (
-    <div className="mt-6 rounded-xl border border-gray-100 bg-white p-4 text-sm">
+    <div className="mt-6 rounded-xl border border-gray-100 bg-surface p-4 text-sm">
       <div className="flex items-center justify-between">
         <p className="flex items-center gap-1.5 font-semibold text-gray-700">
           <Bike size={16} /> Track delivery

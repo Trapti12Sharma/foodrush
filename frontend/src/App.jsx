@@ -13,6 +13,7 @@ import { ADMIN_PANEL_ROLES } from './constants/roles';
 import MainLayout from './layouts/MainLayout';
 
 import Home from './pages/Home';
+import PartnerWithUs from './pages/PartnerWithUs';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import RestaurantListing from './pages/RestaurantListing';
@@ -79,7 +80,27 @@ function App() {
       <CartProvider>
         <FavoritesProvider>
           <LocationProvider>
-          <Toaster position="top-center" toastOptions={{ duration: 3000 }} />
+          <Toaster
+            position="top-center"
+            gutter={10}
+            toastOptions={{
+              duration: 3000,
+              style: {
+                background: '#2a2344',
+                color: '#ffffff',
+                border: '1px solid #4f4675',
+                borderRadius: '14px',
+                padding: '12px 16px',
+                fontSize: '14px',
+                fontWeight: 500,
+                maxWidth: '420px',
+                boxShadow: '0 14px 40px rgba(0, 0, 0, 0.5)',
+              },
+              success: { iconTheme: { primary: '#22c55e', secondary: '#141020' } },
+              error: { iconTheme: { primary: '#ef4444', secondary: '#141020' } },
+              loading: { iconTheme: { primary: '#a855f7', secondary: '#141020' } },
+            }}
+          />
           <LocationPicker />
           {/* M19 — sits INSIDE the providers and OUTSIDE Routes on purpose. Inside,
               so a render error in any page is caught rather than blanking the app;
@@ -95,6 +116,7 @@ function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/partner-with-us" element={<PartnerWithUs />} />
               <Route path="/restaurants" element={<RestaurantListing />} />
               <Route path="/restaurants/:id" element={<RestaurantDetail />} />
               <Route path="/search" element={<Search />} />

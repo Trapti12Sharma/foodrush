@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { Bike, Wallet, MapPin, Store, Clock, Navigation, Radio, ShieldCheck, ChevronDown, ChevronUp } from 'lucide-react';
 import { useDeliveryPartner } from '../../context/DeliveryPartnerContext';
 import { deliveryPartnerService } from '../../services/deliveryPartnerService';
@@ -62,7 +62,7 @@ function OfferCard({ offer, onAccept, onReject, busy }) {
           type="button"
           disabled={busy}
           onClick={() => onReject(offer._id)}
-          className="flex-1 rounded-lg border border-gray-300 bg-white py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          className="flex-1 rounded-lg border border-gray-300 bg-surface py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
         >
           Reject
         </button>
@@ -90,7 +90,7 @@ function LocationSharingControl({ assignmentId }) {
   const isSharing = state === 'sharing' || state === 'requesting';
 
   return (
-    <div className="mt-3 rounded-lg bg-white p-3">
+    <div className="mt-3 rounded-lg bg-surface p-3">
       <div className="flex items-center justify-between gap-3">
         <p className={`flex items-center gap-1.5 text-xs font-medium ${SHARING_STYLE[state] || 'text-amber-700'}`}>
           <Radio size={12} /> {SHARING_TEXT[state]}
@@ -136,7 +136,7 @@ function OtpVerifyForm({ assignmentId, onDelivered }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-3 rounded-lg bg-white p-3">
+    <form onSubmit={handleSubmit} className="mt-3 rounded-lg bg-surface p-3">
       <p className="flex items-center gap-1.5 text-xs font-semibold text-gray-700">
         <ShieldCheck size={14} /> Enter delivery OTP
       </p>
@@ -245,7 +245,7 @@ function EarningsSection() {
   }, []);
 
   return (
-    <div className="mt-4 rounded-xl border border-gray-200 bg-white p-4">
+    <div className="mt-4 rounded-xl border border-gray-200 bg-surface p-4">
       <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900">
         <Wallet size={16} /> Earnings
       </p>
@@ -406,7 +406,7 @@ export default function Dashboard() {
       )}
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
+        <div className="rounded-xl border border-gray-200 bg-surface p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-gray-400">KYC status</p>
           <div className="mt-2">
             <Badge styles={KYC_STYLES} value={profile.kycStatus} />
@@ -417,7 +417,7 @@ export default function Dashboard() {
           {profile.kycStatus === 'SUBMITTED' && <p className="mt-2 text-sm text-gray-500">Your documents are awaiting admin review.</p>}
         </div>
 
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
+        <div className="rounded-xl border border-gray-200 bg-surface p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Account status</p>
           <div className="mt-2">
             <Badge styles={ACCOUNT_STYLES} value={profile.accountStatus} />
@@ -428,7 +428,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="mt-4 rounded-xl border border-gray-200 bg-white p-4">
+      <div className="mt-4 rounded-xl border border-gray-200 bg-surface p-4">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-gray-900">Availability</p>
@@ -451,7 +451,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="mt-4 rounded-xl border border-gray-200 bg-white p-4">
+      <div className="mt-4 rounded-xl border border-gray-200 bg-surface p-4">
         <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-900">
           <Bike size={16} /> Vehicle
         </p>

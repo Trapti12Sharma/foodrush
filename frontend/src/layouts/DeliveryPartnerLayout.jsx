@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { LayoutDashboard, UserRound, LifeBuoy } from 'lucide-react';
 import { DeliveryPartnerProvider, useDeliveryPartner } from '../context/DeliveryPartnerContext';
 import { deliveryPartnerService } from '../services/deliveryPartnerService';
@@ -45,7 +45,7 @@ function Sidebar() {
   const { profile } = useDeliveryPartner();
 
   return (
-    <aside className="w-full shrink-0 rounded-xl border border-gray-200 bg-white p-4 md:w-56 md:rounded-none md:border-0 md:border-r">
+    <aside className="w-full shrink-0 rounded-xl border border-gray-200 bg-surface p-4 md:w-56 md:rounded-none md:border-0 md:border-r">
       <p className="mb-4 truncate text-sm font-semibold text-gray-900">{profile?.fullName}</p>
 
       {profile?.kycStatus !== 'VERIFIED' && (

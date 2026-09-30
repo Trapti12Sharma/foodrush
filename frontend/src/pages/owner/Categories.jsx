@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { Plus, Pencil, Trash2, FolderTree } from 'lucide-react';
 import { useRestaurantOwner } from '../../context/RestaurantOwnerContext';
 import { categoryService } from '../../services/categoryService';
@@ -116,7 +116,7 @@ export default function Categories() {
                 submitting={submitting}
               />
             ) : (
-              <div key={category._id} className="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-4">
+              <div key={category._id} className="flex items-center justify-between rounded-xl border border-gray-200 bg-surface p-4">
                 <div>
                   <p className="font-medium text-gray-900">{category.name}</p>
                   {category.description && <p className="text-sm text-gray-500">{category.description}</p>}

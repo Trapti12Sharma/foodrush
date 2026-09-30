@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { restaurantService } from '../../services/restaurantService';
 import ImageUploadField from '../../components/ImageUploadField';
 
@@ -80,7 +80,7 @@ export default function KycSection({ restaurant, onUpdated }) {
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
+    <div className="rounded-lg border border-gray-200 bg-surface p-4">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-semibold text-gray-900">Business verification (KYC)</p>

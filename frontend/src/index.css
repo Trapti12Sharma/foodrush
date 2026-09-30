@@ -1,3 +1,39 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Dark-theme base. The palette itself lives in tailwind.config.js (see the note
+   there); this layer covers the things utility classes don't reach: the page
+   canvas behind every layout, and form controls — which do NOT inherit `color`
+   from their parent, so without this they render as black text on a dark field. */
+@layer base {
+  body {
+    background-color: theme('colors.gray.50');
+    color: theme('colors.gray.700');
+  }
+
+  input,
+  select,
+  textarea {
+    color: theme('colors.gray.900');
+    background-color: transparent;
+  }
+
+  /* Native dropdown lists are painted by the OS, not the page, so they need
+     their own colours or they open as white-on-white. */
+  option {
+    background-color: theme('colors.surface.DEFAULT');
+    color: theme('colors.gray.900');
+  }
+
+  ::placeholder {
+    color: theme('colors.gray.400');
+    opacity: 1;
+  }
+
+  /* Keeps the browser's own UI (scrollbars, autofill, date pickers) in dark mode
+     instead of flashing light chrome over a dark page. */
+  :root {
+    color-scheme: dark;
+  }
+}

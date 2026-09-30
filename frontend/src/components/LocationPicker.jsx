@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { LocateFixed, Loader2, MapPin, X, Building2 } from 'lucide-react';
 import { useDeliveryLocation } from '../context/LocationContext';
 import { useAuth } from '../context/AuthContext';
@@ -86,7 +86,7 @@ export default function LocationPicker() {
         aria-modal="true"
         aria-label="Choose your delivery location"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl"
+        className="w-full max-w-md rounded-2xl bg-surface p-5 shadow-xl"
       >
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-gray-900">Deliver to</h2>

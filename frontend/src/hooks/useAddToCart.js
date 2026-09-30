@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 

@@ -113,7 +113,7 @@ export default function Search() {
           onChange={(e) => setInputValue(e.target.value)}
           placeholder="Search restaurants or food…"
           autoFocus
-          className="w-full rounded-full border border-gray-200 bg-white py-3 pl-10 pr-4 text-sm shadow-sm outline-none focus:border-brand-400"
+          className="w-full rounded-full border border-gray-200 bg-surface py-3 pl-10 pr-4 text-sm shadow-sm outline-none focus:border-brand-400"
         />
       </form>
 
@@ -145,7 +145,7 @@ export default function Search() {
       {!loading && !failed && foods.length > 0 && (
         <section>
           <h2 className="mb-3 text-lg font-bold text-gray-900">Dishes</h2>
-          <div className="divide-y divide-gray-100 rounded-xl border border-gray-100 bg-white">
+          <div className="divide-y divide-gray-100 rounded-xl border border-gray-100 bg-surface">
             {foods.map((food) => (
               <Link
                 key={food._id}

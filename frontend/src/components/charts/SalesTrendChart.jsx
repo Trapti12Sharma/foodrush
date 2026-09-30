@@ -5,11 +5,13 @@ import { useState } from 'react';
 // the next milestone is a performance pass, so adding ~100 kB gzipped to an
 // already-641 kB bundle to draw one line would be working against it. Follows
 // the same palette and interaction pattern as OrdersTrendChart.
-const LINE_COLOR = '#2a78d6';
-const AREA_COLOR = 'rgba(42, 120, 214, 0.12)';
-const BAR_COLOR = '#e1e0d9';
-const GRIDLINE = '#e1e0d9';
-const AXIS_TEXT = '#898781';
+// Tuned for the dark theme: the former light-background palette (beige gridlines
+// and bars on white) glared against a dark panel and buried the line.
+const LINE_COLOR = '#c084fc';
+const AREA_COLOR = 'rgba(192, 132, 252, 0.18)';
+const BAR_COLOR = 'rgba(255, 255, 255, 0.10)';
+const GRIDLINE = 'rgba(255, 255, 255, 0.08)';
+const AXIS_TEXT = '#a196bb';
 
 function formatMoney(value) {
   if (Math.abs(value) >= 100000) return `₹${(value / 100000).toFixed(1)}L`;
@@ -123,7 +125,7 @@ export default function SalesTrendChart({ data }) {
 
       {hoverIndex !== null && (
         <div
-          className="pointer-events-none absolute z-10 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs shadow-md"
+          className="pointer-events-none absolute z-10 rounded-lg border border-gray-200 bg-surface px-2.5 py-1.5 text-xs shadow-md"
           style={{
             left: `${((paddingLeft + hoverIndex * slot + slot / 2) / width) * 100}%`,
             top: 0,

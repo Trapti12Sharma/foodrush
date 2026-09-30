@@ -45,7 +45,7 @@ export default function CreateDeliveryPartnerForm({ onSubmit, submitting }) {
   }
 
   return (
-    <form onSubmit={handleSubmit(submit)} className="mx-auto max-w-lg space-y-4 rounded-xl border border-gray-200 bg-white p-6">
+    <form onSubmit={handleSubmit(submit)} className="mx-auto max-w-lg space-y-4 rounded-xl border border-gray-200 bg-surface p-6">
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">Full name</label>
         <input {...register('fullName', { required: true })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />

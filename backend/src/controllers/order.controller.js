@@ -24,13 +24,15 @@ const getOrder = asyncHandler(async (req, res) => {
 });
 
 const updateStatus = asyncHandler(async (req, res) => {
-  const order = await orderService.updateOrderStatus(req.user, req.params.id, req.body.status);
+  const order = await orderService.updateOrderStatus(req.user, req.params.id, req.body.status, {
+    prepMinutes: req.body.prepMinutes,
+  });
   await auditService.record({
     req,
     action: 'order.status_update',
     entityType: 'Order',
     entityId: order._id,
-    metadata: { status: order.orderStatus },
+    metadata: { status: order.orderStatus, prepMinutes: req.body.prepMinutes },
   });
   res.json(new ApiResponse(200, 'Order status updated', { order }));
 });

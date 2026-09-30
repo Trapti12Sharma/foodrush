@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { useRestaurantOwner } from '../../context/RestaurantOwnerContext';
 import { orderService } from '../../services/orderService';
 import OrderStatusBadge from '../../components/OrderStatusBadge';
@@ -18,6 +18,8 @@ const NEXT_ACTION = {
   OUT_FOR_DELIVERY: { label: 'Mark delivered', status: 'DELIVERED' },
 };
 const CANCELLABLE_STATUSES = ['PLACED', 'CONFIRMED', 'PREPARING'];
+// Orders that are over — showing a "promised by" time on these is just noise.
+const FINISHED_STATUSES = ['DELIVERED', 'CANCELLED', 'REJECTED', 'REFUNDED', 'REFUND_PENDING'];
 
 const STATUS_FILTERS = [
   { value: '', label: 'All' },
@@ -48,7 +50,20 @@ export default function Orders() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, [selectedRestaurant, statusFilter]);
+  // Kitchen screens sit open for hours; without this, new orders and rider
+  // progress only appear if someone thinks to hit refresh. Reloads quietly (no
+  // spinner) so an open list doesn't flicker every 20 seconds.
+  useEffect(() => {
+    load();
+    const timer = setInterval(() => {
+      if (!selectedRestaurant) return;
+      orderService
+        .list({ restaurant: selectedRestaurant._id, status: statusFilter || undefined, limit: 100 })
+        .then((res) => setOrders(res.orders))
+        .catch(() => {});
+    }, 20000);
+    return () => clearInterval(timer);
+  }, [selectedRestaurant, statusFilter]);
 
   async function advance(orderId, nextStatus) {
     setBusyId(orderId);
@@ -124,7 +139,7 @@ export default function Orders() {
             const busy = busyId === order._id;
 
             return (
-              <div key={order._id} className="rounded-xl border border-gray-200 bg-white p-4">
+              <div key={order._id} className="rounded-xl border border-gray-200 bg-surface p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleString()}</p>
@@ -132,9 +147,36 @@ export default function Orders() {
                       {order.items.length} item{order.items.length !== 1 ? 's' : ''} · ₹{order.totalAmount.toFixed(2)} ·{' '}
                       {order.paymentMethod === 'COD' ? 'Cash on Delivery' : 'Online'}
                     </p>
+                    {order.estimatedDeliveryTime && !FINISHED_STATUSES.includes(order.orderStatus) && (
+                      <p className="mt-1 text-xs text-gray-400">
+                        Promised by {new Date(order.estimatedDeliveryTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    )}
                   </div>
                   <OrderStatusBadge status={order.orderStatus} />
                 </div>
+
+                {/* The kitchen's whole job is on this list — without it the card
+                    says how many items there are but not what to cook. */}
+                <ul className="mt-3 divide-y divide-gray-200 rounded-lg border border-gray-200 bg-gray-50/60">
+                  {order.items.map((item, i) => (
+                    <li key={i} className="flex items-start justify-between gap-3 px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900">
+                          <span className="text-brand-700">{item.quantity}×</span> {item.name}
+                          {item.variantName && <span className="font-normal text-gray-500"> ({item.variantName})</span>}
+                        </p>
+                        {item.addons?.length > 0 && (
+                          <p className="text-xs text-gray-400">+ {item.addons.map((a) => a.name).join(', ')}</p>
+                        )}
+                        {item.note && (
+                          <p className="mt-0.5 text-xs font-medium italic text-amber-400">Note: {item.note}</p>
+                        )}
+                      </div>
+                      <span className="shrink-0 text-xs text-gray-500">₹{(item.price * item.quantity).toFixed(2)}</span>
+                    </li>
+                  ))}
+                </ul>
 
                 <div className="mt-3 flex flex-wrap gap-2">
                   {order.orderStatus === 'PLACED' && (

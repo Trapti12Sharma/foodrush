@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { adminService } from '../../services/adminService';
 
 const STATUS_OPTIONS = ['OPEN', 'IN_PROGRESS', 'WAITING_FOR_USER', 'RESOLVED', 'CLOSED'];
@@ -67,7 +67,7 @@ function TicketDetailModal({ ticketId, onClose, onChanged }) {
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white" onClick={(e) => e.stopPropagation()}>
+      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-surface" onClick={(e) => e.stopPropagation()}>
         <div className="border-b border-gray-100 p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -234,7 +234,7 @@ export default function SupportTickets() {
     <div>
       <h1 className="text-2xl font-bold text-gray-900">Support tickets</h1>
 
-      <form onSubmit={applyFilters} className="mt-4 grid grid-cols-2 gap-2 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-3 lg:grid-cols-6">
+      <form onSubmit={applyFilters} className="mt-4 grid grid-cols-2 gap-2 rounded-xl border border-gray-200 bg-surface p-4 sm:grid-cols-3 lg:grid-cols-6">
         <select value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))} className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
           <option value="">All statuses</option>
           {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -258,7 +258,7 @@ export default function SupportTickets() {
       {loading ? (
         <p className="mt-4 text-sm text-gray-400">Loading…</p>
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200 bg-surface">
           <table className="w-full text-sm">
             <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-400">
               <tr>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { adminService } from '../../services/adminService';
 
 export default function AuditLogs() {
@@ -50,7 +50,7 @@ export default function AuditLogs() {
         redacted before it is ever stored.
       </p>
 
-      <form onSubmit={applyFilters} className="mt-4 grid grid-cols-2 gap-2 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-3 lg:grid-cols-6">
+      <form onSubmit={applyFilters} className="mt-4 grid grid-cols-2 gap-2 rounded-xl border border-gray-200 bg-surface p-4 sm:grid-cols-3 lg:grid-cols-6">
         <input
           value={filters.action}
           onChange={(e) => setFilters((f) => ({ ...f, action: e.target.value }))}
@@ -85,7 +85,7 @@ export default function AuditLogs() {
       {loading ? (
         <p className="mt-4 text-sm text-gray-400">Loading…</p>
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200 bg-surface">
           <table className="w-full text-sm">
             <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-400">
               <tr>
@@ -132,7 +132,7 @@ export default function AuditLogs() {
 
       {detail && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={() => setDetail(null)}>
-          <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl bg-surface p-6" onClick={(e) => e.stopPropagation()}>
             <p className="font-mono text-sm text-gray-900">{detail.action}</p>
             <div className="mt-3 space-y-1 text-sm text-gray-700">
               <p><span className="text-gray-400">Actor:</span> {detail.actor?.name || 'system'} ({detail.actorRole || '—'})</p>

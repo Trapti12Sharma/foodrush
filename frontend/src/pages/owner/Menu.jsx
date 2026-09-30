@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { Plus, Pencil, Trash2, UtensilsCrossed } from 'lucide-react';
 import { useRestaurantOwner } from '../../context/RestaurantOwnerContext';
 import { foodService } from '../../services/foodService';
@@ -141,7 +141,7 @@ export default function Menu() {
                 submitting={submitting}
               />
             ) : (
-              <div key={food._id} className="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-4">
+              <div key={food._id} className="flex items-center justify-between rounded-xl border border-gray-200 bg-surface p-4">
                 <div className="flex items-center gap-3">
                   {/* FoodForm already lets an owner set this image; this row never
                       showed it back, so there was no way to confirm an upload

@@ -6,7 +6,7 @@ export default function AddressCard({ address, selectable, selected, onSelect, o
       onClick={selectable ? onSelect : undefined}
       className={`flex items-start gap-3 rounded-xl border p-4 ${
         selectable ? 'cursor-pointer' : ''
-      } ${selected ? 'border-brand-500 bg-brand-50' : 'border-gray-200 bg-white'}`}
+      } ${selected ? 'border-brand-500 bg-brand-50' : 'border-gray-200 bg-surface'}`}
     >
       <MapPin size={18} className="mt-0.5 shrink-0 text-gray-400" />
       <div className="flex-1">

@@ -2,9 +2,10 @@ import { useState } from 'react';
 
 // Sequential blue (step 450 from the reference palette) — a single-series
 // magnitude-over-time chart needs one hue, not a categorical set.
-const BAR_COLOR = '#2a78d6';
-const GRIDLINE = '#e1e0d9';
-const AXIS_TEXT = '#898781';
+// Dark-theme palette, matching SalesTrendChart.
+const BAR_COLOR = '#a855f7';
+const GRIDLINE = 'rgba(255, 255, 255, 0.08)';
+const AXIS_TEXT = '#a196bb';
 
 const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -72,7 +73,7 @@ export default function OrdersTrendChart({ data }) {
 
       {hoverIndex !== null && (
         <div
-          className="pointer-events-none absolute rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs shadow-md"
+          className="pointer-events-none absolute rounded-lg border border-gray-200 bg-surface px-2.5 py-1.5 text-xs shadow-md"
           style={{
             left: `${((paddingLeft + hoverIndex * barSlot + barSlot / 2) / width) * 100}%`,
             top: 0,

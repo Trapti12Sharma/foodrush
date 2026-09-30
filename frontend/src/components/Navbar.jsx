@@ -27,51 +27,68 @@ export default function Navbar() {
     logout();
   }
 
+  // Restaurant owners, riders and admins run their own consoles — the storefront
+  // controls (location picker, search, Restaurants, cart) are dead weight there and
+  // make the console look like a half-logged-out customer session. Signed-out
+  // visitors still get the full storefront nav.
+  const showStorefrontNav = !user || user.role === 'CUSTOMER';
+
   return (
-    <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
+    <header className="sticky top-0 z-30 border-b border-gray-200 bg-surface/90 shadow-lg shadow-black/20 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3">
-        <Link to="/" className="shrink-0 text-2xl font-extrabold text-brand-600">
-          Food<span className="text-gray-900">Rush</span>
+        <Link to="/" className="shrink-0 text-2xl font-extrabold tracking-tight">
+          <span className="bg-gradient-to-r from-brand-500 to-brand-700 bg-clip-text text-transparent">Food</span>
+          <span className="text-gray-900">Rush</span>
         </Link>
 
-        <button
-          type="button"
-          onClick={openPicker}
-          aria-label="Choose delivery location"
-          className="hidden shrink-0 items-center gap-1 rounded-md px-2 py-1 text-sm text-gray-600 hover:bg-gray-100 md:flex"
-        >
-          <MapPin size={16} className="text-brand-600" />
-          <span className="max-w-[10rem] truncate">{location?.label || 'Set location'}</span>
-        </button>
+        {showStorefrontNav && (
+          <>
+            <button
+              type="button"
+              onClick={openPicker}
+              aria-label="Choose delivery location"
+              className="hidden shrink-0 items-center gap-1 rounded-md px-2 py-1 text-sm text-gray-600 hover:bg-gray-100 md:flex"
+            >
+              <MapPin size={16} className="text-brand-600" />
+              <span className="max-w-[10rem] truncate">{location?.label || 'Set location'}</span>
+            </button>
 
-        <form onSubmit={submitSearch} className="hidden flex-1 md:block">
-          <div className="relative">
-            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search restaurants or food…"
-              className="w-full rounded-full border border-gray-200 bg-gray-50 py-2 pl-9 pr-4 text-sm outline-none focus:border-brand-400"
-            />
-          </div>
-        </form>
+            <form onSubmit={submitSearch} className="hidden flex-1 md:block">
+              <div className="relative">
+                <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search restaurants or food…"
+                  className="w-full rounded-full border border-gray-200 bg-gray-50 py-2 pl-9 pr-4 text-sm outline-none focus:border-brand-400"
+                />
+              </div>
+            </form>
+          </>
+        )}
 
         <nav className="ml-auto hidden items-center gap-4 md:flex">
-          <Link to="/restaurants" className="text-sm font-medium text-gray-700 hover:text-brand-600">
-            Restaurants
-          </Link>
-          <Link to="/cart" className="relative text-gray-700 hover:text-brand-600" aria-label="Cart">
-            <ShoppingCart size={20} />
-            {itemCount > 0 && (
-              <span className="absolute -right-2 -top-2 flex h-4 w-4 items-center justify-center rounded-full bg-brand-600 text-[10px] font-semibold text-white">
-                {itemCount > 9 ? '9+' : itemCount}
-              </span>
-            )}
-          </Link>
+          {showStorefrontNav && (
+            <>
+              <Link to="/restaurants" className="text-sm font-medium text-gray-700 hover:text-brand-600">
+                Restaurants
+              </Link>
+              <Link to="/cart" className="relative text-gray-700 hover:text-brand-600" aria-label="Cart">
+                <ShoppingCart size={20} />
+                {itemCount > 0 && (
+                  <span className="absolute -right-2 -top-2 flex h-4 w-4 items-center justify-center rounded-full bg-brand-600 text-[10px] font-semibold text-white">
+                    {itemCount > 9 ? '9+' : itemCount}
+                  </span>
+                )}
+              </Link>
+            </>
+          )}
 
           {user ? (
             <>
-            <NotificationBell />
+            {/* Each staff console renders its own bell, so showing this one too
+                just duplicates it in the header. */}
+            {showStorefrontNav && <NotificationBell />}
             <div className="relative">
               <button
                 type="button"
@@ -81,7 +98,7 @@ export default function Navbar() {
                 <User size={16} /> {user.name.split(' ')[0]}
               </button>
               {profileOpen && (
-                <div className="absolute right-0 mt-2 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                <div className="absolute right-0 mt-2 w-48 rounded-lg border border-gray-200 bg-surface py-1 shadow-lg">
                   {user.role === 'RESTAURANT_OWNER' && (
                     <Link
                       to="/restaurant/dashboard"
@@ -158,7 +175,7 @@ export default function Navbar() {
           ) : (
             <Link
               to="/login"
-              className="rounded-full bg-brand-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
+              className="rounded-full bg-gradient-to-r from-brand-600 to-brand-700 px-4 py-1.5 text-sm font-medium text-white shadow-sm transition hover:shadow-md hover:shadow-brand-200"
             >
               Login
             </Link>
@@ -177,38 +194,46 @@ export default function Navbar() {
 
       {mobileOpen && (
         <div className="border-t border-gray-200 px-4 py-3 md:hidden">
-          <button
-            type="button"
-            onClick={() => {
-              setMobileOpen(false);
-              openPicker();
-            }}
-            className="mb-3 flex w-full items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-left text-sm text-gray-700"
-          >
-            <MapPin size={16} className="shrink-0 text-brand-600" />
-            <span className="min-w-0 flex-1 truncate">
-              <span className="text-gray-400">Deliver to </span>
-              {location?.label || 'Set location'}
-            </span>
-          </button>
-          <form onSubmit={submitSearch} className="mb-3">
-            <div className="relative">
-              <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search restaurants or food…"
-                className="w-full rounded-full border border-gray-200 bg-gray-50 py-2 pl-9 pr-4 text-sm outline-none"
-              />
-            </div>
-          </form>
+          {showStorefrontNav && (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileOpen(false);
+                  openPicker();
+                }}
+                className="mb-3 flex w-full items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-left text-sm text-gray-700"
+              >
+                <MapPin size={16} className="shrink-0 text-brand-600" />
+                <span className="min-w-0 flex-1 truncate">
+                  <span className="text-gray-400">Deliver to </span>
+                  {location?.label || 'Set location'}
+                </span>
+              </button>
+              <form onSubmit={submitSearch} className="mb-3">
+                <div className="relative">
+                  <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search restaurants or food…"
+                    className="w-full rounded-full border border-gray-200 bg-gray-50 py-2 pl-9 pr-4 text-sm outline-none"
+                  />
+                </div>
+              </form>
+            </>
+          )}
           <div className="flex flex-col gap-1">
-            <Link to="/restaurants" onClick={() => setMobileOpen(false)} className="rounded px-2 py-2 text-sm hover:bg-gray-50">
-              Restaurants
-            </Link>
-            <Link to="/cart" onClick={() => setMobileOpen(false)} className="rounded px-2 py-2 text-sm hover:bg-gray-50">
-              Cart
-            </Link>
+            {showStorefrontNav && (
+              <>
+                <Link to="/restaurants" onClick={() => setMobileOpen(false)} className="rounded px-2 py-2 text-sm hover:bg-gray-50">
+                  Restaurants
+                </Link>
+                <Link to="/cart" onClick={() => setMobileOpen(false)} className="rounded px-2 py-2 text-sm hover:bg-gray-50">
+                  Cart
+                </Link>
+              </>
+            )}
             {user ? (
               <>
                 {user.role === 'RESTAURANT_OWNER' && (

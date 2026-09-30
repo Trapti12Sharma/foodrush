@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { Upload, X } from 'lucide-react';
 import { uploadService } from '../services/uploadService';
 import { configService } from '../services/configService';

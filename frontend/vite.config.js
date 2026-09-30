@@ -1,8 +1,16 @@
+import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  // Lets shared modules be imported by one stable path from any depth, rather
+  // than counting ../ hops differently in components/, pages/ and pages/owner/.
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
   server: {
     port: 5173,
   },

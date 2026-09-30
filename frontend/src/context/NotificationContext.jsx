@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { useAuth } from './AuthContext';
 import { notificationService } from '../services/notificationService';
 import { createSocket } from '../services/socketService';

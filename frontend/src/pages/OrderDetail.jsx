@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { ArrowLeft } from 'lucide-react';
 import { orderService } from '../services/orderService';
 import { useAuth } from '../context/AuthContext';
@@ -142,7 +142,7 @@ export default function OrderDetail() {
 
       <div className="mt-6">
         <p className="mb-2 text-sm font-semibold text-gray-700">Items</p>
-        <div className="divide-y divide-gray-100 rounded-xl border border-gray-100 bg-white">
+        <div className="divide-y divide-gray-100 rounded-xl border border-gray-100 bg-surface">
           {order.items.map((item, i) => (
             <div key={i} className="flex items-center justify-between p-3 text-sm">
               <div>
@@ -159,7 +159,7 @@ export default function OrderDetail() {
         </div>
       </div>
 
-      <div className="mt-6 space-y-1 rounded-xl border border-gray-100 bg-white p-4 text-sm">
+      <div className="mt-6 space-y-1 rounded-xl border border-gray-100 bg-surface p-4 text-sm">
         <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>₹{order.subtotal.toFixed(2)}</span></div>
         <div className="flex justify-between text-gray-600"><span>Delivery fee</span><span>₹{order.deliveryFee.toFixed(2)}</span></div>
         <div className="flex justify-between text-gray-600"><span>Tax</span><span>₹{order.tax.toFixed(2)}</span></div>
@@ -174,7 +174,7 @@ export default function OrderDetail() {
         </div>
       </div>
 
-      <div className="mt-6 rounded-xl border border-gray-100 bg-white p-4 text-sm">
+      <div className="mt-6 rounded-xl border border-gray-100 bg-surface p-4 text-sm">
         <p className="font-semibold text-gray-700">Delivery address</p>
         <p className="mt-1 text-gray-600">
           {order.deliveryAddress.addressLine}, {order.deliveryAddress.city}

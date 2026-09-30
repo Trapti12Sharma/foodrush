@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { MapPinned } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
@@ -51,7 +51,7 @@ function ProfileForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 rounded-xl border border-gray-200 bg-surface p-5 shadow-sm">
       <h2 className="text-lg font-semibold text-gray-900">Your details</h2>
 
       <ImageUploadField label="Profile photo" value={avatar} onChange={setAvatar} purpose="avatar" />
@@ -124,7 +124,7 @@ function PasswordForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 rounded-xl border border-gray-200 bg-surface p-5 shadow-sm">
       <h2 className="text-lg font-semibold text-gray-900">Change password</h2>
 
       <Field label="Current password" error={errors.currentPassword}>
@@ -165,7 +165,7 @@ function PasswordForm() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="rounded-lg bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isSubmitting ? 'Updating…' : 'Update password'}
         </button>
@@ -216,7 +216,7 @@ function NotificationPreferencesForm() {
   if (!preferences) return null;
 
   return (
-    <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    <div className="space-y-4 rounded-xl border border-gray-200 bg-surface p-5 shadow-sm">
       <h2 className="text-lg font-semibold text-gray-900">Email notifications</h2>
       <p className="text-xs text-gray-500">You'll always see these in your notification bell — this only controls what's also emailed to you.</p>
       <div className="divide-y divide-gray-100">
@@ -233,7 +233,7 @@ function NotificationPreferencesForm() {
               aria-label={`Toggle ${label}`}
               className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${preferences[key] ? 'bg-brand-600' : 'bg-gray-200'}`}
             >
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${preferences[key] ? 'translate-x-5' : 'translate-x-0.5'}`} />
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-surface shadow transition-transform ${preferences[key] ? 'translate-x-5' : 'translate-x-0.5'}`} />
             </button>
           </div>
         ))}
@@ -258,7 +258,7 @@ export default function Profile() {
 
       <Link
         to="/profile/addresses"
-        className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+        className="flex items-center gap-2 rounded-xl border border-gray-200 bg-surface p-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
       >
         <MapPinned size={16} className="text-brand-600" /> Manage saved addresses
       </Link>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { Pencil, Trash2, Flag } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { reviewService } from '../services/reviewService';
@@ -42,7 +42,7 @@ function ReviewForm({ initialValues, onSubmit, onCancel, submitting }) {
   const [comment, setComment] = useState(initialValues?.comment || '');
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4">
+    <div className="rounded-xl border border-gray-200 bg-surface p-4">
       <p className="mb-2 text-sm font-medium text-gray-700">Your rating</p>
       <StarRating value={rating} onChange={setRating} size={22} />
       <textarea
@@ -75,7 +75,7 @@ function ReportDialog({ open, onCancel, onSubmit, submitting }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
+      <div className="w-full max-w-sm rounded-xl bg-surface p-5 shadow-xl">
         <p className="font-semibold text-gray-900">Report this review</p>
         <p className="mt-1 text-sm text-gray-500">Your report is anonymous to other users and to the review's author.</p>
         <select

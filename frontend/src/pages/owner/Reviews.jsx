@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { Star, MessageSquare, Trash2 } from 'lucide-react';
 import { useRestaurantOwner } from '../../context/RestaurantOwnerContext';
 import { reviewService } from '../../services/reviewService';
@@ -118,7 +118,7 @@ export default function Reviews() {
       ) : (
         <div className="mt-6 space-y-4">
           {reviews.map((review) => (
-            <div key={review._id} className="rounded-xl border border-gray-200 bg-white p-4">
+            <div key={review._id} className="rounded-xl border border-gray-200 bg-surface p-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-gray-900">{review.user?.name || 'FoodRush user'}</p>
                 <span className="text-xs text-gray-400">{new Date(review.createdAt).toLocaleDateString()}</span>

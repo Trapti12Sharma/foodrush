@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { Upload, X, Image as ImageIcon } from 'lucide-react';
 import { adminService } from '../../services/adminService';
 import { restaurantService } from '../../services/restaurantService';
@@ -84,7 +84,7 @@ function KycReviewModal({ restaurant, onClose, onUpdated }) {
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-xl bg-surface p-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-gray-900">KYC review — {restaurant.name}</h2>
           <KycBadge status={restaurant.kycStatus} />
@@ -238,7 +238,7 @@ function ImageManagerModal({ restaurant, onClose, onUpdated }) {
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-md rounded-xl bg-surface p-6" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-lg font-bold text-gray-900">Manage images — {current.name}</h2>
         <p className="mt-1 text-xs text-gray-500">Each change is saved immediately — no separate save step.</p>
         <div className="mt-4 space-y-4">
@@ -349,7 +349,7 @@ export default function Restaurants() {
       ) : (
         <div className="mt-6 space-y-3">
           {restaurants.map((restaurant) => (
-            <div key={restaurant._id} className="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-4">
+            <div key={restaurant._id} className="flex items-center justify-between rounded-xl border border-gray-200 bg-surface p-4">
               <div className="flex items-center gap-3">
                 <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-gray-100 bg-gray-50">
                   {restaurant.image ? (

@@ -13,25 +13,27 @@ import { ORDER_STATUS_LABELS } from '../OrderStatusBadge';
 // REFUNDED had no entry at all. Refund states get their own amber-to-neutral
 // treatment: money going back is not a fulfilment failure like a cancellation,
 // but it is not a clean delivery either.
+// Same semantics, brightened one step for the dark theme — the original
+// mid-tones were mixed for white panels and read as muddy on a dark one.
 const COLOR_BY_STATUS = {
-  PLACED: '#fab219',
-  CONFIRMED: '#2a78d6',
-  PREPARING: '#2a78d6',
-  READY_FOR_PICKUP: '#2a78d6',
-  OUT_FOR_DELIVERY: '#2a78d6',
-  DELIVERED: '#0ca30c',
-  CANCELLED: '#d03b3b',
-  REJECTED: '#d03b3b',
-  REFUND_PENDING: '#b07d1a',
-  REFUNDED: '#8a7f6d',
+  PLACED: '#fbbf24',
+  CONFIRMED: '#60a5fa',
+  PREPARING: '#60a5fa',
+  READY_FOR_PICKUP: '#60a5fa',
+  OUT_FOR_DELIVERY: '#60a5fa',
+  DELIVERED: '#34d399',
+  CANCELLED: '#f87171',
+  REJECTED: '#f87171',
+  REFUND_PENDING: '#d4a72c',
+  REFUNDED: '#a99dc4',
 };
 
 const LEGEND = [
-  { label: 'Needs attention', color: '#fab219' },
-  { label: 'In progress', color: '#2a78d6' },
-  { label: 'Delivered', color: '#0ca30c' },
-  { label: 'Cancelled / rejected', color: '#d03b3b' },
-  { label: 'Refunded', color: '#8a7f6d' },
+  { label: 'Needs attention', color: '#fbbf24' },
+  { label: 'In progress', color: '#60a5fa' },
+  { label: 'Delivered', color: '#34d399' },
+  { label: 'Cancelled / rejected', color: '#f87171' },
+  { label: 'Refunded', color: '#a99dc4' },
 ];
 
 export default function StatusBreakdownChart({ data }) {

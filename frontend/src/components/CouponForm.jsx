@@ -26,7 +26,7 @@ export default function CouponForm({ onSubmit, submitting }) {
   }
 
   return (
-    <form onSubmit={handleSubmit(submit)} className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
+    <form onSubmit={handleSubmit(submit)} className="space-y-3 rounded-xl border border-gray-200 bg-surface p-4">
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-600">Code</label>

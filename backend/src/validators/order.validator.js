@@ -8,6 +8,13 @@ const createOrderValidator = [
 
 const updateStatusValidator = [
   body('status').isIn(Object.values(ORDER_STATUS)).withMessage('Invalid order status'),
+  // Only meaningful when accepting an order (-> CONFIRMED): how long the kitchen
+  // says it needs. Ignored for every other transition.
+  body('prepMinutes')
+    .optional()
+    .isInt({ min: 5, max: 180 })
+    .withMessage('Preparation time must be between 5 and 180 minutes')
+    .toInt(),
 ];
 
 const cancelOrderValidator = [body('reason').optional({ checkFalsy: true }).trim().isString()];

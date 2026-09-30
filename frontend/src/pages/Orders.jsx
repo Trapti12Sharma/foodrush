@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ClipboardList } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { orderService } from '../services/orderService';
 import OrderStatusBadge from '../components/OrderStatusBadge';
 import EmptyState from '../components/EmptyState';
@@ -45,7 +45,7 @@ export default function Orders() {
           <Link
             key={order._id}
             to={`/orders/${order._id}`}
-            className="block rounded-xl border border-gray-200 bg-white p-4 hover:shadow-sm"
+            className="block rounded-xl border border-gray-200 bg-surface p-4 hover:shadow-sm"
           >
             <div className="flex items-start justify-between gap-3">
               <div>

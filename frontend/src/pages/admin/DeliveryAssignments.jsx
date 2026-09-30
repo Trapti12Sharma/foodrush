@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { adminService } from '../../services/adminService';
 import ConfirmDialog from '../../components/ConfirmDialog';
 
@@ -48,7 +48,7 @@ function WaitingOrderRow({ order, onAssigned }) {
   }
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4">
+    <div className="rounded-xl border border-gray-200 bg-surface p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="font-medium text-gray-900">{order.restaurant?.name}</p>
@@ -167,7 +167,7 @@ export default function DeliveryAssignments() {
         {loading ? (
           <p className="mt-4 text-sm text-gray-400">Loading…</p>
         ) : (
-          <div className="mt-3 overflow-x-auto rounded-xl border border-gray-200 bg-white">
+          <div className="mt-3 overflow-x-auto rounded-xl border border-gray-200 bg-surface">
             <table className="w-full text-sm">
               <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-400">
                 <tr>

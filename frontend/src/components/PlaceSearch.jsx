@@ -97,7 +97,7 @@ export default function PlaceSearch({ onSelect, placeholder = 'Search for your a
       {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
 
       {suggestions.length > 0 && (
-        <ul role="listbox" className="mt-1 max-h-64 overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+        <ul role="listbox" className="mt-1 max-h-64 overflow-auto rounded-lg border border-gray-200 bg-surface shadow-lg">
           {suggestions.map((s) => (
             <li key={s.placeId} role="option" aria-selected="false">
               <button

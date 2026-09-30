@@ -1,6 +1,6 @@
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { authService } from '../services/authService';
 
 export default function ResetPassword() {

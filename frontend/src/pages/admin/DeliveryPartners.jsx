@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { adminService } from '../../services/adminService';
 import ConfirmDialog from '../../components/ConfirmDialog';
 
@@ -150,7 +150,7 @@ export default function DeliveryPartners() {
       ) : (
         <div className="mt-6 space-y-3">
           {partners.map((p) => (
-            <div key={p._id} className="rounded-xl border border-gray-200 bg-white p-4">
+            <div key={p._id} className="rounded-xl border border-gray-200 bg-surface p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-medium text-gray-900">{p.fullName}</p>
@@ -220,7 +220,7 @@ export default function DeliveryPartners() {
 
       {detail && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={() => setDetail(null)}>
-          <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl bg-surface p-6" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-bold text-gray-900">{detail.fullName}</h2>
             <p className="text-xs text-gray-400">{detail.user?.email} · {detail.phone}</p>
             <div className="mt-2 flex gap-2">

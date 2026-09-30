@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { ShoppingCart, Trash2 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -117,7 +117,7 @@ export default function Cart() {
         </Link>
       )}
 
-      <div className="mt-6 divide-y divide-gray-100 rounded-xl border border-gray-100 bg-white">
+      <div className="mt-6 divide-y divide-gray-100 rounded-xl border border-gray-100 bg-surface">
         {cart.items.map((item) => (
           <div key={item._id} className="flex items-center gap-4 p-4">
             <SmartImage src={item.food?.image} alt={item.food?.name || 'Item'} widths={[128, 192]} sizes="64px" className="h-16 w-16 shrink-0 rounded-lg" />
@@ -154,7 +154,7 @@ export default function Cart() {
         ))}
       </div>
 
-      <div className="mt-6 space-y-2 rounded-xl border border-gray-100 bg-white p-4">
+      <div className="mt-6 space-y-2 rounded-xl border border-gray-100 bg-surface p-4">
         <Row label="Subtotal" value={cart.subtotal} />
         <Row label="Delivery fee" value={cart.deliveryFee} />
         <Row label="Tax" value={cart.tax} />

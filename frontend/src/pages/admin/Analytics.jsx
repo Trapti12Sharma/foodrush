@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { Wallet, CheckCircle2, XCircle, Users, Store, TrendingUp } from 'lucide-react';
 import { adminService } from '../../services/adminService';
 import DateRangePicker, { DEFAULT_RANGE } from '../../components/analytics/DateRangePicker';
@@ -16,7 +16,7 @@ const count = (value) => (value === null || value === undefined ? null : Number(
 // explanation instead, and any other failure still surfaces as a real error.
 function Section({ title, subtitle, state, children }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4">
+    <div className="rounded-xl border border-gray-200 bg-surface p-4">
       <div className="mb-3">
         <h2 className="text-sm font-semibold text-gray-700">{title}</h2>
         {subtitle && <p className="mt-0.5 text-xs text-gray-400">{subtitle}</p>}

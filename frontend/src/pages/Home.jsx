@@ -91,15 +91,24 @@ export default function Home() {
 
   return (
     <div>
-      <section className="bg-gradient-to-b from-brand-50 to-white">
-        <div className="mx-auto max-w-4xl px-4 py-16 text-center">
-          <h1 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">Food you love, delivered fast.</h1>
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#1a0f33] via-[#140d26] to-[#0f0b16]">
+        {/* Soft decorative glow blobs — purely cosmetic, clipped by overflow-hidden above */}
+        <div className="pointer-events-none absolute -left-24 -top-24 h-96 w-96 rounded-full bg-brand-600/25 blur-3xl" aria-hidden="true" />
+        <div className="pointer-events-none absolute -right-16 top-10 h-72 w-72 rounded-full bg-accent-500/15 blur-3xl" aria-hidden="true" />
+        <div className="pointer-events-none absolute bottom-0 left-1/3 h-64 w-64 rounded-full bg-brand-500/15 blur-3xl" aria-hidden="true" />
+
+        <div className="relative mx-auto max-w-4xl px-4 py-20 text-center sm:py-24">
+          <h1 className="text-4xl font-extrabold text-white sm:text-5xl">
+            Food you love,{' '}
+            <span className="bg-gradient-to-r from-brand-500 to-accent-400 bg-clip-text text-transparent">delivered fast.</span>
+          </h1>
           <p className="mx-auto mt-3 max-w-xl text-gray-500">Order from the best local restaurants — or list your own on FoodRush.</p>
+
 
           <button
             type="button"
             onClick={openPicker}
-            className="mx-auto mt-6 flex max-w-xl items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2.5 text-left text-sm shadow-sm hover:border-brand-400"
+            className="mx-auto mt-6 flex max-w-xl items-center gap-2 rounded-full border border-gray-200 bg-surface px-4 py-2.5 text-left text-sm shadow-sm transition hover:border-brand-400 hover:shadow-md"
           >
             <MapPin size={16} className="shrink-0 text-brand-600" />
             <span className="min-w-0 flex-1 truncate">
@@ -116,10 +125,10 @@ export default function Home() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search for restaurants or food…"
-                className="w-full rounded-full border border-gray-200 bg-white py-3 pl-10 pr-4 text-sm shadow-sm outline-none focus:border-brand-400"
+                className="w-full rounded-full border border-gray-200 bg-surface py-3 pl-10 pr-4 text-sm shadow-sm outline-none focus:border-brand-400"
               />
             </div>
-            <button type="submit" className="rounded-full bg-brand-600 px-6 py-3 text-sm font-semibold text-white hover:bg-brand-700">
+            <button type="submit" className="rounded-full bg-gradient-to-r from-brand-600 to-brand-700 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:shadow-md hover:shadow-brand-200">
               Search
             </button>
           </form>
@@ -133,7 +142,7 @@ export default function Home() {
             <Link
               key={c.label}
               to={`/search?q=${encodeURIComponent(c.label)}`}
-              className="flex flex-col items-center gap-1 rounded-xl border border-gray-100 bg-white p-3 text-center shadow-sm transition hover:shadow-md"
+              className="flex flex-col items-center gap-1 rounded-xl border border-gray-100 bg-surface p-3 text-center shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-md"
             >
               <span className="text-2xl">{c.emoji}</span>
               <span className="text-xs font-medium text-gray-700">{c.label}</span>
@@ -145,13 +154,13 @@ export default function Home() {
       <section className="mx-auto max-w-7xl px-4">
         <Link
           to="/search?hasOffer=true"
-          className="flex items-center justify-between rounded-xl bg-brand-600 px-6 py-5 text-white shadow-sm transition hover:bg-brand-700"
+          className="flex items-center justify-between rounded-xl bg-gradient-to-r from-brand-600 to-brand-800 px-6 py-5 text-white shadow-sm transition hover:from-brand-700 hover:to-brand-900"
         >
           <div className="flex items-center gap-3">
             <Tag size={22} />
             <div>
               <p className="font-semibold">Deals of the day</p>
-              <p className="text-sm text-brand-100">Browse items with a live discount, across restaurants</p>
+              <p className="text-sm text-white/75">Browse items with a live discount, across restaurants</p>
             </div>
           </div>
           <span className="text-sm font-medium underline">View offers</span>

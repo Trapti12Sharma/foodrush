@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { Plus, Tag, X } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -255,7 +255,7 @@ export default function Checkout() {
       <section className="mt-8">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">2. Review your order</h2>
         <p className="mb-2 text-sm text-gray-500">{cart.restaurant?.name}</p>
-        <div className="divide-y divide-gray-100 rounded-xl border border-gray-100 bg-white">
+        <div className="divide-y divide-gray-100 rounded-xl border border-gray-100 bg-surface">
           {cart.items.map((item) => (
             <div key={item._id} className="flex items-center justify-between p-3 text-sm">
               <div>
@@ -316,13 +316,13 @@ export default function Checkout() {
       <section className="mt-8">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">4. Payment method</h2>
         <div className="space-y-2">
-          <label className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-4 text-sm">
+          <label className="flex items-center gap-3 rounded-xl border border-gray-200 bg-surface p-4 text-sm">
             <input type="radio" name="payment" checked={paymentMethod === 'COD'} onChange={() => setPaymentMethod('COD')} />
             Cash on Delivery
           </label>
           <label
             className={`flex items-center justify-between gap-3 rounded-xl border p-4 text-sm ${
-              onlinePaymentsEnabled ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 text-gray-400'
+              onlinePaymentsEnabled ? 'border-gray-200 bg-surface' : 'border-gray-100 bg-gray-50 text-gray-400'
             }`}
           >
             <span className="flex items-center gap-3">
@@ -341,7 +341,7 @@ export default function Checkout() {
       </section>
 
       {/* Totals + place order */}
-      <section className="mt-8 space-y-2 rounded-xl border border-gray-100 bg-white p-4">
+      <section className="mt-8 space-y-2 rounded-xl border border-gray-100 bg-surface p-4">
         <Row label="Subtotal" value={cart.subtotal} />
         <Row label="Delivery fee" value={cart.deliveryFee} />
         <Row label="Tax" value={cart.tax} />

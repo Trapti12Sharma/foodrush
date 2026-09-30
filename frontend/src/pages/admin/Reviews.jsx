@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { Flag } from 'lucide-react';
 import { adminService } from '../../services/adminService';
 import StarRating from '../../components/StarRating';
@@ -52,7 +52,7 @@ function ReviewDetailModal({ reviewId, onClose, onChanged }) {
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6" onClick={(e) => e.stopPropagation()}>
+      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl bg-surface p-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs text-gray-400">{review.restaurant?.name} · order #{review.order?.orderNumber}</p>
@@ -202,7 +202,7 @@ export default function Reviews() {
     <div>
       <h1 className="text-2xl font-bold text-gray-900">Reviews</h1>
 
-      <form onSubmit={applyFilters} className="mt-4 grid grid-cols-2 gap-2 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-4">
+      <form onSubmit={applyFilters} className="mt-4 grid grid-cols-2 gap-2 rounded-xl border border-gray-200 bg-surface p-4 sm:grid-cols-4">
         <select
           value={filters.moderationStatus}
           onChange={(e) => setFilters((f) => ({ ...f, moderationStatus: e.target.value }))}
@@ -235,7 +235,7 @@ export default function Reviews() {
       {loading ? (
         <p className="mt-4 text-sm text-gray-400">Loading…</p>
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200 bg-surface">
           <table className="w-full text-sm">
             <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-400">
               <tr>

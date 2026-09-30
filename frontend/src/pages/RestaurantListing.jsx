@@ -155,7 +155,7 @@ export default function RestaurantListing() {
         </p>
       )}
 
-      <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white p-3">
+      <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-surface p-3">
         <SlidersHorizontal size={16} className="text-gray-400" />
         <input
           key={`search-${search}`}

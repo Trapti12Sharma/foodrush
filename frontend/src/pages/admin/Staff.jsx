@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { UserPlus, Mail, ShieldOff, Info } from 'lucide-react';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../context/AuthContext';
@@ -49,7 +49,7 @@ function InviteForm({ roles, onCreated, onCancel }) {
   }
 
   return (
-    <form onSubmit={submit} className="rounded-xl border border-gray-200 bg-white p-5">
+    <form onSubmit={submit} className="rounded-xl border border-gray-200 bg-surface p-5">
       <h2 className="text-sm font-semibold text-gray-900">Invite a team member</h2>
       <p className="mt-1 text-xs text-gray-500">
         They receive an email with a single-use link to set their own password. You never see or choose it. The link lasts 7 days.
@@ -243,7 +243,7 @@ export default function Staff() {
         </form>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-surface">
         <table className="min-w-full text-sm">
           <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
             <tr>
@@ -337,7 +337,7 @@ export default function Staff() {
       </div>
 
       {matrix && (
-        <section className="rounded-xl border border-gray-200 bg-white p-5">
+        <section className="rounded-xl border border-gray-200 bg-surface p-5">
           <h2 className="text-sm font-semibold text-gray-900">What each role can do</h2>
           <p className="mt-1 text-xs text-gray-500">Served from the server&apos;s own permission table, so this is exactly what the API enforces.</p>
           <div className="mt-4 overflow-x-auto">

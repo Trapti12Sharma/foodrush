@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 
 export default function Footer() {
   return (
-    <footer className="mt-16 border-t border-gray-200 bg-white">
+    <footer className="mt-16 border-t border-gray-200 bg-surface">
       <div className="mx-auto max-w-7xl px-4 py-10">
         <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
           <div>
@@ -27,8 +27,15 @@ export default function Footer() {
             </ul>
           </div>
           <div>
-            <p className="text-sm font-semibold text-gray-900">Company</p>
-            <p className="mt-2 text-sm text-gray-500">An original, independent food-delivery platform. Not affiliated with any other delivery brand.</p>
+            <p className="text-sm font-semibold text-gray-900">Partner with us</p>
+            <ul className="mt-2 space-y-1 text-sm text-gray-500">
+              <li>
+                <Link to="/partner-with-us" className="font-medium text-brand-600 hover:underline">
+                  Onboard your restaurant
+                </Link>
+              </li>
+            </ul>
+            <p className="mt-3 text-sm text-gray-500">An original, independent food-delivery platform. Not affiliated with any other delivery brand.</p>
           </div>
         </div>
         <p className="mt-8 border-t border-gray-100 pt-6 text-center text-xs text-gray-400">

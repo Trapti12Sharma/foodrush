@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { adminService } from '../../services/adminService';
 import OrderStatusBadge from '../../components/OrderStatusBadge';
 
@@ -52,7 +52,7 @@ export default function Orders() {
       {loading ? (
         <p className="mt-8 text-sm text-gray-400">Loading…</p>
       ) : (
-        <div className="mt-6 overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        <div className="mt-6 overflow-x-auto rounded-xl border border-gray-200 bg-surface">
           <table className="w-full text-sm">
             <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-400">
               <tr>

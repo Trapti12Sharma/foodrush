@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { Star, Clock, Bike, Heart, MapPin, Leaf } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
 import SmartImage from './SmartImage';
@@ -35,7 +35,7 @@ export default function RestaurantCard({ restaurant }) {
   return (
     <Link
       to={`/restaurants/${restaurant._id}`}
-      className="group block overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition hover:shadow-md"
+      className="group block overflow-hidden rounded-2xl border border-gray-200 bg-surface shadow-sm transition duration-300 hover:-translate-y-1 hover:border-brand-600/60 hover:shadow-xl hover:shadow-brand-900/40"
     >
       <div className="relative w-full overflow-hidden bg-gray-100">
         <SmartImage
@@ -46,7 +46,7 @@ export default function RestaurantCard({ restaurant }) {
           className={`w-full transition duration-300 group-hover:scale-105 ${closed ? 'grayscale' : ''}`}
         />
         {restaurant.hasOffer && !closed && (
-          <span className="absolute left-2 top-2 rounded bg-brand-600 px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm">
+          <span className="absolute left-2 top-2 rounded-full bg-gradient-to-r from-brand-600 to-brand-500 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm">
             Offers available
           </span>
         )}
@@ -59,7 +59,7 @@ export default function RestaurantCard({ restaurant }) {
           type="button"
           onClick={handleHeartClick}
           aria-label={favorited ? 'Remove from favorites' : 'Add to favorites'}
-          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm hover:bg-white"
+          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-surface/90 shadow-sm backdrop-blur transition hover:bg-surface hover:scale-110"
         >
           <Heart size={16} className={favorited ? 'fill-red-500 text-red-500' : 'text-gray-500'} />
         </button>
@@ -67,7 +67,7 @@ export default function RestaurantCard({ restaurant }) {
       <div className="p-4">
         <div className="flex items-start justify-between gap-2">
           <h3 className="font-semibold text-gray-900 line-clamp-1">{restaurant.name}</h3>
-          <span className="flex shrink-0 items-center gap-1 rounded bg-green-600 px-1.5 py-0.5 text-xs font-medium text-white">
+          <span className="flex shrink-0 items-center gap-1 rounded-full bg-green-600 px-2 py-0.5 text-xs font-medium text-white">
             <Star size={12} fill="white" /> {restaurant.totalReviews > 0 ? restaurant.rating.toFixed(1) : 'New'}
           </span>
         </div>

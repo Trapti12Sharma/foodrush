@@ -377,8 +377,8 @@ async function getDeliveryOtp(user, orderId) {
   };
 }
 
-async function updateOrderStatus(user, orderId, nextStatus) {
-  const order = await Order.findById(orderId).populate('restaurant', 'owner');
+async function updateOrderStatus(user, orderId, nextStatus, { prepMinutes } = {}) {
+  const order = await Order.findById(orderId).populate('restaurant', 'owner deliveryTime');
   if (!order) throw ApiError.notFound('Order not found');
 
   const isOwner = user.role === ROLES.RESTAURANT_OWNER && order.restaurant.owner.toString() === user._id.toString();
@@ -392,6 +392,16 @@ async function updateOrderStatus(user, orderId, nextStatus) {
 
   order.orderStatus = nextStatus;
   order.statusHistory.push({ status: nextStatus, changedBy: user._id });
+
+  // When the kitchen accepts and says how long it needs, re-base the customer's ETA
+  // on that promise: cook time from now, plus the restaurant's usual travel time.
+  // Without it the ETA keeps counting from when the order was placed, which is
+  // already stale by the time anyone looks at it.
+  if (nextStatus === ORDER_STATUS.CONFIRMED && prepMinutes) {
+    const travelMinutes = order.restaurant.deliveryTime || 0;
+    order.estimatedDeliveryTime = new Date(Date.now() + (prepMinutes + travelMinutes) * 60 * 1000);
+  }
+
   await order.save();
 
   const notifyData = { orderId: order._id, orderNumber: order.orderNumber };

@@ -104,7 +104,7 @@ const restaurantSchema = new mongoose.Schema(
     // How far from `location` this restaurant will deliver, in km.
     deliveryRadiusKm: {
       type: Number,
-      default: 5,
+      default: 20,
       min: 0.5,
       max: 50,
     },

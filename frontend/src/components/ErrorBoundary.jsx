@@ -69,7 +69,7 @@ export default class ErrorBoundary extends Component {
 
     return (
       <div className="flex min-h-[60vh] items-center justify-center px-4 py-12">
-        <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-6 text-center">
+        <div className="w-full max-w-md rounded-xl border border-gray-200 bg-surface p-6 text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-amber-600">
             <AlertTriangle size={22} />
           </div>

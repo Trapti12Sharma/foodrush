@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { CheckCircle2, LocateFixed } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import ImageUploadField from './ImageUploadField';
 import PlaceSearch from './PlaceSearch';
 import { useDeliveryLocation } from '../context/LocationContext';
@@ -64,7 +64,7 @@ export default function CreateRestaurantForm({ onSubmit, submitting }) {
   }
 
   return (
-    <form onSubmit={handleSubmit(submit)} className="mx-auto max-w-lg space-y-4 rounded-xl border border-gray-200 bg-white p-6">
+    <form onSubmit={handleSubmit(submit)} className="mx-auto max-w-lg space-y-4 rounded-xl border border-gray-200 bg-surface p-6">
       <ImageUploadField label="Restaurant image" value={image} onChange={setImage} purpose="restaurant" />
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">Restaurant name</label>

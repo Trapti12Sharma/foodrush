@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { useRestaurantOwner } from '../../context/RestaurantOwnerContext';
 import { restaurantService } from '../../services/restaurantService';
 import { CheckCircle2, LocateFixed } from 'lucide-react';
@@ -127,14 +127,22 @@ export default function Profile() {
         Status: {selectedRestaurant.isApproved ? 'Approved' : 'Pending admin approval'} (admin-controlled)
       </p>
 
-      <div className="mt-6 max-w-lg">
+      {/* Was pinned to max-w-lg, which left this page as a narrow ribbon of
+          controls down the left of a wide dashboard. The form now uses the
+          available width and lays its short fields out side by side. */}
+      <div className="mt-6 max-w-4xl">
         <KycSection restaurant={selectedRestaurant} onUpdated={refresh} />
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="mt-6 max-w-lg space-y-4">
-        <ImageUploadField label="Card image (shown in listings)" value={image} onChange={setImage} purpose="restaurant" />
-        <ImageUploadField label="Cover banner (top of your page — wide, e.g. 3:1)" value={coverImage} onChange={setCoverImage} purpose="restaurant" />
-        <ImageUploadField label="Logo" value={logo} onChange={setLogo} purpose="restaurant" />
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="mt-6 max-w-4xl space-y-4 rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.07] to-white/[0.02] p-6 shadow-lg shadow-black/20 backdrop-blur-xl"
+      >
+        <div className="grid gap-4 sm:grid-cols-3">
+          <ImageUploadField label="Card image (shown in listings)" value={image} onChange={setImage} purpose="restaurant" />
+          <ImageUploadField label="Cover banner (wide, e.g. 3:1)" value={coverImage} onChange={setCoverImage} purpose="restaurant" />
+          <ImageUploadField label="Logo" value={logo} onChange={setLogo} purpose="restaurant" />
+        </div>
         <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
           <input type="checkbox" {...register('isOpen')} /> Open for orders right now
         </label>
@@ -148,13 +156,15 @@ export default function Profile() {
           <OpeningHoursEditor slots={hoursSlots} onChange={setHoursSlots} />
         </div>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Name</label>
-          <input {...register('name', { required: true })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Cuisine (comma separated)</label>
-          <input {...register('cuisine', { required: true })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Name</label>
+            <input {...register('name', { required: true })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Cuisine (comma separated)</label>
+            <input {...register('cuisine', { required: true })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          </div>
         </div>
         <div className="space-y-2 rounded-lg bg-gray-50 p-3">
           <p className="text-sm font-medium text-gray-700">Restaurant location</p>

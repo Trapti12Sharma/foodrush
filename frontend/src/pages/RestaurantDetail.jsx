@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Star, Clock, Bike, Wallet, ArrowLeft, Heart, ChevronDown, Sparkles } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { restaurantService } from '../services/restaurantService';
 import { foodService } from '../services/foodService';
 import EmptyState from '../components/EmptyState';
@@ -40,7 +40,7 @@ function OpeningHoursSummary({ restaurant }) {
                 {label}: {byDay.get(day).map((s) => `${minutesToHHMM(s.open)}–${minutesToHHMM(s.close)}`).join(', ')}
               </li>
             ) : (
-              <li key={day} className="text-gray-300">
+              <li key={day} className="text-gray-400">
                 {label}: closed
               </li>
             )
@@ -210,7 +210,7 @@ export default function RestaurantDetail() {
               <h2 className="mb-3 flex items-center gap-1.5 text-lg font-bold text-gray-900">
                 <Sparkles size={18} className="text-brand-600" /> Recommended
               </h2>
-              <div className="divide-y divide-gray-100 rounded-xl border border-gray-100 bg-white">
+              <div className="divide-y divide-gray-100 rounded-xl border border-gray-100 bg-surface">
                 {recommended.map((food) => (
                   <FoodMenuItem key={`rec-${food._id}`} food={food} requestAdd={requestAdd} disabled={!restaurant.isOpenNow} />
                 ))}
@@ -225,7 +225,7 @@ export default function RestaurantDetail() {
           {groupedMenu.map(([categoryName, items]) => (
             <section key={categoryName}>
               <h2 className="mb-3 text-lg font-bold text-gray-900">{categoryName}</h2>
-              <div className="divide-y divide-gray-100 rounded-xl border border-gray-100 bg-white">
+              <div className="divide-y divide-gray-100 rounded-xl border border-gray-100 bg-surface">
                 {items.map((food) => (
                   <FoodMenuItem key={food._id} food={food} requestAdd={requestAdd} disabled={!restaurant.isOpenNow} />
                 ))}

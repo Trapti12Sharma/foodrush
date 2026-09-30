@@ -44,7 +44,7 @@ export default function AdminLayout() {
   // three-line change is applied identically in the owner and delivery layouts.
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6 md:flex-row md:gap-6">
-      <aside className="w-full shrink-0 rounded-xl border border-gray-200 bg-white p-4 md:w-56 md:rounded-none md:border-0 md:border-r">
+      <aside className="w-full shrink-0 rounded-xl border border-gray-200 bg-surface p-4 md:w-56 md:rounded-none md:border-0 md:border-r">
         <p className="mb-4 text-sm font-semibold text-gray-900">Admin</p>
         <nav className="-mx-1 flex gap-1 overflow-x-auto px-1 md:mx-0 md:block md:space-y-1 md:overflow-visible md:px-0">
           {navItems.map(({ to, label, icon: Icon }) => (

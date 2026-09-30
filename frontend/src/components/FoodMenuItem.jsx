@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Plus, Award, Sparkles } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { useCart } from '../context/CartContext';
 import QuantityStepper from './QuantityStepper';
 import SmartImage from './SmartImage';
@@ -155,7 +155,7 @@ export default function FoodMenuItem({ food, requestAdd, disabled }) {
                     <label
                       key={variant._id}
                       className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-sm ${
-                        variant.isAvailable ? 'cursor-pointer border-gray-200 bg-white' : 'cursor-not-allowed border-gray-100 bg-gray-100 text-gray-400'
+                        variant.isAvailable ? 'cursor-pointer border-gray-200 bg-surface' : 'cursor-not-allowed border-gray-100 bg-gray-100 text-gray-400'
                       }`}
                     >
                       <span className="flex items-center gap-2">
