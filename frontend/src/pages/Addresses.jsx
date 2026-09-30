@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Plus, MapPinOff } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { addressService } from '../services/addressService';
 import AddressCard from '../components/AddressCard';
 import AddressForm from '../components/AddressForm';

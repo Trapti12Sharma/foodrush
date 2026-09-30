@@ -1,19 +1,21 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { adminService } from '../../services/adminService';
 import OrderStatusBadge from '../../components/OrderStatusBadge';
 
 const STATUS_FILTERS = [
   { value: '', label: 'All' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'confirmed', label: 'Confirmed' },
-  { value: 'preparing', label: 'Preparing' },
-  { value: 'ready_for_pickup', label: 'Ready for pickup' },
-  { value: 'out_for_delivery', label: 'Out for delivery' },
-  { value: 'delivered', label: 'Delivered' },
-  { value: 'cancelled', label: 'Cancelled' },
-  { value: 'rejected', label: 'Rejected' },
+  { value: 'PLACED', label: 'Placed' },
+  { value: 'CONFIRMED', label: 'Confirmed' },
+  { value: 'PREPARING', label: 'Preparing' },
+  { value: 'READY_FOR_PICKUP', label: 'Ready for pickup' },
+  { value: 'OUT_FOR_DELIVERY', label: 'Out for delivery' },
+  { value: 'DELIVERED', label: 'Delivered' },
+  { value: 'CANCELLED', label: 'Cancelled' },
+  { value: 'REJECTED', label: 'Rejected' },
+  { value: 'REFUND_PENDING', label: 'Refund pending' },
+  { value: 'REFUNDED', label: 'Refunded' },
 ];
 
 export default function Orders() {
@@ -50,7 +52,7 @@ export default function Orders() {
       {loading ? (
         <p className="mt-8 text-sm text-gray-400">Loading…</p>
       ) : (
-        <div className="mt-6 overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        <div className="mt-6 overflow-x-auto rounded-xl border border-gray-200 bg-surface">
           <table className="w-full text-sm">
             <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-400">
               <tr>

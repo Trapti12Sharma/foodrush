@@ -3,12 +3,16 @@ const FoodItem = require('../models/FoodItem');
 const Restaurant = require('../models/Restaurant');
 const ApiError = require('../utils/ApiError');
 const couponService = require('./coupon.service');
-
-const TAX_RATE = 0.05; // flat 5% — a real deployment would vary this by jurisdiction/item
+const pricing = require('./pricing.service');
+const platformSettingService = require('./platformSetting.service');
+const { MAX_NOTE_LENGTH } = require('../validators/cart.validator');
 
 const POPULATE_PATHS = [
   { path: 'items.food', select: 'name image isVeg' },
-  { path: 'restaurant', select: 'name image isOpen deliveryFee minimumOrder' },
+  // openingHours/timezone are included so the isOpenNow virtual (used by the frontend to
+  // warn "this restaurant is closed" before checkout) reflects the real schedule, not just
+  // the manual isOpen switch.
+  { path: 'restaurant', select: 'name image isOpen openingHours timezone deliveryFee minimumOrder' },
 ];
 
 async function getOrCreateCart(userId) {
@@ -22,6 +26,13 @@ function addonKey(addons) {
     .map((a) => `${a.name}:${a.price}`)
     .sort()
     .join('|');
+}
+
+// Two lines for the same food are the same cart line only if their add-ons, chosen
+// variant AND note all match — a different note (e.g. "no onions") is deliberately kept
+// as its own line rather than merged into one with an ambiguous instruction.
+function lineKey(item) {
+  return `${addonKey(item.addons)}::${item.variantId || ''}::${item.note || ''}`;
 }
 
 // Drops items whose FoodItem was deleted/made unavailable, recomputes every
@@ -59,28 +70,32 @@ async function applyCatalogPricing(cart, restaurant) {
   cart.items = cart.items.filter((item) => {
     const food = foodMap.get(item.food.toString());
     if (!food || !food.isAvailable) return false;
-    item.price = food.effectivePrice();
+    // The catalog changed under this line (variants added/removed since it was added, or
+    // the chosen variant/no-longer-exists) — safest to drop it rather than guess a price.
+    const hasVariants = food.variants && food.variants.length > 0;
+    if (Boolean(item.variantId) !== hasVariants) return false;
+    const price = pricing.unitPriceFor(food, item.variantId);
+    if (price == null) return false;
+    item.price = price;
     return true;
   });
 
   if (cart.items.length === 0) return; // recalculate() zeroes totals and clears the restaurant lock
 
-  const subtotal = cart.items.reduce((sum, item) => {
-    const addonsTotal = item.addons.reduce((a, addon) => a + addon.price, 0);
-    return sum + (item.price + addonsTotal) * item.quantity;
-  }, 0);
+  const subtotal = pricing.subtotalOf(cart.items);
 
   let discount = 0;
   if (cart.couponCode) {
-    const result = await couponService.validateCoupon(cart.couponCode, subtotal).catch(() => null);
+    const context = { restaurantId: restaurant._id, city: restaurant.city, userId: cart.user };
+    const result = await couponService.validateCoupon(cart.couponCode, subtotal, context).catch(() => null);
     if (result) discount = result.discountAmount;
     else cart.couponCode = null; // coupon no longer valid for this cart — drop it rather than show a stale discount
   }
 
-  const tax = Math.round(subtotal * TAX_RATE * 100) / 100;
-  const total = Math.max(subtotal + restaurant.deliveryFee + tax - discount, 0);
-
-  Object.assign(cart, { subtotal, deliveryFee: restaurant.deliveryFee, tax, discount, total });
+  // M17 — the tax rate is admin-configurable, read once per recalculation so a
+  // cart's tax and total always come from the same rate.
+  const taxRate = await platformSettingService.getTaxRate();
+  Object.assign(cart, pricing.computeTotals({ subtotal, deliveryFee: restaurant.deliveryFee, discount, taxRate }));
 }
 
 async function finalize(cart) {
@@ -97,7 +112,7 @@ async function getCart(userId) {
   return finalize(cart);
 }
 
-async function addItem(userId, { foodId, quantity = 1, addons = [] }) {
+async function addItem(userId, { foodId, quantity = 1, addons = [], variantId, note }) {
   if (quantity < 1) throw ApiError.badRequest('Quantity must be at least 1');
 
   const food = await FoodItem.findById(foodId);
@@ -108,6 +123,18 @@ async function addItem(userId, { foodId, quantity = 1, addons = [] }) {
   if (!restaurant || !restaurant.isApproved || !restaurant.isActive) {
     throw ApiError.notFound('Restaurant not found');
   }
+
+  const hasVariants = food.variants && food.variants.length > 0;
+  let variant = null;
+  if (hasVariants) {
+    if (!variantId) throw ApiError.badRequest('Please choose an option (e.g. size) for this item');
+    variant = food.variants.id(variantId);
+    if (!variant || !variant.isAvailable) throw ApiError.badRequest('That option is currently unavailable');
+  } else if (variantId) {
+    throw ApiError.badRequest('This item does not have selectable options');
+  }
+  const unitPrice = pricing.unitPriceFor(food, variantId);
+  const normalizedNote = (note || '').trim().slice(0, MAX_NOTE_LENGTH);
 
   // Validate every requested addon against the food's own addon list — price
   // always comes from that match, never from what the client sent.
@@ -137,13 +164,15 @@ async function addItem(userId, { foodId, quantity = 1, addons = [] }) {
 
   cart.restaurant = restaurant._id;
 
-  const existingLine = cart.items.find(
-    (item) => item.food.toString() === food._id.toString() && addonKey(item.addons) === addonKey(validatedAddons)
-  );
+  const candidate = { addons: validatedAddons, variantId: variantId || null, note: normalizedNote };
+  const existingLine = cart.items.find((item) => item.food.toString() === food._id.toString() && lineKey(item) === lineKey(candidate));
   if (existingLine) {
     existingLine.quantity += quantity;
   } else {
-    cart.items.push({ food: food._id, quantity, price: food.effectivePrice(), addons: validatedAddons });
+    cart.items.push({
+      food: food._id, quantity, price: unitPrice, addons: validatedAddons,
+      variantId: variantId || null, variantName: variant ? variant.name : null, note: normalizedNote,
+    });
   }
 
   await recalculate(cart);
@@ -192,10 +221,18 @@ async function applyCoupon(userId, code) {
   cart.couponCode = null;
   await recalculate(cart);
 
-  const { coupon, discountAmount } = await couponService.validateCoupon(code, cart.subtotal);
+  const restaurant = await Restaurant.findById(cart.restaurant);
+  if (!restaurant) throw ApiError.badRequest('Your cart has no restaurant selected');
+  const context = { restaurantId: restaurant._id, city: restaurant.city, userId: cart.user };
+  const { coupon, discountAmount } = await couponService.validateCoupon(code, cart.subtotal, context);
   cart.couponCode = coupon.code;
   cart.discount = discountAmount;
-  cart.total = Math.max(cart.subtotal + cart.deliveryFee + cart.tax - discountAmount, 0);
+  cart.total = pricing.computeTotals({
+    subtotal: cart.subtotal,
+    deliveryFee: cart.deliveryFee,
+    discount: discountAmount,
+    taxRate: await platformSettingService.getTaxRate(),
+  }).total;
 
   return finalize(cart);
 }

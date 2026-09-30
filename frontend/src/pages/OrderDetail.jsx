@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { ArrowLeft } from 'lucide-react';
 import { orderService } from '../services/orderService';
 import { useAuth } from '../context/AuthContext';
 import OrderStatusBadge from '../components/OrderStatusBadge';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EmptyState from '../components/EmptyState';
+import DeliveryTracker from '../components/DeliveryTracker';
+import DeliveryOtpCard from '../components/DeliveryOtpCard';
+import { loadRazorpayScript, openRazorpayCheckout } from '../utils/razorpay';
 
-const CUSTOMER_CANCELLABLE_STATUSES = ['pending', 'confirmed'];
+const CUSTOMER_CANCELLABLE_STATUSES = ['PLACED', 'CONFIRMED'];
+const RETRYABLE_STATUSES = ['PLACED', 'CONFIRMED'];
 
 export default function OrderDetail() {
   const { id } = useParams();
@@ -18,6 +22,7 @@ export default function OrderDetail() {
   const [error, setError] = useState(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [payingAgain, setPayingAgain] = useState(false);
 
   function load() {
     setLoading(true);
@@ -26,6 +31,14 @@ export default function OrderDetail() {
       .then(setOrder)
       .catch((err) => setError(err.message || 'Order not found'))
       .finally(() => setLoading(false));
+  }
+
+  // Re-fetches without showing the full-page loading state — used when the M8
+  // tracking:ended event fires (delivery just completed), so the page flips
+  // from OUT_FOR_DELIVERY+OTP straight to "Delivered" without a manual refresh
+  // and without flashing a spinner over an already-rendered page.
+  function refreshSilently() {
+    orderService.getById(id).then(setOrder).catch(() => {});
   }
 
   useEffect(load, [id]);
@@ -41,6 +54,32 @@ export default function OrderDetail() {
       toast.error(err.message || 'Could not cancel order');
     } finally {
       setCancelling(false);
+    }
+  }
+
+  async function handleRetryPayment() {
+    setPayingAgain(true);
+    try {
+      const { order: refreshed, razorpay } = await orderService.retryPayment(id);
+      setOrder(refreshed);
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        toast.error('Could not load the payment gateway. Please try again.');
+        return;
+      }
+      const result = await openRazorpayCheckout({ razorpay, order: refreshed, user });
+      const verified = await orderService.verifyPayment(id, {
+        razorpayOrderId: result.razorpay_order_id,
+        razorpayPaymentId: result.razorpay_payment_id,
+        signature: result.razorpay_signature,
+      });
+      setOrder(verified);
+      toast.success('Payment successful!');
+    } catch (err) {
+      toast.error(err.message === 'Payment window closed' ? 'Payment cancelled' : err.message || 'Payment failed');
+      load();
+    } finally {
+      setPayingAgain(false);
     }
   }
 
@@ -64,6 +103,11 @@ export default function OrderDetail() {
 
   const isOwnOrder = order.user === user?._id;
   const canCancel = isOwnOrder && CUSTOMER_CANCELLABLE_STATUSES.includes(order.orderStatus);
+  const canRetryPayment =
+    isOwnOrder &&
+    order.paymentMethod === 'ONLINE' &&
+    order.paymentStatus !== 'paid' &&
+    RETRYABLE_STATUSES.includes(order.orderStatus);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
@@ -79,7 +123,7 @@ export default function OrderDetail() {
         <OrderStatusBadge status={order.orderStatus} />
       </div>
 
-      {order.orderStatus === 'cancelled' && order.cancellationReason && (
+      {order.orderStatus === 'CANCELLED' && order.cancellationReason && (
         <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">Reason: {order.cancellationReason}</p>
       )}
 
@@ -98,14 +142,16 @@ export default function OrderDetail() {
 
       <div className="mt-6">
         <p className="mb-2 text-sm font-semibold text-gray-700">Items</p>
-        <div className="divide-y divide-gray-100 rounded-xl border border-gray-100 bg-white">
+        <div className="divide-y divide-gray-100 rounded-xl border border-gray-100 bg-surface">
           {order.items.map((item, i) => (
             <div key={i} className="flex items-center justify-between p-3 text-sm">
               <div>
                 <p className="font-medium text-gray-900">
                   {item.quantity} × {item.name}
+                  {item.variantName && <span className="font-normal text-gray-500"> ({item.variantName})</span>}
                 </p>
                 {item.addons?.length > 0 && <p className="text-xs text-gray-400">{item.addons.map((a) => a.name).join(', ')}</p>}
+                {item.note && <p className="text-xs italic text-gray-400">Note: {item.note}</p>}
               </div>
               <p className="text-gray-700">₹{((item.price + item.addons.reduce((a, x) => a + x.price, 0)) * item.quantity).toFixed(2)}</p>
             </div>
@@ -113,7 +159,7 @@ export default function OrderDetail() {
         </div>
       </div>
 
-      <div className="mt-6 space-y-1 rounded-xl border border-gray-100 bg-white p-4 text-sm">
+      <div className="mt-6 space-y-1 rounded-xl border border-gray-100 bg-surface p-4 text-sm">
         <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>₹{order.subtotal.toFixed(2)}</span></div>
         <div className="flex justify-between text-gray-600"><span>Delivery fee</span><span>₹{order.deliveryFee.toFixed(2)}</span></div>
         <div className="flex justify-between text-gray-600"><span>Tax</span><span>₹{order.tax.toFixed(2)}</span></div>
@@ -128,7 +174,7 @@ export default function OrderDetail() {
         </div>
       </div>
 
-      <div className="mt-6 rounded-xl border border-gray-100 bg-white p-4 text-sm">
+      <div className="mt-6 rounded-xl border border-gray-100 bg-surface p-4 text-sm">
         <p className="font-semibold text-gray-700">Delivery address</p>
         <p className="mt-1 text-gray-600">
           {order.deliveryAddress.addressLine}, {order.deliveryAddress.city}
@@ -138,7 +184,40 @@ export default function OrderDetail() {
         <p className="mt-1 text-gray-600">
           {order.paymentMethod === 'COD' ? 'Cash on Delivery' : 'Online Payment'} · {order.paymentStatus}
         </p>
+        {order.deliveryPartner && (
+          <>
+            <p className="mt-3 font-semibold text-gray-700">Delivery partner</p>
+            <p className="mt-1 text-gray-600">
+              {order.deliveryPartner.fullName} · {order.deliveryPartner.vehicleType}
+              {order.deliveryPartner.vehicleNumber ? ` (${order.deliveryPartner.vehicleNumber})` : ''}
+              {order.deliveryPartner.phone ? ` · ${order.deliveryPartner.phone}` : ''}
+            </p>
+          </>
+        )}
+        {(order.orderStatus === 'REFUND_PENDING' || order.orderStatus === 'REFUNDED') && (
+          <p className="mt-1 text-xs text-gray-500">
+            {order.orderStatus === 'REFUNDED' ? 'Your refund has been completed.' : 'Your refund is being processed by the payment gateway.'}
+          </p>
+        )}
       </div>
+
+      {order.orderStatus === 'OUT_FOR_DELIVERY' && order.deliveryPartner && (
+        <>
+          <DeliveryOtpCard orderId={order._id} />
+          <DeliveryTracker orderId={order._id} onDelivered={refreshSilently} />
+        </>
+      )}
+
+      {canRetryPayment && (
+        <button
+          type="button"
+          onClick={handleRetryPayment}
+          disabled={payingAgain}
+          className="mt-6 w-full rounded-lg bg-brand-600 py-2.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+        >
+          {payingAgain ? 'Opening payment…' : 'Retry payment'}
+        </button>
+      )}
 
       {canCancel && (
         <button

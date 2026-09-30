@@ -1,27 +1,42 @@
-import { useRef, useState } from 'react';
-import toast from 'react-hot-toast';
+import { useEffect, useRef, useState } from 'react';
+import toast from '@/utils/toast';
 import { Upload, X } from 'lucide-react';
 import { uploadService } from '../services/uploadService';
+import { configService } from '../services/configService';
+import { optimizedUrl, resolveImageUrl } from '../utils/images';
 
-// Backend serves uploaded files from its own origin (http://localhost:5000/uploads/...),
-// not the frontend's — the API base URL already carries that origin, minus the /api suffix.
-const API_ORIGIN = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '');
+// Kept as a re-export: several components import it from here.
+export { resolveImageUrl };
 
-export function resolveImageUrl(url) {
-  if (!url) return '';
-  return url.startsWith('http') ? url : `${API_ORIGIN}${url}`;
+// One request per page load, shared by every upload field on it.
+let persistenceCheck;
+function checkStoragePersistence() {
+  if (!persistenceCheck) {
+    persistenceCheck = configService
+      .get()
+      .then((config) => config.imageStoragePersistent !== false)
+      .catch(() => true); // if we can't tell, don't cry wolf
+  }
+  return persistenceCheck;
 }
 
-export default function ImageUploadField({ label = 'Image', value, onChange }) {
+// `purpose` tells the backend what the picture is for (avatar | restaurant | food | category),
+// which decides who is allowed to upload it.
+export default function ImageUploadField({ label = 'Image', value, onChange, purpose = 'avatar' }) {
   const inputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
+  const [persistent, setPersistent] = useState(true);
+
+  useEffect(() => {
+    checkStoragePersistence().then(setPersistent);
+  }, []);
 
   async function handleFileChange(e) {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
     try {
-      const url = await uploadService.uploadImage(file);
+      const url = await uploadService.uploadImage(file, purpose);
       onChange(url);
     } catch (err) {
       toast.error(err.message || 'Could not upload image');
@@ -37,7 +52,7 @@ export default function ImageUploadField({ label = 'Image', value, onChange }) {
       <div className="flex items-center gap-3">
         {value ? (
           <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-gray-200">
-            <img src={resolveImageUrl(value)} alt="" className="h-full w-full object-cover" />
+            <img src={optimizedUrl(value, { width: 128, height: 128 })} alt="" className="h-full w-full object-cover" />
             <button
               type="button"
               onClick={() => onChange('')}
@@ -68,6 +83,11 @@ export default function ImageUploadField({ label = 'Image', value, onChange }) {
           onChange={handleFileChange}
         />
       </div>
+      {!persistent && (
+        <p className="mt-1 text-xs text-amber-600">
+          Heads up: this server stores images temporarily — they will disappear on the next restart until permanent image storage is set up.
+        </p>
+      )}
     </div>
   );
 }

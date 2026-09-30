@@ -1,4 +1,29 @@
 const { body } = require('express-validator');
+const { isSafeImageUrl } = require('../utils/imageUrl');
+const { isValidPointCoordinates } = require('../utils/geo');
+const { MAX_SLOTS, isValidTimezone } = require('../utils/openingHours');
+
+const TIME_RULE = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+const scheduleRules = [
+  body('openingHours').optional().isArray({ max: MAX_SLOTS }).withMessage(`At most ${MAX_SLOTS} opening-hour slots are allowed`),
+  body('openingHours.*.day').optional().isInt({ min: 0, max: 6 }).withMessage('day must be 0 (Sunday) to 6 (Saturday)'),
+  body('openingHours.*.open').optional().matches(TIME_RULE).withMessage('open must be 24-hour HH:MM'),
+  body('openingHours.*.close').optional().matches(TIME_RULE).withMessage('close must be 24-hour HH:MM'),
+  body('timezone').optional().isString().trim().custom(isValidTimezone).withMessage('Unknown timezone'),
+];
+
+const locationRules = [
+  body('location.coordinates')
+    .optional()
+    .custom((coordinates) => isValidPointCoordinates(coordinates))
+    .withMessage('location.coordinates must be a real [longitude, latitude]'),
+  body('deliveryRadiusKm').optional().isFloat({ min: 0.5, max: 50 }).withMessage('deliveryRadiusKm must be between 0.5 and 50'),
+];
+
+const imageRules = ['image', 'coverImage', 'logo'].map((field) =>
+  body(field).optional({ nullable: true }).custom(isSafeImageUrl).withMessage(`${field} must be an uploaded image or an https:// URL`)
+);
 
 const createRestaurantValidator = [
   body('name').trim().notEmpty().withMessage('Restaurant name is required').isLength({ max: 120 }),
@@ -12,10 +37,9 @@ const createRestaurantValidator = [
   body('deliveryTime').isFloat({ min: 0 }).withMessage('Delivery time must be a positive number'),
   body('deliveryFee').optional().isFloat({ min: 0 }),
   body('minimumOrder').optional().isFloat({ min: 0 }),
-  body('location.coordinates')
-    .optional()
-    .isArray({ min: 2, max: 2 })
-    .withMessage('location.coordinates must be [lng, lat]'),
+  ...locationRules,
+  ...imageRules,
+  ...scheduleRules,
 ];
 
 const updateRestaurantValidator = [
@@ -29,7 +53,25 @@ const updateRestaurantValidator = [
   body('deliveryFee').optional().isFloat({ min: 0 }),
   body('minimumOrder').optional().isFloat({ min: 0 }),
   body('isOpen').optional().isBoolean(),
-  body('location.coordinates').optional().isArray({ min: 2, max: 2 }),
+  ...locationRules,
+  ...imageRules,
+  ...scheduleRules,
 ];
 
-module.exports = { createRestaurantValidator, updateRestaurantValidator };
+// M14 — every document a reviewer needs for a real business-verification decision,
+// matching the exact "a successful submission always represents a complete
+// submission" convention deliveryPartner.validator.js already uses for KYC. GST
+// stays optional (see the Restaurant model's own comment on kycDocumentsSchema).
+// isSafeImageUrl alone treats '' as valid (a normal, optional image field may be
+// cleared) — these documents are mandatory, so notEmpty() is checked first.
+const submitKycValidator = [
+  body('fssaiLicenseNumber').trim().notEmpty().withMessage('FSSAI license number is required').isLength({ max: 40 }),
+  body('fssaiCertificateUrl').trim().notEmpty().withMessage('FSSAI certificate is required').custom(isSafeImageUrl).withMessage('fssaiCertificateUrl must be an uploaded image or an https:// URL'),
+  body('panNumber').trim().notEmpty().withMessage('PAN number is required').isLength({ max: 20 }),
+  body('panCardUrl').trim().notEmpty().withMessage('PAN card image is required').custom(isSafeImageUrl).withMessage('panCardUrl must be an uploaded image or an https:// URL'),
+  body('ownerIdentityProofUrl').trim().notEmpty().withMessage('An identity proof is required').custom(isSafeImageUrl).withMessage('ownerIdentityProofUrl must be an uploaded image or an https:// URL'),
+  body('gstNumber').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
+  body('gstCertificateUrl').optional({ checkFalsy: true }).custom(isSafeImageUrl).withMessage('gstCertificateUrl must be an uploaded image or an https:// URL'),
+];
+
+module.exports = { createRestaurantValidator, updateRestaurantValidator, submitKycValidator };

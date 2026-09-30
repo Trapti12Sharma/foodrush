@@ -36,6 +36,10 @@ export function AuthProvider({ children }) {
     return newUser;
   }, []);
 
+  // Lets pages that change the profile (or re-issue the session, e.g. after a password
+  // change) push the fresh user object in without a second round-trip.
+  const updateUser = useCallback((nextUser) => setUser(nextUser), []);
+
   const logout = useCallback(async () => {
     await authService.logout();
     setUser(null);
@@ -43,7 +47,7 @@ export function AuthProvider({ children }) {
   }, [navigate]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

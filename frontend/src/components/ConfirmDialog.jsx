@@ -3,7 +3,7 @@ export default function ConfirmDialog({ open, title, description, confirmLabel =
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
+      <div className="w-full max-w-sm rounded-xl bg-surface p-5 shadow-xl">
         <p className="font-semibold text-gray-900">{title}</p>
         {description && <p className="mt-1 text-sm text-gray-500">{description}</p>}
         <div className="mt-5 flex justify-end gap-2">

@@ -6,10 +6,78 @@ export const adminService = {
   setUserActive: (id, isActive) => api.patch(`/admin/users/${id}/status`, { isActive }).then((r) => r.data.user),
   listRestaurants: (params) => api.get('/admin/restaurants', { params }).then((r) => r.data),
   approveRestaurant: (id) => api.patch(`/admin/restaurants/${id}/approve`).then((r) => r.data.restaurant),
+  rejectRestaurantKyc: (id, reason) => api.patch(`/admin/restaurants/${id}/reject-kyc`, { reason }).then((r) => r.data.restaurant),
   setRestaurantActive: (id, isActive) =>
     api.patch(`/admin/restaurants/${id}/status`, { isActive }).then((r) => r.data.restaurant),
   listOrders: (params) => api.get('/admin/orders', { params }).then((r) => r.data),
   createCoupon: (payload) => api.post('/coupons', payload).then((r) => r.data.coupon),
   listCoupons: (params) => api.get('/coupons', { params }).then((r) => r.data),
   updateCoupon: (id, payload) => api.patch(`/coupons/${id}`, payload).then((r) => r.data.coupon),
+  listDeliveryPartners: (params) => api.get('/admin/delivery-partners', { params }).then((r) => r.data),
+  getDeliveryPartner: (id) => api.get(`/admin/delivery-partners/${id}`).then((r) => r.data.deliveryPartner),
+  approveDeliveryPartnerKyc: (id) => api.patch(`/admin/delivery-partners/${id}/approve-kyc`).then((r) => r.data.deliveryPartner),
+  rejectDeliveryPartnerKyc: (id, reason) =>
+    api.patch(`/admin/delivery-partners/${id}/reject-kyc`, { reason }).then((r) => r.data.deliveryPartner),
+  suspendDeliveryPartner: (id, reason) =>
+    api.patch(`/admin/delivery-partners/${id}/suspend`, { reason }).then((r) => r.data.deliveryPartner),
+  reactivateDeliveryPartner: (id) => api.patch(`/admin/delivery-partners/${id}/reactivate`).then((r) => r.data.deliveryPartner),
+  listDeliveryAssignments: (params) => api.get('/admin/delivery-assignments', { params }).then((r) => r.data),
+  listEligibleRiders: (orderId) => api.get(`/admin/orders/${orderId}/eligible-riders`).then((r) => r.data.riders),
+  assignOrder: (orderId, deliveryPartnerId) =>
+    api.post(`/admin/orders/${orderId}/assign`, deliveryPartnerId ? { deliveryPartnerId } : {}).then((r) => r.data.assignment),
+  cancelDeliveryAssignment: (id, reason) => api.patch(`/admin/delivery-assignments/${id}/cancel`, { reason }).then((r) => r.data.assignment),
+  listDeliverySettlements: (params) => api.get('/admin/delivery-settlements', { params }).then((r) => r.data),
+  getDeliverySettlement: (id) => api.get(`/admin/delivery-settlements/${id}`).then((r) => r.data),
+  generateDeliverySettlement: (payload) => api.post('/admin/delivery-settlements/generate', payload).then((r) => r.data.settlement),
+  approveDeliverySettlement: (id) => api.patch(`/admin/delivery-settlements/${id}/approve`).then((r) => r.data.settlement),
+  markDeliverySettlementPaid: (id, payload) => api.patch(`/admin/delivery-settlements/${id}/mark-paid`, payload).then((r) => r.data.settlement),
+  markDeliverySettlementFailed: (id, reason) => api.patch(`/admin/delivery-settlements/${id}/failed`, { reason }).then((r) => r.data.settlement),
+  listSupportTickets: (params) => api.get('/admin/support/tickets', { params }).then((r) => r.data),
+  getSupportTicket: (id) => api.get(`/admin/support/tickets/${id}`).then((r) => r.data.ticket),
+  updateSupportTicketStatus: (id, status) => api.patch(`/admin/support/tickets/${id}/status`, { status }).then((r) => r.data.ticket),
+  updateSupportTicketPriority: (id, priority) => api.patch(`/admin/support/tickets/${id}/priority`, { priority }).then((r) => r.data.ticket),
+  assignSupportTicket: (id, assignedTo) => api.patch(`/admin/support/tickets/${id}/assign`, { assignedTo: assignedTo || undefined }).then((r) => r.data.ticket),
+  addSupportTicketMessage: (id, payload) => api.post(`/admin/support/tickets/${id}/messages`, payload).then((r) => r.data.ticket),
+  resolveSupportTicket: (id, resolution) => api.patch(`/admin/support/tickets/${id}/resolve`, { resolution }).then((r) => r.data.ticket),
+  closeSupportTicket: (id) => api.patch(`/admin/support/tickets/${id}/close`).then((r) => r.data.ticket),
+  listAuditLogs: (params) => api.get('/admin/audit-logs', { params }).then((r) => r.data),
+  getAuditLog: (id) => api.get(`/admin/audit-logs/${id}`).then((r) => r.data.log),
+  // M16 — Analytics & Reporting. `params` carries the shared date-range contract:
+  // { preset } or { preset: 'custom', startDate, endDate }. Each slice is gated by
+  // the permission that governs that data domain, so a staff role may legitimately
+  // get 403 on some of these while succeeding on others.
+  getAnalyticsOverview: (params) => api.get('/admin/analytics/overview', { params }).then((r) => r.data),
+  getAnalyticsSales: (params) => api.get('/admin/analytics/sales', { params }).then((r) => r.data),
+  getAnalyticsOrders: (params) => api.get('/admin/analytics/orders', { params }).then((r) => r.data),
+  getAnalyticsCustomers: (params) => api.get('/admin/analytics/customers', { params }).then((r) => r.data),
+  getAnalyticsRestaurants: (params) => api.get('/admin/analytics/restaurants', { params }).then((r) => r.data),
+  getAnalyticsFood: (params) => api.get('/admin/analytics/food', { params }).then((r) => r.data),
+  getAnalyticsDelivery: (params) => api.get('/admin/analytics/delivery', { params }).then((r) => r.data),
+  getAnalyticsPayments: (params) => api.get('/admin/analytics/payments', { params }).then((r) => r.data),
+  getAnalyticsCoupons: (params) => api.get('/admin/analytics/coupons', { params }).then((r) => r.data),
+  // M15 — Review Moderation & Trust System.
+  listReviews: (params) => api.get('/admin/reviews', { params }).then((r) => r.data),
+  getReview: (id) => api.get(`/admin/reviews/${id}`).then((r) => r.data),
+  approveReview: (id) => api.patch(`/admin/reviews/${id}/approve`).then((r) => r.data.review),
+  rejectReview: (id, reason) => api.patch(`/admin/reviews/${id}/reject`, { reason }).then((r) => r.data.review),
+  hideReview: (id, reason) => api.patch(`/admin/reviews/${id}/hide`, reason ? { reason } : {}).then((r) => r.data.review),
+  restoreReview: (id) => api.patch(`/admin/reviews/${id}/restore`).then((r) => r.data.review),
+
+  // M17 — platform settings and the super-admin staff console. Both are gated by
+  // permissions only SUPER_ADMIN holds (settings:manage / admins:manage), so every
+  // other staff role gets a 403 here by design; the nav hides the pages rather
+  // than letting someone walk into an error.
+  //
+  // updateSettings takes the whole patch INCLUDING `version` — the optimistic
+  // concurrency token read from the last GET. The caller must pass the version it
+  // rendered, not a remembered one, or a concurrent edit goes undetected.
+  getSettings: () => api.get('/admin/settings').then((r) => r.data.settings),
+  updateSettings: (payload) => api.patch('/admin/settings', payload).then((r) => r.data.settings),
+
+  getRoleMatrix: () => api.get('/admin/roles').then((r) => r.data),
+  listStaff: (params) => api.get('/admin/staff', { params }).then((r) => r.data),
+  createStaff: (payload) => api.post('/admin/staff', payload).then((r) => r.data.staff),
+  updateStaffRole: (id, role) => api.patch(`/admin/staff/${id}/role`, { role }).then((r) => r.data.staff),
+  revokeStaff: (id) => api.patch(`/admin/staff/${id}/revoke`).then((r) => r.data.staff),
+  resendStaffInvite: (id) => api.post(`/admin/staff/${id}/resend-invite`).then((r) => r.data.staff),
 };

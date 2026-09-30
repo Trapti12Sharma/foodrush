@@ -2,6 +2,7 @@ const Restaurant = require('../models/Restaurant');
 const Order = require('../models/Order');
 const ApiError = require('../utils/ApiError');
 const { assertOwnerOrAdmin } = require('../utils/ownership');
+const { PERMISSIONS } = require('../utils/permissions');
 const { ORDER_STATUS } = require('../utils/constants');
 
 // "Revenue" is defined as the sum of totalAmount across DELIVERED orders only —
@@ -10,14 +11,14 @@ const { ORDER_STATUS } = require('../utils/constants');
 async function getRestaurantDashboard(requester, restaurantId) {
   const restaurant = await Restaurant.findById(restaurantId);
   if (!restaurant) throw ApiError.notFound('Restaurant not found');
-  assertOwnerOrAdmin(restaurant.owner, requester, 'You can only view your own restaurant dashboard');
+  assertOwnerOrAdmin(restaurant.owner, requester, 'You can only view your own restaurant dashboard', PERMISSIONS.RESTAURANTS_READ_ALL);
 
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
 
   const [totalOrders, pendingOrders, todayOrders, deliveredAgg] = await Promise.all([
     Order.countDocuments({ restaurant: restaurant._id }),
-    Order.countDocuments({ restaurant: restaurant._id, orderStatus: ORDER_STATUS.PENDING }),
+    Order.countDocuments({ restaurant: restaurant._id, orderStatus: ORDER_STATUS.PLACED }),
     Order.countDocuments({ restaurant: restaurant._id, createdAt: { $gte: startOfToday } }),
     Order.aggregate([
       { $match: { restaurant: restaurant._id, orderStatus: ORDER_STATUS.DELIVERED } },

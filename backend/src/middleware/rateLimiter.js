@@ -28,4 +28,81 @@ const authLimiter = rateLimit({
   },
 });
 
-module.exports = { apiLimiter, authLimiter };
+// Uploads are the most expensive thing a client can ask for (bandwidth, storage and, on
+// Cloudinary, quota), so they get their own tighter ceiling on top of the general one.
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isTest ? 100000 : 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many uploads. Please try again later.',
+    errors: [],
+  },
+});
+
+// Every call here spends real Google Maps quota, and the endpoints are public (guests pick
+// a location before logging in), so this per-IP ceiling is the abuse guard. The frontend
+// debounces typing well below it.
+const geoLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: isTest ? 100000 : 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many location requests. Please slow down.',
+    errors: [],
+  },
+});
+
+// Defense in depth alongside the per-order deliveryOtpAttempts counter (the real
+// brute-force protection — see deliveryOtp.service.js): this just stops one IP
+// from hammering the endpoint across many different assignment ids.
+const otpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isTest ? 100000 : 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many attempts. Please try again later.',
+    errors: [],
+  },
+});
+
+// Guards against spam ticket creation and message flooding — a real customer/rider/
+// owner never needs anywhere near this many in 15 minutes; a script hammering the
+// endpoint does.
+const supportLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isTest ? 100000 : 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many support requests. Please try again later.',
+    errors: [],
+  },
+});
+
+// Guards against review-spam and report-spam (submitting many reviews or
+// reporting many reviews in a burst) — a real customer never needs anywhere
+// near this many in 15 minutes; a script hammering the endpoint does. The
+// per-(review,reporter) unique index (see ReviewReport model) is the real
+// duplicate-report guard; this is the same defense-in-depth role supportLimiter
+// plays alongside support ticket creation.
+const reviewLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isTest ? 100000 : 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many review requests. Please try again later.',
+    errors: [],
+  },
+});
+
+module.exports = { apiLimiter, authLimiter, uploadLimiter, geoLimiter, otpLimiter, supportLimiter, reviewLimiter };

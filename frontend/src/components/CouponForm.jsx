@@ -19,11 +19,14 @@ export default function CouponForm({ onSubmit, submitting }) {
       maximumDiscount: values.maximumDiscount ? Number(values.maximumDiscount) : undefined,
       expiryDate: new Date(values.expiryDate).toISOString(),
       usageLimit: values.usageLimit ? Number(values.usageLimit) : undefined,
+      perUserLimit: values.perUserLimit ? Number(values.perUserLimit) : undefined,
+      city: values.city?.trim() || undefined,
+      fundedBy: values.fundedBy || undefined,
     });
   }
 
   return (
-    <form onSubmit={handleSubmit(submit)} className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
+    <form onSubmit={handleSubmit(submit)} className="space-y-3 rounded-xl border border-gray-200 bg-surface p-4">
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-600">Code</label>
@@ -67,6 +70,35 @@ export default function CouponForm({ onSubmit, submitting }) {
           <input type="number" {...register('usageLimit', { min: 1 })} placeholder="Unlimited" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
         </div>
       </div>
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">Per-user limit</label>
+          <input
+            type="number"
+            {...register('perUserLimit', { min: 1 })}
+            placeholder="Unlimited"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">City scope (optional)</label>
+          <input
+            {...register('city')}
+            placeholder="All cities"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">Funded by</label>
+          <select {...register('fundedBy')} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <option value="PLATFORM">Platform</option>
+            <option value="RESTAURANT">Restaurant</option>
+          </select>
+        </div>
+      </div>
+      <p className="text-xs text-gray-400">
+        City scope restricts this coupon to restaurants in that city. Restaurant-specific coupons can be created via the API for now.
+      </p>
       {(errors.code || errors.discountValue || errors.expiryDate) && (
         <p className="text-xs text-red-600">Please fill in code, discount value, and expiry date.</p>
       )}

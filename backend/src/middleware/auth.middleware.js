@@ -2,6 +2,8 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const User = require('../models/User');
 const { verifyToken, COOKIE_NAME } = require('../services/token.service');
+const { ROLES } = require('../utils/constants');
+const { hasPermission } = require('../utils/permissions');
 
 function extractToken(req) {
   if (req.cookies && req.cookies[COOKIE_NAME]) return req.cookies[COOKIE_NAME];
@@ -10,21 +12,32 @@ function extractToken(req) {
   return null;
 }
 
-// Verifies the JWT, then re-loads the user from the DB (not just trusting the
-// token payload) so a deactivated account or role change takes effect immediately
-// instead of waiting for the token to expire.
-const authenticateUser = asyncHandler(async (req, res, next) => {
-  const token = extractToken(req);
+// A token issued before the user's last password change is no longer valid. JWT
+// `iat` has one-second resolution, so compare in whole seconds.
+function isRevoked(payload, user) {
+  if (!user.passwordChangedAt) return false;
+  return payload.iat < Math.floor(user.passwordChangedAt.getTime() / 1000);
+}
+
+// The single place that turns a raw JWT into a trusted, live User document —
+// shared by the HTTP middleware below AND the Socket.IO auth middleware
+// (realtime/socketAuth.js), so a deactivated account or role change takes effect
+// identically and immediately on both transports, not just HTTP. Throws
+// ApiError.unauthorized (never a raw jsonwebtoken error) on any failure, and
+// never leaks which specific check failed.
+async function resolveUserFromToken(token) {
   if (!token) throw ApiError.unauthorized('Authentication required');
-
-  const payload = verifyToken(token); // throws JsonWebTokenError/TokenExpiredError -> errorHandler
+  const payload = verifyToken(token); // throws JsonWebTokenError/TokenExpiredError
   const user = await User.findById(payload.sub);
-
-  if (!user || !user.isActive) {
+  if (!user || !user.isActive || isRevoked(payload, user)) {
     throw ApiError.unauthorized('Session expired. Please login again.');
   }
+  return user;
+}
 
-  req.user = user;
+const authenticateUser = asyncHandler(async (req, res, next) => {
+  const token = extractToken(req);
+  req.user = await resolveUserFromToken(token); // JWT errors -> errorHandler via asyncHandler
   next();
 });
 
@@ -39,6 +52,26 @@ const authorizeRoles = (...roles) => (req, res, next) => {
   next();
 };
 
+// Restricts a route to users holding EVERY listed permission. Prefer this over
+// authorizeRoles for anything platform-wide (admin/staff features) — see
+// utils/permissions.js. Like authorizeRoles it never checks resource ownership.
+const requirePermission = (...permissions) => (req, res, next) => {
+  if (!req.user) return next(ApiError.unauthorized('Authentication required'));
+  if (!permissions.every((permission) => hasPermission(req.user, permission))) {
+    return next(ApiError.forbidden('You do not have permission to perform this action'));
+  }
+  next();
+};
+
+// For routes a restaurant owner may use on their OWN resources and platform staff
+// may use on ANY resource: passes for owners, or for anyone holding `permission`.
+// The per-resource ownership check still happens in the service.
+const requireOwnerOrPermission = (permission) => (req, res, next) => {
+  if (!req.user) return next(ApiError.unauthorized('Authentication required'));
+  if (req.user.role === ROLES.RESTAURANT_OWNER || hasPermission(req.user, permission)) return next();
+  next(ApiError.forbidden('You do not have permission to perform this action'));
+};
+
 // For public browse endpoints (restaurant/menu listings) that behave slightly
 // differently for a logged-in owner/admin (e.g. revealing their own unapproved
 // restaurant) but must never reject an anonymous visitor. Invalid/expired tokens
@@ -50,11 +83,18 @@ const optionalAuth = asyncHandler(async (req, res, next) => {
   try {
     const payload = verifyToken(token);
     const user = await User.findById(payload.sub);
-    if (user && user.isActive) req.user = user;
+    if (user && user.isActive && !isRevoked(payload, user)) req.user = user;
   } catch (err) {
     // ignore — anonymous request
   }
   next();
 });
 
-module.exports = { authenticateUser, authorizeRoles, optionalAuth };
+module.exports = {
+  authenticateUser,
+  authorizeRoles,
+  requirePermission,
+  requireOwnerOrPermission,
+  optionalAuth,
+  resolveUserFromToken,
+};

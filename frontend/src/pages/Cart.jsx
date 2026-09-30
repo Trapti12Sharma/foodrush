@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { ShoppingCart, Trash2 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import QuantityStepper from '../components/QuantityStepper';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EmptyState from '../components/EmptyState';
-import { resolveImageUrl } from '../components/ImageUploadField';
+import SmartImage from '../components/SmartImage';
 
 function Row({ label, value, emphasis }) {
   return (
@@ -113,19 +113,23 @@ export default function Cart() {
 
       {cart.restaurant && (
         <Link to={`/restaurants/${cart.restaurant._id}`} className="mt-1 inline-block text-sm text-gray-500 hover:text-brand-600">
-          {cart.restaurant.name} {!cart.restaurant.isOpen && <span className="text-red-600">(currently closed)</span>}
+          {cart.restaurant.name} {!(cart.restaurant.isOpenNow ?? cart.restaurant.isOpen) && <span className="text-red-600">(currently closed)</span>}
         </Link>
       )}
 
-      <div className="mt-6 divide-y divide-gray-100 rounded-xl border border-gray-100 bg-white">
+      <div className="mt-6 divide-y divide-gray-100 rounded-xl border border-gray-100 bg-surface">
         {cart.items.map((item) => (
           <div key={item._id} className="flex items-center gap-4 p-4">
-            {item.food?.image && <img src={resolveImageUrl(item.food.image)} alt={item.food.name} className="h-16 w-16 rounded-lg object-cover" />}
+            <SmartImage src={item.food?.image} alt={item.food?.name || 'Item'} widths={[128, 192]} sizes="64px" className="h-16 w-16 shrink-0 rounded-lg" />
             <div className="flex-1">
-              <p className="font-medium text-gray-900">{item.food?.name || 'Item no longer available'}</p>
+              <p className="font-medium text-gray-900">
+                {item.food?.name || 'Item no longer available'}
+                {item.variantName && <span className="font-normal text-gray-500"> ({item.variantName})</span>}
+              </p>
               {item.addons.length > 0 && (
                 <p className="text-xs text-gray-400">{item.addons.map((a) => a.name).join(', ')}</p>
               )}
+              {item.note && <p className="text-xs italic text-gray-400">Note: {item.note}</p>}
               <p className="mt-1 text-sm text-gray-600">
                 ₹{item.price}
                 {item.addons.map((a) => ` + ₹${a.price}`).join('')} each
@@ -150,7 +154,7 @@ export default function Cart() {
         ))}
       </div>
 
-      <div className="mt-6 space-y-2 rounded-xl border border-gray-100 bg-white p-4">
+      <div className="mt-6 space-y-2 rounded-xl border border-gray-100 bg-surface p-4">
         <Row label="Subtotal" value={cart.subtotal} />
         <Row label="Delivery fee" value={cart.deliveryFee} />
         <Row label="Tax" value={cart.tax} />
@@ -169,7 +173,7 @@ export default function Cart() {
 
       <button
         type="button"
-        disabled={belowMinimum || (cart.restaurant && !cart.restaurant.isOpen)}
+        disabled={belowMinimum || (cart.restaurant && !(cart.restaurant.isOpenNow ?? cart.restaurant.isOpen))}
         onClick={() => navigate('/checkout')}
         className="mt-4 w-full rounded-lg bg-brand-600 py-3 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
       >

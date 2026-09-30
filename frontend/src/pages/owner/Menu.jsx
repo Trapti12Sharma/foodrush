@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { Plus, Pencil, Trash2, UtensilsCrossed } from 'lucide-react';
 import { useRestaurantOwner } from '../../context/RestaurantOwnerContext';
 import { foodService } from '../../services/foodService';
@@ -8,6 +8,7 @@ import { categoryService } from '../../services/categoryService';
 import FoodForm from '../../components/FoodForm';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import EmptyState from '../../components/EmptyState';
+import SmartImage from '../../components/SmartImage';
 
 export default function Menu() {
   const { selectedRestaurant } = useRestaurantOwner();
@@ -140,19 +141,25 @@ export default function Menu() {
                 submitting={submitting}
               />
             ) : (
-              <div key={food._id} className="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-4">
-                <div>
-                  <p className="font-medium text-gray-900">{food.name}</p>
-                  <p className="text-xs text-gray-400">{food.category?.name}</p>
-                  <p className="mt-1 text-sm text-gray-700">
-                    {food.discountPrice != null ? (
-                      <>
-                        ₹{food.discountPrice} <span className="text-xs text-gray-400 line-through">₹{food.price}</span>
-                      </>
-                    ) : (
-                      `₹${food.price}`
-                    )}
-                  </p>
+              <div key={food._id} className="flex items-center justify-between rounded-xl border border-gray-200 bg-surface p-4">
+                <div className="flex items-center gap-3">
+                  {/* FoodForm already lets an owner set this image; this row never
+                      showed it back, so there was no way to confirm an upload
+                      "took" without opening the edit form again. */}
+                  <SmartImage src={food.image} alt={food.name} widths={[96, 144]} sizes="48px" className="h-12 w-12 shrink-0 rounded-lg" />
+                  <div>
+                    <p className="font-medium text-gray-900">{food.name}</p>
+                    <p className="text-xs text-gray-400">{food.category?.name}</p>
+                    <p className="mt-1 text-sm text-gray-700">
+                      {food.discountPrice != null ? (
+                        <>
+                          ₹{food.discountPrice} <span className="text-xs text-gray-400 line-through">₹{food.price}</span>
+                        </>
+                      ) : (
+                        `₹${food.price}`
+                      )}
+                    </p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <label className="flex items-center gap-1.5 text-xs text-gray-500">

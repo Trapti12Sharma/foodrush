@@ -2,9 +2,12 @@ const User = require('../models/User');
 const Restaurant = require('../models/Restaurant');
 const Order = require('../models/Order');
 const ApiError = require('../utils/ApiError');
+const notificationService = require('./notification.service');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { escapeRegex } = require('../utils/regex');
-const { ORDER_STATUS } = require('../utils/constants');
+const staffService = require('./staff.service');
+const { ROLES, ORDER_STATUS, RESTAURANT_KYC_STATUS, NOTIFICATION_TYPE } = require('../utils/constants');
+const { PERMISSIONS, hasPermission, isStaffRole } = require('../utils/permissions');
 
 // Platform-wide stats (unscoped) — the admin equivalent of Phase 9's
 // per-restaurant dashboard.service.js. Revenue is delivered-orders-only, same
@@ -19,7 +22,7 @@ async function getDashboardStats() {
       User.countDocuments({}),
       Restaurant.countDocuments({}),
       Order.countDocuments({}),
-      Order.countDocuments({ orderStatus: ORDER_STATUS.PENDING }),
+      Order.countDocuments({ orderStatus: ORDER_STATUS.PLACED }),
       Order.aggregate([
         { $match: { orderStatus: ORDER_STATUS.DELIVERED } },
         { $group: { _id: null, revenue: { $sum: '$totalAmount' } } },
@@ -67,11 +70,33 @@ async function listUsers(query) {
   return { items, pagination: buildPaginationMeta(total, page, limit) };
 }
 
-async function setUserActive(id, isActive) {
+// Privilege guards: nobody can lock themselves out by accident, and only someone
+// who may manage admins (SUPER_ADMIN) can enable/disable a staff account, so an
+// ADMIN can never disable the SUPER_ADMIN above them.
+async function setUserActive(id, isActive, actor) {
   const user = await User.findById(id);
   if (!user) throw ApiError.notFound('User not found');
+  if (actor && user._id.toString() === actor._id.toString()) {
+    throw ApiError.badRequest('You cannot change the status of your own account');
+  }
+  if (actor && isStaffRole(user.role) && !hasPermission(actor, PERMISSIONS.ADMINS_MANAGE)) {
+    throw ApiError.forbidden('Only a super admin can change the status of a staff account');
+  }
+  // M17 — the same last-super-admin rule the staff console applies to a role
+  // change or a revoke. Without it, this endpoint was the remaining way to leave
+  // the platform with nobody holding settings:manage/admins:manage: deactivating
+  // the sole super admin passed every check above (it is not a self-change, and
+  // the actor does hold ADMINS_MANAGE). Only deactivation can lock anyone out, so
+  // reactivating is not gated.
+  if (!isActive) await staffService.assertNotLastSuperAdmin(user, 'deactivating their account');
+
+  const previous = { isActive: user.isActive };
   user.isActive = isActive;
   await user.save();
+  // Closes the concurrent-demotion window described in staff.service.js: two
+  // simultaneous deactivations of the last two super admins would each see one
+  // remaining. The loser is rolled back and gets a 409.
+  if (!isActive && user.role === ROLES.SUPER_ADMIN) await staffService.assertSuperAdminSurvived(user, previous);
   return user;
 }
 
@@ -81,6 +106,7 @@ async function listRestaurantsForAdmin(query) {
   if (query.search) filter.name = new RegExp(escapeRegex(query.search), 'i');
   if (query.isApproved !== undefined) filter.isApproved = query.isApproved === 'true';
   if (query.isActive !== undefined) filter.isActive = query.isActive === 'true';
+  if (query.kycStatus) filter.kycStatus = query.kycStatus;
 
   const [items, total] = await Promise.all([
     Restaurant.find(filter).sort('-createdAt').skip(skip).limit(limit).populate('owner', 'name email'),
@@ -89,11 +115,59 @@ async function listRestaurantsForAdmin(query) {
   return { items, pagination: buildPaginationMeta(total, page, limit) };
 }
 
-async function approveRestaurant(id) {
+// M14 — approving now also resolves the KYC review in the same action (mirrors
+// deliveryPartnerService.approveKyc combining kycStatus + accountStatus in one
+// step): a restaurant must have actually submitted its business documents
+// first. isApproved is otherwise unaffected in every other way — a restaurant
+// resubmitting KYC later (e.g. renewing a licence) never has this re-checked
+// against its already-live status; that only happens on THIS explicit action.
+async function approveRestaurant(id, admin) {
   const restaurant = await Restaurant.findById(id);
   if (!restaurant) throw ApiError.notFound('Restaurant not found');
+  if (restaurant.kycStatus !== RESTAURANT_KYC_STATUS.SUBMITTED) {
+    throw ApiError.badRequest(`This restaurant's KYC is "${restaurant.kycStatus}" — documents must be submitted (and not already reviewed) before it can be approved`);
+  }
   restaurant.isApproved = true;
+  restaurant.kycStatus = RESTAURANT_KYC_STATUS.VERIFIED;
+  restaurant.kycRejectionReason = null;
+  restaurant.kycReviewedAt = new Date();
+  restaurant.kycReviewedBy = admin ? admin._id : null;
   await restaurant.save();
+
+  await notificationService.notify({
+    recipient: restaurant.owner,
+    type: NOTIFICATION_TYPE.RESTAURANT_KYC_VERIFIED,
+    data: { restaurantId: restaurant._id, restaurantName: restaurant.name },
+    eventKey: `RESTAURANT:${restaurant._id}:KYC_VERIFIED:${restaurant.owner}`,
+  });
+
+  return restaurant;
+}
+
+// M14 — mirrors deliveryPartnerService.rejectKyc: only valid from SUBMITTED, a
+// reason is required and shown back to the owner. isApproved/isActive are
+// untouched — an already-live restaurant whose KYC renewal is rejected stays
+// live; only the paperwork trail records the rejection (see the model's own
+// comment on why these are deliberately decoupled).
+async function rejectRestaurantKyc(id, admin, reason) {
+  const restaurant = await Restaurant.findById(id);
+  if (!restaurant) throw ApiError.notFound('Restaurant not found');
+  if (restaurant.kycStatus !== RESTAURANT_KYC_STATUS.SUBMITTED) {
+    throw ApiError.badRequest(`Cannot reject KYC from status "${restaurant.kycStatus}"`);
+  }
+  restaurant.kycStatus = RESTAURANT_KYC_STATUS.REJECTED;
+  restaurant.kycRejectionReason = reason;
+  restaurant.kycReviewedAt = new Date();
+  restaurant.kycReviewedBy = admin ? admin._id : null;
+  await restaurant.save();
+
+  await notificationService.notify({
+    recipient: restaurant.owner,
+    type: NOTIFICATION_TYPE.RESTAURANT_KYC_REJECTED,
+    data: { restaurantId: restaurant._id, restaurantName: restaurant.name, reason },
+    eventKey: `RESTAURANT:${restaurant._id}:KYC_REJECTED:${restaurant.owner}:${restaurant.kycReviewedAt.getTime()}`,
+  });
+
   return restaurant;
 }
 
@@ -111,5 +185,6 @@ module.exports = {
   setUserActive,
   listRestaurantsForAdmin,
   approveRestaurant,
+  rejectRestaurantKyc,
   setRestaurantActive,
 };

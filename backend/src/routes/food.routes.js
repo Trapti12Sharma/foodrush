@@ -2,8 +2,10 @@ const express = require('express');
 const foodController = require('../controllers/foodItem.controller');
 const { createFoodValidator, updateFoodValidator } = require('../validators/foodItem.validator');
 const validate = require('../middleware/validate');
-const { authenticateUser, authorizeRoles, optionalAuth } = require('../middleware/auth.middleware');
-const { ROLES } = require('../utils/constants');
+const { authenticateUser, requireOwnerOrPermission, optionalAuth } = require('../middleware/auth.middleware');
+const { uploadSingleImage } = require('../middleware/upload.middleware');
+const { uploadLimiter } = require('../middleware/rateLimiter');
+const { PERMISSIONS } = require('../utils/permissions');
 
 const router = express.Router();
 
@@ -132,7 +134,7 @@ router.get('/:id', optionalAuth, foodController.getById);
 router.post(
   '/',
   authenticateUser,
-  authorizeRoles(ROLES.RESTAURANT_OWNER, ROLES.ADMIN),
+  requireOwnerOrPermission(PERMISSIONS.RESTAURANTS_MANAGE),
   createFoodValidator,
   validate,
   foodController.create
@@ -179,7 +181,7 @@ router.post(
 router.put(
   '/:id',
   authenticateUser,
-  authorizeRoles(ROLES.RESTAURANT_OWNER, ROLES.ADMIN),
+  requireOwnerOrPermission(PERMISSIONS.RESTAURANTS_MANAGE),
   updateFoodValidator,
   validate,
   foodController.update
@@ -206,8 +208,72 @@ router.put(
 router.delete(
   '/:id',
   authenticateUser,
-  authorizeRoles(ROLES.RESTAURANT_OWNER, ROLES.ADMIN),
+  requireOwnerOrPermission(PERMISSIONS.RESTAURANTS_MANAGE),
   foodController.remove
+);
+
+/**
+ * @swagger
+ * /foods/{id}/image:
+ *   post:
+ *     summary: Upload (or replace) a food item's image (owner of its restaurant, or admin)
+ *     description: >
+ *       A single self-contained request: validates the file (real JPEG/PNG/WEBP bytes, max
+ *       MAX_UPLOAD_SIZE_MB), uploads it to Cloudinary (or local disk in development), persists
+ *       the new URL + Cloudinary public_id, and only THEN removes the previous image — never
+ *       the other way around.
+ *     tags: [Foods]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema: { type: object, required: [image], properties: { image: { type: string, format: binary } } }
+ *     responses:
+ *       201:
+ *         description: Uploaded — the updated food item
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { type: object, properties: { food: { $ref: '#/components/schemas/FoodItem' } } } } }
+ *       400: { description: 'No file, not a real image, or file too large' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       429: { description: Too many uploads }
+ *       502: { description: Image storage provider unavailable }
+ */
+router.post(
+  '/:id/image',
+  uploadLimiter,
+  authenticateUser,
+  requireOwnerOrPermission(PERMISSIONS.RESTAURANTS_MANAGE),
+  uploadSingleImage('image'),
+  foodController.uploadImage
+);
+
+/**
+ * @swagger
+ * /foods/{id}/image:
+ *   delete:
+ *     summary: Delete a food item's image (owner of its restaurant, or admin)
+ *     description: Deletes the Cloudinary asset first, and updates the food item only once that succeeds — a genuine storage failure is reported as 502, never silently treated as done.
+ *     tags: [Foods]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Deleted — the updated food item }
+ *       400: { description: This food item has no image to delete }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       502: { description: Image storage provider could not delete the asset }
+ */
+router.delete(
+  '/:id/image',
+  authenticateUser,
+  requireOwnerOrPermission(PERMISSIONS.RESTAURANTS_MANAGE),
+  foodController.deleteImage
 );
 
 module.exports = router;

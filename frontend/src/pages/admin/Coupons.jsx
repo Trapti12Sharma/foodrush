@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { Plus, Tag } from 'lucide-react';
 import { adminService } from '../../services/adminService';
 import CouponForm from '../../components/CouponForm';
@@ -75,13 +75,14 @@ export default function Coupons() {
       ) : coupons.length === 0 && !creating ? (
         <EmptyState icon={Tag} title="No coupons yet" description="Create one to offer discounts at checkout." />
       ) : (
-        <div className="mt-6 overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        <div className="mt-6 overflow-x-auto rounded-xl border border-gray-200 bg-surface">
           <table className="w-full text-sm">
             <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-400">
               <tr>
                 <th className="px-4 py-2">Code</th>
                 <th className="px-4 py-2">Discount</th>
                 <th className="px-4 py-2">Min order</th>
+                <th className="px-4 py-2">Scope</th>
                 <th className="px-4 py-2">Usage</th>
                 <th className="px-4 py-2">Expires</th>
                 <th className="px-4 py-2">Status</th>
@@ -96,6 +97,10 @@ export default function Coupons() {
                     {coupon.discountType === 'PERCENTAGE' ? `${coupon.discountValue}%` : `₹${coupon.discountValue}`}
                   </td>
                   <td className="px-4 py-2.5 text-gray-600">₹{coupon.minimumOrder}</td>
+                  <td className="px-4 py-2.5 text-gray-500">
+                    {coupon.restaurant ? 'One restaurant' : coupon.city ? coupon.city : 'All'}
+                    {coupon.perUserLimit ? ` · ${coupon.perUserLimit}/user` : ''}
+                  </td>
                   <td className="px-4 py-2.5 text-gray-600">
                     {coupon.usedCount}{coupon.usageLimit ? ` / ${coupon.usageLimit}` : ''}
                   </td>

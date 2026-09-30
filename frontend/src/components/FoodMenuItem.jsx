@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { Plus, Award, Sparkles } from 'lucide-react';
+import toast from '@/utils/toast';
 import { useCart } from '../context/CartContext';
 import QuantityStepper from './QuantityStepper';
-import { resolveImageUrl } from './ImageUploadField';
+import SmartImage from './SmartImage';
 
 export function VegDot({ isVeg }) {
   return (
@@ -20,14 +20,21 @@ export function VegDot({ isVeg }) {
 
 export default function FoodMenuItem({ food, requestAdd, disabled }) {
   const { cart, updateQuantity, removeItem } = useCart();
-  const [showAddons, setShowAddons] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [selectedVariantId, setSelectedVariantId] = useState(
+    () => food.variants?.find((v) => v.isAvailable)?._id || food.variants?.[0]?._id || ''
+  );
   const [selectedAddonIds, setSelectedAddonIds] = useState([]);
+  const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const hasVariants = food.variants?.length > 0;
   const hasAddons = food.addons?.length > 0;
-  const simpleLine = !hasAddons
-    ? cart.items.find((i) => i.food?._id === food._id && i.addons.length === 0)
-    : null;
+  const hasOptions = hasVariants || hasAddons;
+
+  // A food with no variants/addons has one possible cart line, found by food id alone —
+  // that's the only case the inline +/- stepper applies to.
+  const simpleLine = !hasOptions ? cart.items.find((i) => i.food?._id === food._id && i.addons.length === 0 && !i.variantId) : null;
 
   async function handleSimpleAdd() {
     setBusy(true);
@@ -64,70 +71,156 @@ export default function FoodMenuItem({ food, requestAdd, disabled }) {
     setSelectedAddonIds((prev) => (prev.includes(addonId) ? prev.filter((id) => id !== addonId) : [...prev, addonId]));
   }
 
-  async function handleAddWithAddons() {
+  async function handleAddWithOptions() {
+    if (hasVariants && !selectedVariantId) {
+      toast.error('Please choose an option');
+      return;
+    }
     setBusy(true);
-    await requestAdd({ foodId: food._id, quantity: 1, addons: selectedAddonIds.map((addonId) => ({ addonId })) });
-    setBusy(false);
-    setShowAddons(false);
-    setSelectedAddonIds([]);
+    try {
+      await requestAdd({
+        foodId: food._id,
+        quantity: 1,
+        addons: selectedAddonIds.map((addonId) => ({ addonId })),
+        variantId: selectedVariantId || undefined,
+        note: note.trim() || undefined,
+      });
+      setOptionsOpen(false);
+      setSelectedAddonIds([]);
+      setNote('');
+    } finally {
+      setBusy(false);
+    }
   }
+
+  const selectedVariant = food.variants?.find((v) => v._id === selectedVariantId);
+  const displayPrice = hasVariants
+    ? selectedVariant
+      ? (selectedVariant.discountPrice ?? selectedVariant.price)
+      : food.displayPrice
+    : food.discountPrice;
 
   return (
     <div className="flex items-start justify-between gap-4 p-4">
-      <div className="flex-1">
-        <div className="flex items-center gap-2">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
           <VegDot isVeg={food.isVeg} />
           <p className="font-medium text-gray-900">{food.name}</p>
         </div>
+        {(food.isBestseller || food.isRecommended) && (
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {food.isBestseller && (
+              <span className="flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                <Award size={10} /> Bestseller
+              </span>
+            )}
+            {food.isRecommended && (
+              <span className="flex items-center gap-1 rounded bg-brand-100 px-1.5 py-0.5 text-[10px] font-semibold text-brand-700">
+                <Sparkles size={10} /> Recommended
+              </span>
+            )}
+          </div>
+        )}
         {food.description && <p className="mt-1 text-sm text-gray-500">{food.description}</p>}
         <p className="mt-2 text-sm font-semibold text-gray-900">
-          {food.discountPrice != null ? (
+          {hasVariants ? (
+            `From ₹${food.displayPrice}`
+          ) : displayPrice != null && displayPrice !== food.price ? (
             <>
-              ₹{food.discountPrice}{' '}
-              <span className="ml-1 text-xs font-normal text-gray-400 line-through">₹{food.price}</span>
+              ₹{displayPrice} <span className="ml-1 text-xs font-normal text-gray-400 line-through">₹{food.price}</span>
             </>
           ) : (
             `₹${food.price}`
           )}
         </p>
 
-        {hasAddons && !showAddons && (
+        {hasOptions && !optionsOpen && (
           <button
             type="button"
             disabled={disabled}
-            onClick={() => setShowAddons(true)}
+            onClick={() => setOptionsOpen(true)}
             className="mt-2 text-xs font-medium text-brand-600 hover:underline disabled:cursor-not-allowed disabled:text-gray-400"
           >
-            Customize &amp; add
+            {hasVariants ? 'Select options' : 'Customize & add'}
           </button>
         )}
 
-        {hasAddons && showAddons && (
+        {hasOptions && optionsOpen && (
           <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
-            <p className="mb-2 text-xs font-medium text-gray-600">Add-ons</p>
-            <div className="space-y-1">
-              {food.addons
-                .filter((a) => a.isAvailable)
-                .map((addon) => (
-                  <label key={addon._id} className="flex items-center justify-between gap-2 text-sm text-gray-700">
-                    <span className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedAddonIds.includes(addon._id)}
-                        onChange={() => toggleAddon(addon._id)}
-                      />
-                      {addon.name}
-                    </span>
-                    <span className="text-gray-400">+₹{addon.price}</span>
-                  </label>
-                ))}
+            {hasVariants && (
+              <div className="mb-3">
+                <p className="mb-1.5 text-xs font-medium text-gray-600">Choose an option</p>
+                <div className="space-y-1">
+                  {food.variants.map((variant) => (
+                    <label
+                      key={variant._id}
+                      className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-sm ${
+                        variant.isAvailable ? 'cursor-pointer border-gray-200 bg-surface' : 'cursor-not-allowed border-gray-100 bg-gray-100 text-gray-400'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name={`variant-${food._id}`}
+                          disabled={!variant.isAvailable}
+                          checked={selectedVariantId === variant._id}
+                          onChange={() => setSelectedVariantId(variant._id)}
+                        />
+                        {variant.name}
+                        {!variant.isAvailable && ' (unavailable)'}
+                      </span>
+                      <span className="text-gray-600">
+                        {variant.discountPrice != null ? (
+                          <>
+                            ₹{variant.discountPrice} <span className="text-gray-400 line-through">₹{variant.price}</span>
+                          </>
+                        ) : (
+                          `₹${variant.price}`
+                        )}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {hasAddons && (
+              <div className="mb-3">
+                <p className="mb-1.5 text-xs font-medium text-gray-600">Add-ons</p>
+                <div className="space-y-1">
+                  {food.addons
+                    .filter((a) => a.isAvailable)
+                    .map((addon) => (
+                      <label key={addon._id} className="flex items-center justify-between gap-2 text-sm text-gray-700">
+                        <span className="flex items-center gap-2">
+                          <input type="checkbox" checked={selectedAddonIds.includes(addon._id)} onChange={() => toggleAddon(addon._id)} />
+                          {addon.name}
+                        </span>
+                        <span className="text-gray-400">+₹{addon.price}</span>
+                      </label>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            <div className="mb-3">
+              <label className="mb-1 block text-xs font-medium text-gray-600">Cooking instructions (optional)</label>
+              <input
+                value={note}
+                onChange={(e) => setNote(e.target.value.slice(0, 140))}
+                placeholder="e.g. less spicy, no onions"
+                maxLength={140}
+                className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
+              />
             </div>
-            <div className="mt-3 flex gap-2">
+
+            <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => {
-                  setShowAddons(false);
+                  setOptionsOpen(false);
                   setSelectedAddonIds([]);
+                  setNote('');
                 }}
                 className="flex-1 rounded-lg border border-gray-200 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100"
               >
@@ -135,9 +228,9 @@ export default function FoodMenuItem({ food, requestAdd, disabled }) {
               </button>
               <button
                 type="button"
-                onClick={handleAddWithAddons}
-                disabled={busy}
-                className="flex-1 rounded-lg bg-brand-600 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+                onClick={handleAddWithOptions}
+                disabled={busy || (hasVariants && (!selectedVariantId || selectedVariant?.isAvailable === false))}
+                className="flex-1 rounded-lg bg-brand-600 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Add to cart
               </button>
@@ -147,15 +240,10 @@ export default function FoodMenuItem({ food, requestAdd, disabled }) {
       </div>
 
       <div className="flex shrink-0 flex-col items-end gap-2">
-        {food.image && <img src={resolveImageUrl(food.image)} alt={food.name} className="h-20 w-20 rounded-lg object-cover" />}
-        {!hasAddons &&
+        <SmartImage src={food.image} alt={food.name} widths={[160, 240]} sizes="80px" className="h-20 w-20 rounded-lg" />
+        {!hasOptions &&
           (simpleLine ? (
-            <QuantityStepper
-              quantity={simpleLine.quantity}
-              onIncrement={handleIncrement}
-              onDecrement={handleDecrement}
-              disabled={busy || disabled}
-            />
+            <QuantityStepper quantity={simpleLine.quantity} onIncrement={handleIncrement} onDecrement={handleDecrement} disabled={busy || disabled} />
           ) : (
             <button
               type="button"

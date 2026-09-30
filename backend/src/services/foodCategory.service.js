@@ -3,13 +3,15 @@ const FoodItem = require('../models/FoodItem');
 const Restaurant = require('../models/Restaurant');
 const ApiError = require('../utils/ApiError');
 const { assertOwnerOrAdmin } = require('../utils/ownership');
+const { PERMISSIONS, hasPermission } = require('../utils/permissions');
 const restaurantService = require('./restaurant.service');
+const storageService = require('./storage.service');
 
 async function listByRestaurant(restaurantId, requester) {
   const restaurant = await restaurantService.getRestaurantById(restaurantId, requester);
   const isManager =
     requester &&
-    (requester.role === 'ADMIN' || restaurant.owner.toString() === requester._id.toString());
+    (hasPermission(requester, PERMISSIONS.RESTAURANTS_READ_ALL) || restaurant.owner.toString() === requester._id.toString());
 
   const filter = { restaurant: restaurant._id };
   if (!isManager) filter.isActive = true; // customers only see enabled categories
@@ -41,10 +43,12 @@ async function updateCategory(id, requester, payload) {
   const restaurant = await Restaurant.findById(category.restaurant);
   assertOwnerOrAdmin(restaurant.owner, requester, 'You can only manage your own restaurant');
 
+  const previousImage = category.image;
   ['name', 'description', 'image', 'isActive'].forEach((field) => {
     if (payload[field] !== undefined) category[field] = payload[field];
   });
   await category.save();
+  await storageService.cleanupReplaced(previousImage, category.image, restaurant.owner);
   return category;
 }
 
@@ -63,6 +67,7 @@ async function deleteCategory(id, requester) {
   }
 
   await category.deleteOne();
+  await storageService.deleteIfOwned(category.image, restaurant.owner);
 }
 
 module.exports = { listByRestaurant, getCategoryById, createCategory, updateCategory, deleteCategory };

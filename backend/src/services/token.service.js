@@ -10,14 +10,25 @@ function parseDurationToMs(duration) {
   return value * unitMs[match[2]];
 }
 
+// M18 — the algorithm is pinned on BOTH sign and verify rather than left to the
+// library's defaults. jsonwebtoken 9 already refuses `alg: none` for a string
+// secret, so this is defence in depth rather than a live hole being closed: it
+// means a token is only ever accepted if it was signed the one way this service
+// signs them, and it stays true if the signing key is ever changed to an
+// asymmetric one (the case where an unpinned verify becomes a real algorithm-
+// confusion vulnerability). Pinning costs nothing and removes the need to
+// re-reason about it later.
+const JWT_ALGORITHM = 'HS256';
+
 function signToken(user) {
   return jwt.sign({ sub: user._id.toString(), role: user.role }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+    algorithm: JWT_ALGORITHM,
   });
 }
 
 function verifyToken(token) {
-  return jwt.verify(token, process.env.JWT_SECRET);
+  return jwt.verify(token, process.env.JWT_SECRET, { algorithms: [JWT_ALGORITHM] });
 }
 
 function cookieOptions() {
@@ -37,4 +48,4 @@ function cookieOptions() {
   };
 }
 
-module.exports = { COOKIE_NAME, signToken, verifyToken, cookieOptions };
+module.exports = { COOKIE_NAME, JWT_ALGORITHM, signToken, verifyToken, cookieOptions };

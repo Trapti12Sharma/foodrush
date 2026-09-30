@@ -6,7 +6,23 @@ const { escapeRegex } = require('../utils/regex');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { assertOwnerOrAdmin } = require('../utils/ownership');
 const restaurantService = require('./restaurant.service');
-const { ROLES } = require('../utils/constants');
+const storageService = require('./storage.service');
+const { parseCloudinaryUrl } = require('../utils/imageUrl');
+const { PERMISSIONS, hasPermission } = require('../utils/permissions');
+
+// Same reasoning as restaurant.service.js's identical helper: always
+// server-derived from the URL, never a client-settable field.
+function derivePublicId(url) {
+  return parseCloudinaryUrl(url)?.publicId || null;
+}
+
+// Mirrors restaurant.service.js#cleanupOldImage exactly — prefer the reliably
+// stored publicId; a pre-M13 record without one falls back to the URL-ownership heuristic.
+async function cleanupOldImage(oldUrl, oldPublicId, newUrl, ownerId) {
+  if (!oldUrl || oldUrl === newUrl) return;
+  if (oldPublicId) await storageService.deleteByPublicId(oldPublicId);
+  else await storageService.deleteIfOwned(oldUrl, ownerId);
+}
 
 const SORT_MAP = {
   price_asc: 'price',
@@ -24,6 +40,9 @@ const CREATE_FIELDS = [
   'isVeg',
   'preparationTime',
   'addons',
+  'variants',
+  'isRecommended',
+  'isBestseller',
 ];
 const UPDATE_FIELDS = [...CREATE_FIELDS, 'isAvailable', 'category'];
 
@@ -34,7 +53,8 @@ async function listFoods(query, requester) {
   if (query.restaurant) {
     const restaurant = await restaurantService.getRestaurantById(query.restaurant, requester);
     const isManager =
-      requester && (requester.role === ROLES.ADMIN || restaurant.owner.toString() === requester._id.toString());
+      requester &&
+      (hasPermission(requester, PERMISSIONS.RESTAURANTS_READ_ALL) || restaurant.owner.toString() === requester._id.toString());
 
     filter.restaurant = restaurant._id;
     if (!isManager) filter.isAvailable = true;
@@ -106,6 +126,7 @@ async function createFood(requester, payload) {
   await validateCategoryBelongsToRestaurant(payload.category, restaurant._id);
 
   const data = pickFields(payload, CREATE_FIELDS);
+  if (data.image !== undefined) data.imagePublicId = derivePublicId(data.image);
   return FoodItem.create({ ...data, restaurant: restaurant._id, category: payload.category });
 }
 
@@ -121,8 +142,12 @@ async function updateFood(id, requester, payload) {
   }
 
   const data = pickFields(payload, UPDATE_FIELDS);
+  if (data.image !== undefined) data.imagePublicId = derivePublicId(data.image);
+  const previousImage = food.image;
+  const previousPublicId = food.imagePublicId;
   Object.assign(food, data);
   await food.save();
+  await cleanupOldImage(previousImage, previousPublicId, food.image, restaurant.owner);
   return food;
 }
 
@@ -139,6 +164,52 @@ async function deleteFood(id, requester) {
   assertOwnerOrAdmin(restaurant.owner, requester, 'You can only manage your own restaurant');
 
   await food.deleteOne();
+  if (food.imagePublicId) await storageService.deleteByPublicId(food.imagePublicId);
+  else await storageService.deleteIfOwned(food.image, restaurant.owner);
 }
 
-module.exports = { listFoods, getFoodById, createFood, updateFood, deleteFood };
+// M13 — the dedicated one-request "upload and attach" endpoint, mirroring
+// restaurant.service.js#uploadRestaurantImage exactly: upload first (old image
+// untouched if this fails), persist, only then clean up the old asset.
+async function uploadFoodImage(id, requester, file) {
+  const food = await FoodItem.findById(id);
+  if (!food) throw ApiError.notFound('Food item not found');
+  const restaurant = await Restaurant.findById(food.restaurant);
+  assertOwnerOrAdmin(restaurant.owner, requester, 'You can only manage your own restaurant');
+
+  const { url, publicId } = await storageService.saveUploadedFile(file, { purpose: 'food', userId: requester._id.toString() });
+
+  const previousImage = food.image;
+  const previousPublicId = food.imagePublicId;
+  food.image = url;
+  food.imagePublicId = publicId || null;
+  await food.save();
+
+  await cleanupOldImage(previousImage, previousPublicId, url, restaurant.owner);
+  return food;
+}
+
+// M13 — mirrors restaurant.service.js#deleteRestaurantImage's delete-flow and
+// legacy-fallback behavior exactly (see its comment for the one documented edge case).
+async function deleteFoodImage(id, requester) {
+  const food = await FoodItem.findById(id);
+  if (!food) throw ApiError.notFound('Food item not found');
+  const restaurant = await Restaurant.findById(food.restaurant);
+  assertOwnerOrAdmin(restaurant.owner, requester, 'You can only manage your own restaurant');
+
+  if (!food.image) throw ApiError.badRequest('This food item has no image to delete');
+
+  if (food.imagePublicId) {
+    const result = await storageService.deleteByPublicId(food.imagePublicId);
+    if (!result.success) throw new ApiError(502, 'Could not delete the image. Please try again.');
+  } else {
+    await storageService.deleteIfOwned(food.image, restaurant.owner);
+  }
+
+  food.image = '';
+  food.imagePublicId = null;
+  await food.save();
+  return food;
+}
+
+module.exports = { listFoods, getFoodById, createFood, updateFood, deleteFood, uploadFoodImage, deleteFoodImage };

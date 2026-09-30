@@ -1,17 +1,55 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Star, Clock, Bike, Wallet, ArrowLeft, Heart } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { Star, Clock, Bike, Wallet, ArrowLeft, Heart, ChevronDown, Sparkles } from 'lucide-react';
+import toast from '@/utils/toast';
 import { restaurantService } from '../services/restaurantService';
 import { foodService } from '../services/foodService';
 import EmptyState from '../components/EmptyState';
 import FoodMenuItem from '../components/FoodMenuItem';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ReviewsSection from '../components/ReviewsSection';
-import { resolveImageUrl } from '../components/ImageUploadField';
+import SmartImage from '../components/SmartImage';
 import { useAddToCart } from '../hooks/useAddToCart';
 import { useAuth } from '../context/AuthContext';
 import { useFavorites } from '../context/FavoritesContext';
+
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const minutesToHHMM = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+
+function OpeningHoursSummary({ restaurant }) {
+  const [open, setOpen] = useState(false);
+  const slots = restaurant.openingHours || [];
+  if (slots.length === 0) return null;
+
+  const byDay = new Map();
+  slots.forEach((s) => {
+    if (!byDay.has(s.day)) byDay.set(s.day, []);
+    byDay.get(s.day).push(s);
+  });
+
+  return (
+    <div className="mt-3 text-sm">
+      <button type="button" onClick={() => setOpen((v) => !v)} className="flex items-center gap-1 font-medium text-gray-700 hover:text-brand-600">
+        <Clock size={14} /> Opening hours <ChevronDown size={14} className={open ? 'rotate-180 transition' : 'transition'} />
+      </button>
+      {open && (
+        <ul className="mt-2 space-y-0.5 text-gray-500">
+          {DAY_NAMES.map((label, day) =>
+            byDay.has(day) ? (
+              <li key={day}>
+                {label}: {byDay.get(day).map((s) => `${minutesToHHMM(s.open)}–${minutesToHHMM(s.close)}`).join(', ')}
+              </li>
+            ) : (
+              <li key={day} className="text-gray-400">
+                {label}: closed
+              </li>
+            )
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 export default function RestaurantDetail() {
   const { id } = useParams();
@@ -20,6 +58,7 @@ export default function RestaurantDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [menuSearch, setMenuSearch] = useState('');
+  const [vegOnly, setVegOnly] = useState(false);
   const { requestAdd, conflict, confirmSwitch, cancelSwitch } = useAddToCart();
   const { user } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
@@ -54,20 +93,26 @@ export default function RestaurantDetail() {
     }
   }
 
-  const groupedMenu = useMemo(() => {
+  const filteredFoods = useMemo(() => {
     const term = menuSearch.trim().toLowerCase();
-    const filtered = term
-      ? foods.filter((f) => f.name.toLowerCase().includes(term) || f.description?.toLowerCase().includes(term))
-      : foods;
+    return foods.filter((f) => {
+      if (vegOnly && !f.isVeg) return false;
+      if (!term) return true;
+      return f.name.toLowerCase().includes(term) || f.description?.toLowerCase().includes(term);
+    });
+  }, [foods, menuSearch, vegOnly]);
 
+  const recommended = useMemo(() => filteredFoods.filter((f) => f.isRecommended), [filteredFoods]);
+
+  const groupedMenu = useMemo(() => {
     const groups = new Map();
-    filtered.forEach((food) => {
+    filteredFoods.forEach((food) => {
       const key = food.category?.name || 'Other';
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(food);
     });
     return Array.from(groups.entries());
-  }, [foods, menuSearch]);
+  }, [filteredFoods]);
 
   if (loading) {
     return <div className="py-24 text-center text-gray-400">Loading restaurant…</div>;
@@ -91,11 +136,16 @@ export default function RestaurantDetail() {
 
   return (
     <div>
-      <div className="aspect-[3/1] w-full bg-gray-200">
-        {restaurant.image && (
-          <img src={resolveImageUrl(restaurant.image)} alt={restaurant.name} className="h-full w-full object-cover" />
-        )}
-      </div>
+      <SmartImage
+        src={restaurant.coverImage || restaurant.image}
+        alt={restaurant.name}
+        cuisine={restaurant.cuisine}
+        aspect={3 / 1}
+        widths={[640, 1024, 1600]}
+        sizes="100vw"
+        eager
+        className="w-full"
+      />
 
       <div className="mx-auto max-w-5xl px-4 py-6">
         <Link to="/restaurants" className="mb-3 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-brand-600">
@@ -104,6 +154,9 @@ export default function RestaurantDetail() {
 
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-start gap-2">
+            {restaurant.logo && (
+              <SmartImage src={restaurant.logo} alt={`${restaurant.name} logo`} widths={[96, 192]} sizes="56px" className="h-14 w-14 shrink-0 rounded-full border border-gray-200" />
+            )}
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{restaurant.name}</h1>
               <p className="mt-1 text-sm text-gray-500">{restaurant.cuisine.join(', ')} · {restaurant.city}</p>
@@ -131,20 +184,40 @@ export default function RestaurantDetail() {
           <span className="flex items-center gap-1"><Wallet size={16} /> Min order ₹{restaurant.minimumOrder}</span>
         </div>
 
-        {!restaurant.isOpen && (
+        <OpeningHoursSummary restaurant={restaurant} />
+
+        {!restaurant.isOpenNow && (
           <div className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
             Restaurant is currently closed. You can browse the menu, but ordering is unavailable right now.
           </div>
         )}
 
-        <input
-          value={menuSearch}
-          onChange={(e) => setMenuSearch(e.target.value)}
-          placeholder="Search this menu…"
-          className="mt-6 w-full max-w-sm rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-400"
-        />
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <input
+            value={menuSearch}
+            onChange={(e) => setMenuSearch(e.target.value)}
+            placeholder="Search this menu…"
+            className="w-full max-w-sm rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-400"
+          />
+          <label className="flex items-center gap-1.5 text-sm text-gray-700">
+            <input type="checkbox" checked={vegOnly} onChange={(e) => setVegOnly(e.target.checked)} /> Veg only
+          </label>
+        </div>
 
         <div className="mt-6 space-y-8">
+          {recommended.length > 0 && (
+            <section>
+              <h2 className="mb-3 flex items-center gap-1.5 text-lg font-bold text-gray-900">
+                <Sparkles size={18} className="text-brand-600" /> Recommended
+              </h2>
+              <div className="divide-y divide-gray-100 rounded-xl border border-gray-100 bg-surface">
+                {recommended.map((food) => (
+                  <FoodMenuItem key={`rec-${food._id}`} food={food} requestAdd={requestAdd} disabled={!restaurant.isOpenNow} />
+                ))}
+              </div>
+            </section>
+          )}
+
           {groupedMenu.length === 0 && (
             <EmptyState title="No menu items found" description="Try a different search, or check back later." />
           )}
@@ -152,9 +225,9 @@ export default function RestaurantDetail() {
           {groupedMenu.map(([categoryName, items]) => (
             <section key={categoryName}>
               <h2 className="mb-3 text-lg font-bold text-gray-900">{categoryName}</h2>
-              <div className="divide-y divide-gray-100 rounded-xl border border-gray-100 bg-white">
+              <div className="divide-y divide-gray-100 rounded-xl border border-gray-100 bg-surface">
                 {items.map((food) => (
-                  <FoodMenuItem key={food._id} food={food} requestAdd={requestAdd} disabled={!restaurant.isOpen} />
+                  <FoodMenuItem key={food._id} food={food} requestAdd={requestAdd} disabled={!restaurant.isOpenNow} />
                 ))}
               </div>
             </section>

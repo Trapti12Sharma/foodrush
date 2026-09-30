@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 import { Plus, Tag, X } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import { addressService } from '../services/addressService';
 import { orderService } from '../services/orderService';
+import { restaurantService } from '../services/restaurantService';
 import { configService } from '../services/configService';
 import AddressCard from '../components/AddressCard';
 import AddressForm from '../components/AddressForm';
 import EmptyState from '../components/EmptyState';
+import { loadRazorpayScript, openRazorpayCheckout } from '../utils/razorpay';
 
 function Row({ label, value, emphasis }) {
   return (
@@ -21,6 +24,7 @@ function Row({ label, value, emphasis }) {
 
 export default function Checkout() {
   const { cart, loading: cartLoading, applyCoupon, removeCoupon, refresh } = useCart();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [addresses, setAddresses] = useState([]);
@@ -62,6 +66,28 @@ export default function Checkout() {
     }
   }, [cartLoading, cart.items.length, navigate]);
 
+  // Ask the server whether this restaurant delivers to the selected address. (The server enforces the
+  // same rule when the order is placed; this just tells the customer up front.)
+  const selectedAddress = addresses.find((a) => a._id === selectedAddressId);
+  const [delivery, setDelivery] = useState(null);
+  const restaurantId = cart.restaurant?._id;
+  const addressLat = selectedAddress?.latitude;
+  const addressLng = selectedAddress?.longitude;
+  useEffect(() => {
+    if (!restaurantId || addressLat == null || addressLng == null) {
+      setDelivery(null);
+      return undefined;
+    }
+    let cancelled = false;
+    restaurantService
+      .deliveryCheck(restaurantId, addressLat, addressLng)
+      .then((result) => !cancelled && setDelivery(result))
+      .catch(() => !cancelled && setDelivery(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [restaurantId, addressLat, addressLng]);
+
   async function handleAddAddress(values) {
     setAddressSubmitting(true);
     try {
@@ -102,6 +128,47 @@ export default function Checkout() {
     }
   }
 
+  // Navigate away first, THEN refresh the (now-empty) cart in the background.
+  // Awaiting refresh() before navigating let this component re-render with an
+  // empty cart while still mounted, which fires its own "cart is empty ->
+  // redirect to /cart" effect — a race that could overwrite this navigation
+  // to the order confirmation page with a bounce back to /cart.
+  function goToOrder(orderId) {
+    navigate(`/orders/${orderId}`);
+    refresh();
+  }
+
+  // Opens Razorpay Checkout for a just-created ONLINE order. Whatever happens —
+  // success, the customer closes the modal, or Razorpay reports a failure — the
+  // order already exists (created before this point) so we always land on the
+  // order page, where a "Retry payment" action is available for anything short
+  // of a verified success.
+  async function payOnline(order, razorpay) {
+    const scriptLoaded = await loadRazorpayScript();
+    if (!scriptLoaded) {
+      toast.error('Could not load the payment gateway. Your order was placed — retry payment from the order page.');
+      goToOrder(order._id);
+      return;
+    }
+    try {
+      const result = await openRazorpayCheckout({ razorpay, order, user });
+      await orderService.verifyPayment(order._id, {
+        razorpayOrderId: result.razorpay_order_id,
+        razorpayPaymentId: result.razorpay_payment_id,
+        signature: result.razorpay_signature,
+      });
+      toast.success('Payment successful — order placed!');
+    } catch (err) {
+      toast.error(
+        err.message === 'Payment window closed'
+          ? 'Payment cancelled — you can retry from your order page.'
+          : err.message || 'Payment failed — you can retry from your order page.'
+      );
+    } finally {
+      goToOrder(order._id);
+    }
+  }
+
   async function handlePlaceOrder() {
     if (!selectedAddressId) {
       toast.error('Please select a delivery address');
@@ -109,15 +176,13 @@ export default function Checkout() {
     }
     setPlacing(true);
     try {
-      const order = await orderService.create({ addressId: selectedAddressId, paymentMethod });
-      toast.success('Order placed successfully');
-      // Navigate away first, THEN refresh the (now-empty) cart in the background.
-      // Awaiting refresh() before navigating let this component re-render with an
-      // empty cart while still mounted, which fires its own "cart is empty ->
-      // redirect to /cart" effect — a race that could overwrite this navigation
-      // to the order confirmation page with a bounce back to /cart.
-      navigate(`/orders/${order._id}`);
-      refresh();
+      const { order, razorpay } = await orderService.create({ addressId: selectedAddressId, paymentMethod });
+      if (paymentMethod === 'ONLINE' && razorpay) {
+        await payOnline(order, razorpay);
+      } else {
+        toast.success('Order placed successfully');
+        goToOrder(order._id);
+      }
     } catch (err) {
       toast.error(err.message || 'Could not place your order');
     } finally {
@@ -130,8 +195,9 @@ export default function Checkout() {
   }
 
   const belowMinimum = cart.restaurant && cart.subtotal < cart.restaurant.minimumOrder;
-  const restaurantClosed = cart.restaurant && !cart.restaurant.isOpen;
-  const canPlaceOrder = !belowMinimum && !restaurantClosed && !!selectedAddressId && !placing;
+  const restaurantClosed = cart.restaurant && !(cart.restaurant.isOpenNow ?? cart.restaurant.isOpen);
+  const outOfRange = delivery?.deliverable === false;
+  const canPlaceOrder = !belowMinimum && !restaurantClosed && !outOfRange && !!selectedAddressId && !placing;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
@@ -173,18 +239,32 @@ export default function Checkout() {
         )}
       </section>
 
+      {outOfRange && (
+        <p className="mt-3 rounded-lg bg-red-50 px-4 py-2.5 text-sm font-medium text-red-700">
+          {cart.restaurant?.name} doesn&apos;t deliver to this address — it&apos;s {delivery.distanceKm} km away and they deliver within {delivery.radiusKm} km.
+          Choose a different address or another restaurant.
+        </p>
+      )}
+      {selectedAddress && selectedAddress.latitude == null && (
+        <p className="mt-3 rounded-lg bg-amber-50 px-4 py-2.5 text-sm text-amber-700">
+          This address&apos;s location isn&apos;t confirmed, so we can&apos;t check the delivery distance. Edit it in your addresses to confirm.
+        </p>
+      )}
+
       {/* Step 2: Review order */}
       <section className="mt-8">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">2. Review your order</h2>
         <p className="mb-2 text-sm text-gray-500">{cart.restaurant?.name}</p>
-        <div className="divide-y divide-gray-100 rounded-xl border border-gray-100 bg-white">
+        <div className="divide-y divide-gray-100 rounded-xl border border-gray-100 bg-surface">
           {cart.items.map((item) => (
             <div key={item._id} className="flex items-center justify-between p-3 text-sm">
               <div>
                 <p className="font-medium text-gray-900">
                   {item.quantity} × {item.food?.name}
+                  {item.variantName && <span className="font-normal text-gray-500"> ({item.variantName})</span>}
                 </p>
                 {item.addons.length > 0 && <p className="text-xs text-gray-400">{item.addons.map((a) => a.name).join(', ')}</p>}
+                {item.note && <p className="text-xs italic text-gray-400">Note: {item.note}</p>}
               </div>
               <p className="text-gray-700">₹{((item.price + item.addons.reduce((a, x) => a + x.price, 0)) * item.quantity).toFixed(2)}</p>
             </div>
@@ -236,13 +316,13 @@ export default function Checkout() {
       <section className="mt-8">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">4. Payment method</h2>
         <div className="space-y-2">
-          <label className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-4 text-sm">
+          <label className="flex items-center gap-3 rounded-xl border border-gray-200 bg-surface p-4 text-sm">
             <input type="radio" name="payment" checked={paymentMethod === 'COD'} onChange={() => setPaymentMethod('COD')} />
             Cash on Delivery
           </label>
           <label
             className={`flex items-center justify-between gap-3 rounded-xl border p-4 text-sm ${
-              onlinePaymentsEnabled ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 text-gray-400'
+              onlinePaymentsEnabled ? 'border-gray-200 bg-surface' : 'border-gray-100 bg-gray-50 text-gray-400'
             }`}
           >
             <span className="flex items-center gap-3">
@@ -261,7 +341,7 @@ export default function Checkout() {
       </section>
 
       {/* Totals + place order */}
-      <section className="mt-8 space-y-2 rounded-xl border border-gray-100 bg-white p-4">
+      <section className="mt-8 space-y-2 rounded-xl border border-gray-100 bg-surface p-4">
         <Row label="Subtotal" value={cart.subtotal} />
         <Row label="Delivery fee" value={cart.deliveryFee} />
         <Row label="Tax" value={cart.tax} />

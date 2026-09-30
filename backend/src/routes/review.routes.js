@@ -1,8 +1,14 @@
 const express = require('express');
 const reviewController = require('../controllers/review.controller');
-const { createReviewValidator, updateReviewValidator } = require('../validators/review.validator');
+const {
+  createReviewValidator,
+  updateReviewValidator,
+  reportReviewValidator,
+  replyToReviewValidator,
+} = require('../validators/review.validator');
 const validate = require('../middleware/validate');
 const { authenticateUser } = require('../middleware/auth.middleware');
+const { reviewLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
 
@@ -15,9 +21,11 @@ const router = express.Router();
  *       Only the customer whose own order this is, and only once that order
  *       has reached orderStatus=delivered, may review it — enforced
  *       server-side by re-loading the order, not just by the frontend hiding
- *       the "write a review" button. The order's restaurant.rating and
- *       totalReviews are recalculated immediately. A unique index on
- *       Review.order blocks a second review for the same order.
+ *       the "write a review" button. A unique index on Review.order blocks a
+ *       second review for the same order. The review starts moderationStatus
+ *       "PENDING" (M15) — it does not affect the restaurant's public rating
+ *       until an admin approves it, and it is only visible to its own author
+ *       and to moderation staff until then.
  *     tags: [Reviews]
  *     requestBody:
  *       required: true
@@ -46,14 +54,17 @@ const router = express.Router();
  *         content: { application/json: { schema: { $ref: '#/components/schemas/ApiError' } } }
  *       422: { $ref: '#/components/responses/ValidationError' }
  */
-router.post('/', authenticateUser, createReviewValidator, validate, reviewController.createReview);
+router.post('/', authenticateUser, reviewLimiter, createReviewValidator, validate, reviewController.createReview);
 
 /**
  * @swagger
  * /reviews/{id}:
  *   put:
  *     summary: Edit your own review (or an admin editing any review)
- *     description: Recalculates the restaurant's rating afterward.
+ *     description: >
+ *       Changing rating/comment/images resets moderationStatus back to
+ *       PENDING (M15) — an edited review needs a fresh look before it counts
+ *       toward the rating again — then recalculates the restaurant's rating.
  *     tags: [Reviews]
  *     parameters:
  *       - in: path
@@ -101,5 +112,117 @@ router.put('/:id', authenticateUser, updateReviewValidator, validate, reviewCont
  *       404: { $ref: '#/components/responses/NotFound' }
  */
 router.delete('/:id', authenticateUser, reviewController.deleteReview);
+
+/**
+ * @swagger
+ * /reviews/{id}/report:
+ *   post:
+ *     summary: Report a review as inappropriate (M15)
+ *     description: >
+ *       One report per customer per review — a second attempt returns 409.
+ *       Reporting your own review is rejected. Does not itself change the
+ *       review's moderationStatus; it only raises reportCount/reportedAt for
+ *       moderation staff to triage (GET /admin/reviews?reported=true).
+ *     tags: [Reviews]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [reason]
+ *             properties:
+ *               reason: { type: string, enum: [SPAM, ABUSIVE, OFFENSIVE, FAKE, IRRELEVANT, OTHER] }
+ *     responses:
+ *       201: { description: Report recorded }
+ *       400: { description: "You cannot report your own review" }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       409: { description: "You have already reported this review" }
+ *       422: { $ref: '#/components/responses/ValidationError' }
+ */
+router.post('/:id/report', authenticateUser, reviewLimiter, reportReviewValidator, validate, reviewController.reportReview);
+
+/**
+ * @swagger
+ * /reviews/{id}/reply:
+ *   put:
+ *     summary: Publish or update the restaurant's reply to a review (M21)
+ *     description: >
+ *       Only the restaurant's own OWNER may write a reply — deliberately not
+ *       staff holding restaurants:manage, who may edit the restaurant's profile
+ *       and submit its KYC. Editing a profile is administration; publishing
+ *       words under a restaurant's name to its customers is speech, so nobody
+ *       can put words in a business's mouth.
+ *
+ *       Only an APPROVED review can be replied to: a PENDING or REJECTED review
+ *       is not public, so a reply to one would be a reply to nobody, and a
+ *       HIDDEN review should not gain new public content.
+ *
+ *       Idempotent — calling it again replaces the existing reply, so a
+ *       double-submit leaves one reply rather than two. The review's author is
+ *       notified on the FIRST reply only; later edits are the restaurant
+ *       correcting its own wording and do not re-notify.
+ *
+ *       Replies are not moderated (the review they answer already was); a
+ *       moderator can delete an abusive one via DELETE on this path.
+ *     tags: [Reviews]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [text]
+ *             properties:
+ *               text: { type: string, maxLength: 1000 }
+ *     responses:
+ *       200:
+ *         description: The review, including its reply
+ *         content:
+ *           application/json:
+ *             schema: { type: object, properties: { data: { type: object, properties: { review: { $ref: '#/components/schemas/Review' } } } } }
+ *       400: { description: The review is not APPROVED, so it cannot be replied to }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { description: Not the owner of this review's restaurant }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       422: { $ref: '#/components/responses/ValidationError' }
+ */
+router.put('/:id/reply', authenticateUser, reviewLimiter, replyToReviewValidator, validate, reviewController.replyToReview);
+
+/**
+ * @swagger
+ * /reviews/{id}/reply:
+ *   delete:
+ *     summary: Remove the restaurant's reply to a review (M21)
+ *     description: >
+ *       Allowed to the restaurant's owner (retracting their own words) OR to
+ *       staff holding reviews:moderate (removing an abusive reply). The second
+ *       case is why this is not owner-only: replies are deliberately published
+ *       without passing through a moderation queue, so removal has to be
+ *       possible without waiting for the person who wrote it.
+ *     tags: [Reviews]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: Reply removed }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { description: Neither the restaurant's owner nor a moderator }
+ *       404: { description: Review not found, or it has no reply to remove }
+ */
+router.delete('/:id/reply', authenticateUser, reviewController.deleteReply);
 
 module.exports = router;

@@ -1,9 +1,11 @@
 import { Outlet, NavLink } from 'react-router-dom';
-import toast from 'react-hot-toast';
-import { LayoutDashboard, ClipboardList, UtensilsCrossed, FolderTree, Store, Star } from 'lucide-react';
+import toast from '@/utils/toast';
+import { LayoutDashboard, ClipboardList, UtensilsCrossed, FolderTree, Store, Star, LifeBuoy } from 'lucide-react';
 import { RestaurantOwnerProvider, useRestaurantOwner } from '../context/RestaurantOwnerContext';
 import { restaurantService } from '../services/restaurantService';
 import CreateRestaurantForm from '../components/CreateRestaurantForm';
+import NotificationBell from '../components/NotificationBell';
+import NewOrderAlert from '../components/NewOrderAlert';
 import { useState } from 'react';
 
 const NAV_ITEMS = [
@@ -13,6 +15,7 @@ const NAV_ITEMS = [
   { to: '/restaurant/categories', label: 'Categories', icon: FolderTree },
   { to: '/restaurant/profile', label: 'Profile', icon: Store },
   { to: '/restaurant/reviews', label: 'Reviews', icon: Star },
+  { to: '/restaurant/support', label: 'Support', icon: LifeBuoy },
 ];
 
 function Onboarding() {
@@ -47,7 +50,7 @@ function Sidebar() {
   const { restaurants, selectedId, setSelectedId, selectedRestaurant } = useRestaurantOwner();
 
   return (
-    <aside className="w-56 shrink-0 border-r border-gray-200 bg-white p-4">
+    <aside className="w-full shrink-0 rounded-xl border border-gray-200 bg-surface p-4 md:w-56 md:rounded-none md:border-0 md:border-r">
       {restaurants.length > 1 ? (
         <select
           value={selectedId || ''}
@@ -68,13 +71,13 @@ function Sidebar() {
         <p className="mb-3 rounded bg-amber-50 px-2 py-1.5 text-xs font-medium text-amber-700">Pending admin approval</p>
       )}
 
-      <nav className="space-y-1">
+      <nav className="-mx-1 flex gap-1 overflow-x-auto px-1 md:mx-0 md:block md:space-y-1 md:overflow-visible md:px-0">
         {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
             className={({ isActive }) =>
-              `flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${
+              `flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2.5 text-sm font-medium md:py-2 ${
                 isActive ? 'bg-brand-50 text-brand-700' : 'text-gray-600 hover:bg-gray-50'
               }`
             }
@@ -94,11 +97,17 @@ function LayoutInner() {
   if (restaurants.length === 0) return <Onboarding />;
 
   return (
-    <div className="mx-auto flex max-w-6xl gap-6 px-4 py-6">
+    <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6 md:flex-row md:gap-6">
       <Sidebar />
       <div className="flex-1">
+        <div className="mb-4 flex justify-end">
+          <NotificationBell />
+        </div>
         <Outlet />
       </div>
+      {/* Mounted at the layout level so an incoming order interrupts the owner
+          wherever they are in the console, not just on the Orders page. */}
+      <NewOrderAlert />
     </div>
   );
 }

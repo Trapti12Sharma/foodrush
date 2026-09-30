@@ -13,11 +13,16 @@ const addressSchema = new mongoose.Schema(
       trim: true,
       default: 'Home',
     },
+    // Who to call at this address (the recipient can differ from the account holder).
+    name: { type: String, trim: true, maxlength: 100 },
+    phone: { type: String, trim: true },
     addressLine: {
       type: String,
       required: [true, 'Address line is required'],
       trim: true,
     },
+    addressLine2: { type: String, trim: true, maxlength: 200 },
+    landmark: { type: String, trim: true, maxlength: 150 },
     city: {
       type: String,
       required: [true, 'City is required'],
