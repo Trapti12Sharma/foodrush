@@ -21,11 +21,11 @@ export function NotificationProvider({ children }) {
     notificationService
       .list({ limit: 10 })
       .then((res) => setNotifications(res.notifications))
-      .catch(() => {});
+      .catch(() => { });
     notificationService
       .unreadCount()
       .then(setUnreadCount)
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -47,7 +47,15 @@ export function NotificationProvider({ children }) {
       const notification = { ...payload, _id: payload.id, readAt: null };
       setNotifications((prev) => [notification, ...prev].slice(0, 20));
       setUnreadCount((prev) => prev + 1);
-      toast(notification.title, { icon: '🔔' });
+      // Skip the bell toast for types that already produce their own dedicated
+      // UI feedback — ORDER_PLACED triggers NewOrderAlert for the restaurant
+      // owner (a full-screen interrupt), and SUPPORT_TICKET_CREATED triggers
+      // the inline "Support ticket created" success toast in the create form.
+      // Showing a second toast on top of those is redundant noise.
+      const SILENT_TYPES = new Set(['ORDER_PLACED', 'SUPPORT_TICKET_CREATED']);
+      if (!SILENT_TYPES.has(notification.type)) {
+        toast(notification.title, { icon: '🔔' });
+      }
     });
 
     return () => {

@@ -1,5 +1,5 @@
 import { Outlet, NavLink } from 'react-router-dom';
-import { LayoutDashboard, BarChart3, Users, Store, ClipboardList, Tag, Bike, Navigation, Wallet, LifeBuoy, ScrollText, Star, SlidersHorizontal, UserCog } from 'lucide-react';
+import { LayoutDashboard, BarChart3, Users, Store, ClipboardList, Tag, Bike, Navigation, Wallet, LifeBuoy, Star, SlidersHorizontal, UserCog } from 'lucide-react';
 import NotificationBell from '../components/NotificationBell';
 import { useAuth } from '../context/AuthContext';
 
@@ -15,7 +15,6 @@ const NAV_ITEMS = [
   { to: '/admin/delivery-assignments', label: 'Dispatch', icon: Navigation },
   { to: '/admin/delivery-settlements', label: 'Settlements', icon: Wallet },
   { to: '/admin/support-tickets', label: 'Support', icon: LifeBuoy },
-  { to: '/admin/audit-logs', label: 'Audit logs', icon: ScrollText },
   // M17 — the two super-admin-only screens. `permission` is the permission the
   // endpoints behind the link actually require, so the sidebar shows a staff
   // member only what they can use instead of links that 403 on arrival. Hiding a

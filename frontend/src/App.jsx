@@ -63,7 +63,6 @@ const AdminDeliveryAssignments = lazy(() => import('./pages/admin/DeliveryAssign
 const AdminDeliverySettlements = lazy(() => import('./pages/admin/DeliverySettlements'));
 const AdminSupportTickets = lazy(() => import('./pages/admin/SupportTickets'));
 const AdminReviews = lazy(() => import('./pages/admin/Reviews'));
-const AdminAuditLogs = lazy(() => import('./pages/admin/AuditLogs'));
 const AdminSettings = lazy(() => import('./pages/admin/Settings'));
 const AdminStaff = lazy(() => import('./pages/admin/Staff'));
 
@@ -79,182 +78,181 @@ function App() {
   return (
     <AuthProvider>
       <NotificationProvider>
-      <CartProvider>
-        <FavoritesProvider>
-          <LocationProvider>
-          <Toaster
-            position="top-center"
-            gutter={10}
-            toastOptions={{
-              duration: 3000,
-              style: {
-                background: '#2a2344',
-                color: '#ffffff',
-                border: '1px solid #4f4675',
-                borderRadius: '14px',
-                padding: '12px 16px',
-                fontSize: '14px',
-                fontWeight: 500,
-                maxWidth: '420px',
-                boxShadow: '0 14px 40px rgba(0, 0, 0, 0.5)',
-              },
-              success: { iconTheme: { primary: '#22c55e', secondary: '#141020' } },
-              error: { iconTheme: { primary: '#ef4444', secondary: '#141020' } },
-              loading: { iconTheme: { primary: '#a855f7', secondary: '#141020' } },
-            }}
-          />
-          <LocationPicker />
-          {/* M19 — sits INSIDE the providers and OUTSIDE Routes on purpose. Inside,
+        <CartProvider>
+          <FavoritesProvider>
+            <LocationProvider>
+              <Toaster
+                position="top-center"
+                gutter={10}
+                toastOptions={{
+                  duration: 3000,
+                  style: {
+                    background: '#2a2344',
+                    color: '#ffffff',
+                    border: '1px solid #4f4675',
+                    borderRadius: '14px',
+                    padding: '12px 16px',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    maxWidth: '420px',
+                    boxShadow: '0 14px 40px rgba(0, 0, 0, 0.5)',
+                  },
+                  success: { iconTheme: { primary: '#22c55e', secondary: '#141020' } },
+                  error: { iconTheme: { primary: '#ef4444', secondary: '#141020' } },
+                  loading: { iconTheme: { primary: '#a855f7', secondary: '#141020' } },
+                }}
+              />
+              <LocationPicker />
+              {/* M19 — sits INSIDE the providers and OUTSIDE Routes on purpose. Inside,
               so a render error in any page is caught rather than blanking the app;
               outside Routes, so the fallback survives the failure of whichever
               route threw. It also wraps Suspense, which is what catches a failed
               lazy-chunk import after a deploy (see ErrorBoundary's chunk case). */}
-          <ErrorBoundary>
-          <Suspense fallback={<RouteFallback />}>
-          <Routes>
-            {/* Auth screens sit OUTSIDE MainLayout so they render without the
+              <ErrorBoundary>
+                <Suspense fallback={<RouteFallback />}>
+                  <Routes>
+                    {/* Auth screens sit OUTSIDE MainLayout so they render without the
                 storefront chrome — a nav bar offering search, restaurants and a
                 cart is just a set of ways to wander off mid-sign-in. Each of
                 these pages carries its own FoodRush wordmark linking home. */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/register" element={<Register />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
+                    <Route path="/reset-password" element={<ResetPassword />} />
 
-            <Route element={<MainLayout />}>
-              <Route path="/" element={<Home />} />
-              <Route path="/partner-with-us" element={<PartnerWithUs />} />
-              <Route path="/deliver-with-us" element={<DeliverWithUs />} />
-              <Route path="/restaurants" element={<RestaurantListing />} />
-              <Route path="/restaurants/:id" element={<RestaurantDetail />} />
-              <Route path="/search" element={<Search />} />
+                    <Route element={<MainLayout />}>
+                      <Route path="/" element={<Home />} />
+                      <Route path="/partner-with-us" element={<PartnerWithUs />} />
+                      <Route path="/deliver-with-us" element={<DeliverWithUs />} />
+                      <Route path="/restaurants" element={<RestaurantListing />} />
+                      <Route path="/restaurants/:id" element={<RestaurantDetail />} />
+                      <Route path="/search" element={<Search />} />
 
-              <Route path="/cart" element={<Cart />} />
-              <Route
-                path="/checkout"
-                element={
-                  <ProtectedRoute>
-                    <Checkout />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/orders"
-                element={
-                  <ProtectedRoute>
-                    <Orders />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/orders/:id"
-                element={
-                  <ProtectedRoute>
-                    <OrderDetail />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/profile"
-                element={
-                  <ProtectedRoute>
-                    <Profile />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/profile/addresses"
-                element={
-                  <ProtectedRoute>
-                    <Addresses />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/favorites"
-                element={
-                  <ProtectedRoute>
-                    <Favorites />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/support"
-                element={
-                  <ProtectedRoute>
-                    <Support />
-                  </ProtectedRoute>
-                }
-              />
+                      <Route path="/cart" element={<Cart />} />
+                      <Route
+                        path="/checkout"
+                        element={
+                          <ProtectedRoute>
+                            <Checkout />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/orders"
+                        element={
+                          <ProtectedRoute>
+                            <Orders />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/orders/:id"
+                        element={
+                          <ProtectedRoute>
+                            <OrderDetail />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/profile"
+                        element={
+                          <ProtectedRoute>
+                            <Profile />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/profile/addresses"
+                        element={
+                          <ProtectedRoute>
+                            <Addresses />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/favorites"
+                        element={
+                          <ProtectedRoute>
+                            <Favorites />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/support"
+                        element={
+                          <ProtectedRoute>
+                            <Support />
+                          </ProtectedRoute>
+                        }
+                      />
 
-              <Route
-                path="/restaurant"
-                element={
-                  <ProtectedRoute roles={['RESTAURANT_OWNER']}>
-                    <RestaurantOwnerLayout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route path="dashboard" element={<OwnerDashboard />} />
-                <Route path="orders" element={<OwnerOrders />} />
-                <Route path="menu" element={<OwnerMenu />} />
-                <Route path="categories" element={<OwnerCategories />} />
-                <Route path="coupons" element={<OwnerCoupons />} />
-                <Route path="profile" element={<OwnerProfile />} />
-                <Route path="reviews" element={<OwnerReviews />} />
-                <Route path="support" element={<OwnerSupport />} />
-              </Route>
+                      <Route
+                        path="/restaurant"
+                        element={
+                          <ProtectedRoute roles={['RESTAURANT_OWNER']}>
+                            <RestaurantOwnerLayout />
+                          </ProtectedRoute>
+                        }
+                      >
+                        <Route path="dashboard" element={<OwnerDashboard />} />
+                        <Route path="orders" element={<OwnerOrders />} />
+                        <Route path="menu" element={<OwnerMenu />} />
+                        <Route path="categories" element={<OwnerCategories />} />
+                        <Route path="coupons" element={<OwnerCoupons />} />
+                        <Route path="profile" element={<OwnerProfile />} />
+                        <Route path="reviews" element={<OwnerReviews />} />
+                        <Route path="support" element={<OwnerSupport />} />
+                      </Route>
 
-              <Route
-                path="/delivery"
-                element={
-                  <ProtectedRoute roles={['DELIVERY_PARTNER']}>
-                    <DeliveryPartnerLayout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route path="dashboard" element={<DeliveryDashboard />} />
-                <Route path="profile" element={<DeliveryProfile />} />
-                <Route path="support" element={<DeliverySupport />} />
-              </Route>
+                      <Route
+                        path="/delivery"
+                        element={
+                          <ProtectedRoute roles={['DELIVERY_PARTNER']}>
+                            <DeliveryPartnerLayout />
+                          </ProtectedRoute>
+                        }
+                      >
+                        <Route path="dashboard" element={<DeliveryDashboard />} />
+                        <Route path="profile" element={<DeliveryProfile />} />
+                        <Route path="support" element={<DeliverySupport />} />
+                      </Route>
 
-              <Route
-                path="/admin"
-                element={
-                  <ProtectedRoute roles={ADMIN_PANEL_ROLES}>
-                    <AdminLayout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route path="dashboard" element={<AdminDashboard />} />
-                <Route path="analytics" element={<AdminAnalytics />} />
-                <Route path="users" element={<AdminUsers />} />
-                <Route path="restaurants" element={<AdminRestaurants />} />
-                <Route path="orders" element={<AdminOrders />} />
-                <Route path="coupons" element={<AdminCoupons />} />
-                <Route path="delivery-partners" element={<AdminDeliveryPartners />} />
-                <Route path="delivery-assignments" element={<AdminDeliveryAssignments />} />
-                <Route path="delivery-settlements" element={<AdminDeliverySettlements />} />
-                <Route path="support-tickets" element={<AdminSupportTickets />} />
-                <Route path="reviews" element={<AdminReviews />} />
-                <Route path="audit-logs" element={<AdminAuditLogs />} />
-                {/* M17 — reachable by every ADMIN_PANEL_ROLE like the routes above,
+                      <Route
+                        path="/admin"
+                        element={
+                          <ProtectedRoute roles={ADMIN_PANEL_ROLES}>
+                            <AdminLayout />
+                          </ProtectedRoute>
+                        }
+                      >
+                        <Route path="dashboard" element={<AdminDashboard />} />
+                        <Route path="analytics" element={<AdminAnalytics />} />
+                        <Route path="users" element={<AdminUsers />} />
+                        <Route path="restaurants" element={<AdminRestaurants />} />
+                        <Route path="orders" element={<AdminOrders />} />
+                        <Route path="coupons" element={<AdminCoupons />} />
+                        <Route path="delivery-partners" element={<AdminDeliveryPartners />} />
+                        <Route path="delivery-assignments" element={<AdminDeliveryAssignments />} />
+                        <Route path="delivery-settlements" element={<AdminDeliverySettlements />} />
+                        <Route path="support-tickets" element={<AdminSupportTickets />} />
+                        <Route path="reviews" element={<AdminReviews />} />
+                        {/* M17 — reachable by every ADMIN_PANEL_ROLE like the routes above,
                     but the endpoints behind them require settings:manage /
                     admins:manage (SUPER_ADMIN only). The nav hides the links for
                     everyone else; a staff member who types the URL gets the page
                     with a permission error from the API rather than data. */}
-                <Route path="settings" element={<AdminSettings />} />
-                <Route path="staff" element={<AdminStaff />} />
-              </Route>
+                        <Route path="settings" element={<AdminSettings />} />
+                        <Route path="staff" element={<AdminStaff />} />
+                      </Route>
 
-              <Route path="*" element={<NotFound />} />
-            </Route>
-          </Routes>
-          </Suspense>
-          </ErrorBoundary>
-          </LocationProvider>
-        </FavoritesProvider>
-      </CartProvider>
+                      <Route path="*" element={<NotFound />} />
+                    </Route>
+                  </Routes>
+                </Suspense>
+              </ErrorBoundary>
+            </LocationProvider>
+          </FavoritesProvider>
+        </CartProvider>
       </NotificationProvider>
     </AuthProvider>
   );
