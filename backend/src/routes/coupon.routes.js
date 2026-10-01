@@ -1,5 +1,5 @@
 const express = require('express');
-const { body } = require('express-validator');
+const { body, query } = require('express-validator');
 const couponController = require('../controllers/coupon.controller');
 const { createCouponValidator, updateCouponValidator } = require('../validators/coupon.validator');
 const validate = require('../middleware/validate');
@@ -57,6 +57,56 @@ router.post(
   ],
   validate,
   couponController.validateCoupon
+);
+
+/**
+ * @swagger
+ * /coupons/available:
+ *   get:
+ *     summary: List coupons a signed-in customer can currently use at a restaurant
+ *     description: >
+ *       Scope-matches like POST /coupons/validate (this restaurant's own coupons, the
+ *       restaurant's city's coupons, and fully platform-wide ones), and additionally
+ *       excludes anything already exhausted either globally (usageLimit) or by this
+ *       customer personally (perUserLimit) — everything returned here is genuinely
+ *       usable right now, not just well-formed. minimumOrder is NOT filtered against
+ *       (the cart's subtotal isn't known at browse time), so still re-checked for real
+ *       when actually applied via POST /cart/coupon.
+ *     tags: [Coupons]
+ *     parameters:
+ *       - { in: query, name: restaurantId, required: true, schema: { type: string } }
+ *     responses:
+ *       200:
+ *         description: Coupons currently available at this restaurant
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     coupons:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           code: { type: string }
+ *                           description: { type: string }
+ *                           discountType: { type: string, enum: [PERCENTAGE, FLAT] }
+ *                           discountValue: { type: number }
+ *                           minimumOrder: { type: number }
+ *                           maximumDiscount: { type: number, nullable: true }
+ *                           expiryDate: { type: string, format: date-time }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       422: { $ref: '#/components/responses/ValidationError' }
+ */
+router.get(
+  '/available',
+  authenticateUser,
+  [query('restaurantId').notEmpty().withMessage('restaurantId is required').isMongoId().withMessage('Invalid restaurant id')],
+  validate,
+  couponController.listAvailableCoupons
 );
 
 router.use(authenticateUser, requirePermission(PERMISSIONS.COUPONS_MANAGE));

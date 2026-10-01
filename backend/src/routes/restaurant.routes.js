@@ -6,6 +6,8 @@ const dashboardController = require('../controllers/dashboard.controller');
 const analyticsController = require('../controllers/analytics.controller');
 const reviewController = require('../controllers/review.controller');
 const { createRestaurantValidator, updateRestaurantValidator, submitKycValidator } = require('../validators/restaurant.validator');
+const { createOwnCouponValidator, updateOwnCouponValidator } = require('../validators/coupon.validator');
+const couponController = require('../controllers/coupon.controller');
 const validate = require('../middleware/validate');
 const {
   authenticateUser,
@@ -587,6 +589,92 @@ router.post(
   submitKycValidator,
   validate,
   restaurantController.submitKyc
+);
+
+/**
+ * @swagger
+ * /restaurants/{id}/coupons:
+ *   get:
+ *     summary: List this restaurant's own coupons (its own owner, or admin)
+ *     description: >
+ *       Only coupons scoped to THIS restaurant — never the platform-wide or
+ *       city-wide coupons an admin manages separately via GET /coupons.
+ *     tags: [Coupons]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: This restaurant's coupons }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *   post:
+ *     summary: Create a coupon funded by and scoped to this restaurant (its own owner, or admin)
+ *     description: >
+ *       `restaurant` is always this restaurant (taken from the URL, never the request
+ *       body) and `fundedBy` is always RESTAURANT — an owner cannot create a
+ *       platform-wide, city-wide, or platform-funded coupon; those remain an
+ *       admin-only action via POST /coupons.
+ *     tags: [Coupons]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [code, discountType, discountValue, expiryDate]
+ *             properties:
+ *               code: { type: string }
+ *               description: { type: string }
+ *               discountType: { type: string, enum: [PERCENTAGE, FLAT] }
+ *               discountValue: { type: number }
+ *               minimumOrder: { type: number }
+ *               maximumDiscount: { type: number, nullable: true }
+ *               expiryDate: { type: string, format: date-time }
+ *               usageLimit: { type: integer, nullable: true }
+ *               perUserLimit: { type: integer, nullable: true }
+ *     responses:
+ *       201: { description: Coupon created }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { $ref: '#/components/responses/NotFound' }
+ *       409: { description: A coupon with this code already exists }
+ *       422: { $ref: '#/components/responses/ValidationError' }
+ */
+router.get('/:id/coupons', authenticateUser, requireOwnerOrPermission(PERMISSIONS.COUPONS_MANAGE), couponController.listMyCoupons);
+router.post(
+  '/:id/coupons',
+  authenticateUser,
+  requireOwnerOrPermission(PERMISSIONS.COUPONS_MANAGE),
+  createOwnCouponValidator,
+  validate,
+  couponController.createMyCoupon
+);
+
+/**
+ * @swagger
+ * /restaurants/{id}/coupons/{couponId}:
+ *   patch:
+ *     summary: Update one of this restaurant's own coupons (its own owner, or admin)
+ *     tags: [Coupons]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string } }
+ *       - { in: path, name: couponId, required: true, schema: { type: string } }
+ *     responses:
+ *       200: { description: Coupon updated }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/Forbidden' }
+ *       404: { description: 'Restaurant not found, or this coupon does not belong to it' }
+ *       422: { $ref: '#/components/responses/ValidationError' }
+ */
+router.patch(
+  '/:id/coupons/:couponId',
+  authenticateUser,
+  requireOwnerOrPermission(PERMISSIONS.COUPONS_MANAGE),
+  updateOwnCouponValidator,
+  validate,
+  couponController.updateMyCoupon
 );
 
 module.exports = router;

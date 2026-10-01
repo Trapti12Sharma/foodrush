@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import toast from '@/utils/toast';
-import { Plus, Tag, X } from 'lucide-react';
+import { Plus, Tag, X, Sparkles } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { addressService } from '../services/addressService';
 import { orderService } from '../services/orderService';
 import { restaurantService } from '../services/restaurantService';
 import { configService } from '../services/configService';
+import { couponService } from '../services/couponService';
 import AddressCard from '../components/AddressCard';
 import AddressForm from '../components/AddressForm';
 import EmptyState from '../components/EmptyState';
@@ -35,6 +36,10 @@ export default function Checkout() {
 
   const [couponInput, setCouponInput] = useState('');
   const [couponBusy, setCouponBusy] = useState(false);
+  // What this customer can actually use at this restaurant right now — fetched
+  // fresh per restaurant so switching carts (clear + order elsewhere) doesn't
+  // show stale offers from the last one.
+  const [availableCoupons, setAvailableCoupons] = useState([]);
 
   const [onlinePaymentsEnabled, setOnlinePaymentsEnabled] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('COD');
@@ -73,6 +78,22 @@ export default function Checkout() {
   const restaurantId = cart.restaurant?._id;
   const addressLat = selectedAddress?.latitude;
   const addressLng = selectedAddress?.longitude;
+
+  // Offers created by this restaurant's owner, or scoped platform/city-wide by
+  // an admin — same underlying Coupon documents either way, already filtered
+  // server-side to ones this customer can genuinely still use (not expired, not
+  // globally or personally exhausted). Best-effort: a failed fetch just means no
+  // offers are shown, not a broken checkout — the manual code field still works.
+  useEffect(() => {
+    if (!restaurantId) {
+      setAvailableCoupons([]);
+      return;
+    }
+    couponService
+      .listAvailable(restaurantId)
+      .then(setAvailableCoupons)
+      .catch(() => setAvailableCoupons([]));
+  }, [restaurantId]);
   useEffect(() => {
     if (!restaurantId || addressLat == null || addressLng == null) {
       setDelivery(null);
@@ -103,11 +124,15 @@ export default function Checkout() {
     }
   }
 
-  async function handleApplyCoupon() {
-    if (!couponInput.trim()) return;
+  // Takes an explicit code so an "available offers" chip can apply itself
+  // directly, without first stuffing the manual-entry field and pretending the
+  // customer typed it.
+  async function handleApplyCoupon(explicitCode) {
+    const code = explicitCode || couponInput.trim();
+    if (!code) return;
     setCouponBusy(true);
     try {
-      await applyCoupon(couponInput.trim());
+      await applyCoupon(code);
       toast.success('Coupon applied');
     } catch (err) {
       toast.error(err.message || 'Invalid coupon');
@@ -284,31 +309,63 @@ export default function Checkout() {
       <section className="mt-8">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">3. Coupon</h2>
         {cart.couponCode ? (
-          <div className="flex items-center justify-between rounded-lg bg-green-50 px-4 py-2.5 text-sm">
-            <span className="flex items-center gap-2 font-medium text-green-700">
+          <div className="flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm">
+            <span className="flex items-center gap-2 font-medium text-emerald-300">
               <Tag size={14} /> {cart.couponCode} applied — saved ₹{cart.discount.toFixed(2)}
             </span>
-            <button type="button" onClick={handleRemoveCoupon} disabled={couponBusy} className="text-green-700 hover:text-green-900">
+            <button type="button" onClick={handleRemoveCoupon} disabled={couponBusy} className="text-emerald-300 hover:text-emerald-100">
               <X size={14} />
             </button>
           </div>
         ) : (
-          <div className="flex gap-2">
-            <input
-              value={couponInput}
-              onChange={(e) => setCouponInput(e.target.value)}
-              placeholder="Enter coupon code"
-              className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-400"
-            />
-            <button
-              type="button"
-              onClick={handleApplyCoupon}
-              disabled={couponBusy || !couponInput.trim()}
-              className="rounded-lg border border-brand-600 px-4 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50 disabled:opacity-50"
-            >
-              Apply
-            </button>
-          </div>
+          <>
+            {/* Offers this customer can actually use here — created either by this
+                restaurant's own owner, or scoped platform/city-wide by an admin.
+                One click applies it, instead of requiring the customer to already
+                know a code exists. */}
+            {availableCoupons.length > 0 && (
+              <div className="mb-3 space-y-2">
+                <p className="flex items-center gap-1.5 text-xs font-medium text-gray-400">
+                  <Sparkles size={13} className="text-brand-500" /> Available for this order
+                </p>
+                {availableCoupons.map((offer) => (
+                  <button
+                    key={offer.code}
+                    type="button"
+                    onClick={() => handleApplyCoupon(offer.code)}
+                    disabled={couponBusy}
+                    className="flex w-full items-center justify-between gap-3 rounded-lg border border-dashed border-brand-600/40 bg-brand-600/5 px-4 py-2.5 text-left text-sm transition hover:border-brand-600 hover:bg-brand-600/10 disabled:opacity-50"
+                  >
+                    <span>
+                      <span className="font-mono font-semibold text-gray-900">{offer.code}</span>
+                      <span className="ml-2 text-gray-500">
+                        {offer.discountType === 'PERCENTAGE' ? `${offer.discountValue}% off` : `₹${offer.discountValue} off`}
+                        {offer.minimumOrder > 0 ? ` on orders above ₹${offer.minimumOrder}` : ''}
+                      </span>
+                      {offer.description && <span className="block text-xs text-gray-400">{offer.description}</span>}
+                    </span>
+                    <span className="shrink-0 text-xs font-semibold text-brand-600">Apply</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <input
+                value={couponInput}
+                onChange={(e) => setCouponInput(e.target.value)}
+                placeholder="Enter coupon code"
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-400"
+              />
+              <button
+                type="button"
+                onClick={() => handleApplyCoupon()}
+                disabled={couponBusy || !couponInput.trim()}
+                className="rounded-lg border border-brand-600 px-4 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50 disabled:opacity-50"
+              >
+                Apply
+              </button>
+            </div>
+          </>
         )}
       </section>
 

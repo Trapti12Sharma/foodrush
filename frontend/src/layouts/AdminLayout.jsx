@@ -54,15 +54,14 @@ export default function AdminLayout() {
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
       <aside className="w-full shrink-0 border-b border-gray-200 bg-surface p-4 md:w-56 md:border-b-0 md:border-r">
-        <p className="mb-4 text-sm font-semibold text-gray-900">Admin</p>
+        <p className="mb-4 text-xl font-bold text-gray-900">Admin</p>
         <nav className="-mx-1 flex gap-1 overflow-x-auto px-1 md:mx-0 md:block md:space-y-1 md:overflow-visible md:px-0">
           {navItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
               className={({ isActive }) =>
-                `flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2.5 text-sm font-medium md:py-2 ${
-                  isActive ? 'bg-brand-50 text-brand-700' : 'text-gray-600 hover:bg-gray-50'
+                `flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2.5 text-sm font-medium md:py-2 ${isActive ? 'bg-brand-50 text-brand-700' : 'text-gray-600 hover:bg-gray-50'
                 }`
               }
             >

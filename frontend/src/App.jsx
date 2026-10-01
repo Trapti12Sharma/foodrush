@@ -45,6 +45,7 @@ const OwnerDashboard = lazy(() => import('./pages/owner/Dashboard'));
 const OwnerOrders = lazy(() => import('./pages/owner/Orders'));
 const OwnerMenu = lazy(() => import('./pages/owner/Menu'));
 const OwnerCategories = lazy(() => import('./pages/owner/Categories'));
+const OwnerCoupons = lazy(() => import('./pages/owner/Coupons'));
 const OwnerProfile = lazy(() => import('./pages/owner/Profile'));
 const OwnerReviews = lazy(() => import('./pages/owner/Reviews'));
 const OwnerSupport = lazy(() => import('./pages/owner/Support'));
@@ -198,6 +199,7 @@ function App() {
                 <Route path="orders" element={<OwnerOrders />} />
                 <Route path="menu" element={<OwnerMenu />} />
                 <Route path="categories" element={<OwnerCategories />} />
+                <Route path="coupons" element={<OwnerCoupons />} />
                 <Route path="profile" element={<OwnerProfile />} />
                 <Route path="reviews" element={<OwnerReviews />} />
                 <Route path="support" element={<OwnerSupport />} />

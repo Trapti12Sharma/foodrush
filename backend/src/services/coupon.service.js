@@ -1,9 +1,12 @@
 const Coupon = require('../models/Coupon');
 const CouponUsage = require('../models/CouponUsage');
+const Restaurant = require('../models/Restaurant');
 const ApiError = require('../utils/ApiError');
-const { DISCOUNT_TYPES } = require('../utils/constants');
+const { DISCOUNT_TYPES, COUPON_FUNDED_BY } = require('../utils/constants');
+const { PERMISSIONS } = require('../utils/permissions');
 const { parsePagination, buildPaginationMeta } = require('../utils/pagination');
 const { escapeRegex } = require('../utils/regex');
+const { assertOwnerOrAdmin } = require('../utils/ownership');
 
 // Pure validation + discount calculation, reused by the standalone "validate this
 // code" endpoint and cart.service's apply/recalculate paths. Does NOT increment
@@ -150,4 +153,139 @@ async function updateCoupon(id, payload) {
   return coupon;
 }
 
-module.exports = { validateCoupon, redeemCoupon, releaseCoupon, recordUsage, createCoupon, listCoupons, updateCoupon };
+// --- Restaurant-owner-scoped coupon management ---
+//
+// A restaurant owner may create and manage coupons, but ONLY for their own
+// restaurant — never platform-wide or city-wide ones (those remain exclusively
+// an admin/COUPONS_MANAGE action via createCoupon/listCoupons/updateCoupon
+// above). The three functions below are the owner-facing counterparts: each
+// takes the restaurant id from the URL, not from the request body, and FORCES
+// `restaurant`/`city`/`fundedBy` server-side rather than trusting the payload —
+// so even a client that sends `{ restaurant: '<someone else's restaurant>' }`
+// or `{ city: 'Mumbai' }` cannot escape its own restaurant's scope. This is the
+// same "ignore what a client claims, derive it server-side" rule the Cloudinary
+// publicId and KYC review fields already follow elsewhere in this codebase.
+const OWNER_EDITABLE_FIELDS = [
+  'description', 'discountType', 'discountValue', 'minimumOrder', 'maximumDiscount', 'expiryDate', 'usageLimit', 'perUserLimit',
+];
+
+async function assertRestaurantAccess(restaurantId, user) {
+  const restaurant = await Restaurant.findById(restaurantId).select('owner');
+  if (!restaurant) throw ApiError.notFound('Restaurant not found');
+  assertOwnerOrAdmin(restaurant.owner, user, 'Only this restaurant\'s owner or an admin can manage its coupons', PERMISSIONS.COUPONS_MANAGE);
+  return restaurant;
+}
+
+async function listForRestaurant(restaurantId, user, query) {
+  await assertRestaurantAccess(restaurantId, user);
+  const { page, limit, skip } = parsePagination(query);
+  const filter = { restaurant: restaurantId };
+  if (query.isActive !== undefined) filter.isActive = query.isActive === 'true';
+
+  const [items, total] = await Promise.all([
+    Coupon.find(filter).sort('-createdAt').skip(skip).limit(limit),
+    Coupon.countDocuments(filter),
+  ]);
+  return { items, pagination: buildPaginationMeta(total, page, limit) };
+}
+
+async function createForRestaurant(restaurantId, user, payload) {
+  await assertRestaurantAccess(restaurantId, user);
+  const code = (payload.code || '').trim().toUpperCase();
+  if (!code) throw ApiError.badRequest('Coupon code is required');
+  const existing = await Coupon.findOne({ code });
+  if (existing) throw ApiError.conflict('A coupon with this code already exists');
+
+  const data = {};
+  OWNER_EDITABLE_FIELDS.forEach((field) => {
+    if (payload[field] !== undefined) data[field] = payload[field];
+  });
+  // The owner is the one giving up margin on their own promotion — never
+  // PLATFORM (that would mean the platform absorbs a discount it never agreed
+  // to fund) and never client-settable.
+  return Coupon.create({ ...data, code, restaurant: restaurantId, city: null, fundedBy: COUPON_FUNDED_BY.RESTAURANT });
+}
+
+async function updateForRestaurant(restaurantId, couponId, user, payload) {
+  await assertRestaurantAccess(restaurantId, user);
+  const coupon = await Coupon.findOne({ _id: couponId, restaurant: restaurantId });
+  if (!coupon) throw ApiError.notFound('Coupon not found for this restaurant');
+
+  OWNER_EDITABLE_FIELDS.forEach((field) => {
+    if (payload[field] !== undefined) coupon[field] = payload[field];
+  });
+  if (payload.isActive !== undefined) coupon.isActive = payload.isActive;
+  // restaurant/city/fundedBy are deliberately never read from payload here —
+  // there is no code path by which an owner's coupon can be re-scoped.
+  await coupon.save();
+  return coupon;
+}
+
+// --- Customer-facing discovery ---
+//
+// "What offers can I use here?" for a restaurant's page/checkout — the
+// counterpart to validateCoupon's "is THIS specific code valid" check. Applies
+// the identical scope rule (own restaurant, OR city-wide with no restaurant, OR
+// fully platform-wide) and the identical isActive/expiry/global-usage-limit
+// checks, so nothing shown here can fail those checks when actually applied.
+//
+// What it deliberately does NOT guarantee: minimumOrder (the cart's subtotal
+// isn't known yet) and perUserLimit are still re-checked for real at apply time
+// (POST /cart/coupon) — but perUserLimit IS filtered out here too, so a coupon a
+// customer has already exhausted their personal uses of is not dangled in front
+// of them as if it were still available.
+async function listAvailableForCustomer({ restaurantId, userId }) {
+  if (!restaurantId) return [];
+  const restaurant = await Restaurant.findById(restaurantId).select('city');
+  if (!restaurant) return [];
+
+  const now = new Date();
+  const candidates = await Coupon.find({
+    isActive: true,
+    expiryDate: { $gt: now },
+    $or: [{ usageLimit: null }, { $expr: { $lt: ['$usedCount', '$usageLimit'] } }],
+    $and: [
+      {
+        $or: [
+          { restaurant: restaurantId },
+          { restaurant: null, city: restaurant.city },
+          { restaurant: null, city: null },
+        ],
+      },
+    ],
+  })
+    .select('code description discountType discountValue minimumOrder maximumDiscount expiryDate perUserLimit')
+    .sort('-discountValue')
+    .lean();
+
+  if (candidates.length === 0) return candidates;
+
+  // One query for every candidate's per-user usage count, rather than one query
+  // per coupon — a restaurant page with a handful of active offers should not
+  // cost a handful of round trips.
+  const usageCounts = userId
+    ? await CouponUsage.aggregate([
+        { $match: { user: userId, coupon: { $in: candidates.map((c) => c._id) } } },
+        { $group: { _id: '$coupon', count: { $sum: 1 } } },
+      ])
+    : [];
+  const usedById = new Map(usageCounts.map((row) => [String(row._id), row.count]));
+
+  return candidates
+    .filter((c) => c.perUserLimit == null || (usedById.get(String(c._id)) || 0) < c.perUserLimit)
+    .map(({ perUserLimit, ...rest }) => rest); // internal to the filter above, not customer-facing
+}
+
+module.exports = {
+  validateCoupon,
+  redeemCoupon,
+  releaseCoupon,
+  recordUsage,
+  createCoupon,
+  listCoupons,
+  updateCoupon,
+  listForRestaurant,
+  createForRestaurant,
+  updateForRestaurant,
+  listAvailableForCustomer,
+};

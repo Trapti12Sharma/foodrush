@@ -30,4 +30,10 @@ export const restaurantService = {
   // M14 — submit (or resubmit) business-verification documents for admin review.
   // Never touches isApproved/isActive itself.
   submitKyc: (id, payload) => api.post(`/restaurants/${id}/kyc/submit`, payload).then((r) => r.data.restaurant),
+  // This restaurant's OWN coupons only — never the platform/city-wide ones an
+  // admin manages via couponService. `restaurant`/`city`/`fundedBy` are forced
+  // server-side from the URL, not accepted from `payload`.
+  listCoupons: (id, params) => api.get(`/restaurants/${id}/coupons`, { params }).then((r) => r.data),
+  createCoupon: (id, payload) => api.post(`/restaurants/${id}/coupons`, payload).then((r) => r.data.coupon),
+  updateCoupon: (id, couponId, payload) => api.patch(`/restaurants/${id}/coupons/${couponId}`, payload).then((r) => r.data.coupon),
 };

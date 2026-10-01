@@ -49,4 +49,49 @@ const updateCoupon = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, 'Coupon updated', { coupon }));
 });
 
-module.exports = { validateCoupon, createCoupon, listCoupons, updateCoupon };
+// "What can I use here?" — fed by whatever restaurant the customer is looking
+// at (their current cart's restaurant, or the restaurant page they're on).
+const listAvailableCoupons = asyncHandler(async (req, res) => {
+  const coupons = await couponService.listAvailableForCustomer({ restaurantId: req.query.restaurantId, userId: req.user._id });
+  res.json(new ApiResponse(200, 'Available coupons fetched', { coupons }));
+});
+
+const listMyCoupons = asyncHandler(async (req, res) => {
+  const { items, pagination } = await couponService.listForRestaurant(req.params.id, req.user, req.query);
+  res.json(new ApiResponse(200, 'Coupons fetched', { coupons: items, pagination }));
+});
+
+const createMyCoupon = asyncHandler(async (req, res) => {
+  const coupon = await couponService.createForRestaurant(req.params.id, req.user, req.body);
+  await auditService.record({
+    req,
+    action: 'coupon.create',
+    entityType: 'Coupon',
+    entityId: coupon._id,
+    metadata: { code: coupon.code, restaurant: req.params.id, discountType: coupon.discountType, discountValue: coupon.discountValue },
+  });
+  res.status(201).json(new ApiResponse(201, 'Coupon created', { coupon }));
+});
+
+const updateMyCoupon = asyncHandler(async (req, res) => {
+  const coupon = await couponService.updateForRestaurant(req.params.id, req.params.couponId, req.user, req.body);
+  await auditService.record({
+    req,
+    action: 'coupon.update',
+    entityType: 'Coupon',
+    entityId: coupon._id,
+    metadata: { code: coupon.code, restaurant: req.params.id, changes: req.body },
+  });
+  res.json(new ApiResponse(200, 'Coupon updated', { coupon }));
+});
+
+module.exports = {
+  validateCoupon,
+  createCoupon,
+  listCoupons,
+  updateCoupon,
+  listAvailableCoupons,
+  listMyCoupons,
+  createMyCoupon,
+  updateMyCoupon,
+};

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from '@/utils/toast';
-import { Users, Store, ListOrdered, Clock, CheckCircle2, Wallet, Bike, FileCheck2, ArrowRight, Inbox } from 'lucide-react';
+import { Users, Store, ListOrdered, Clock, CheckCircle2, Wallet, Bike, FileCheck2, ArrowRight, Inbox, ChevronDown } from 'lucide-react';
 import { adminService } from '../../services/adminService';
 import KpiCard from '../../components/analytics/KpiCard';
 import OrdersTrendChart from '../../components/charts/OrdersTrendChart';
@@ -70,12 +70,37 @@ function QueueRow({ icon: Icon, label, description, count, to }) {
   );
 }
 
+// Remembered per browser, not per account — purely "did this admin fold this
+// panel last time", the same kind of convenience a sidebar's collapsed state
+// would use. Never the source of truth for anything, so a cleared/blocked
+// localStorage just falls back to expanded.
+const COLLAPSE_KEY = 'foodrush.admin.attentionCollapsed';
+
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   // null while loading / if a count couldn't be fetched, so the row shows "—"
   // rather than claiming a confident zero.
   const [pending, setPending] = useState({});
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(COLLAPSE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(COLLAPSE_KEY, String(next));
+      } catch {
+        /* Private window / blocked storage — collapsing still works for this render. */
+      }
+      return next;
+    });
+  }
 
   useEffect(() => {
     adminService
@@ -112,9 +137,17 @@ export default function Dashboard() {
       <h1 className="text-2xl font-bold text-gray-900">Platform overview</h1>
 
       {/* Sits above the vanity metrics on purpose: this is the only part of the
-          page that represents someone waiting on an admin to act. */}
+          page that represents someone waiting on an admin to act. Collapsible
+          because once an admin has cleared the queue (or just doesn't want it
+          taking up the top of their dashboard every day), there's nothing left
+          to act on until the badge count says otherwise. */}
       <section className={`mt-6 overflow-hidden ${GLASS}`}>
-        <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-expanded={!collapsed}
+          className="flex w-full items-center gap-2 px-4 py-3 text-left transition hover:bg-white/[0.04]"
+        >
           <Inbox size={16} className="text-brand-500" />
           <h2 className="text-sm font-semibold text-gray-900">Needs your attention</h2>
           {totalWaiting > 0 && (
@@ -122,19 +155,22 @@ export default function Dashboard() {
               {totalWaiting}
             </span>
           )}
-        </div>
-        <div className="divide-y divide-white/10">
-          {QUEUES.map((queue) => (
-            <QueueRow
-              key={queue.key}
-              icon={queue.icon}
-              label={queue.label}
-              description={queue.description}
-              count={pending[queue.key] ?? null}
-              to={queue.to}
-            />
-          ))}
-        </div>
+          <ChevronDown size={16} className={`ml-auto shrink-0 text-gray-400 transition-transform ${collapsed ? '' : 'rotate-180'}`} />
+        </button>
+        {!collapsed && (
+          <div className="divide-y divide-white/10 border-t border-white/10">
+            {QUEUES.map((queue) => (
+              <QueueRow
+                key={queue.key}
+                icon={queue.icon}
+                label={queue.label}
+                description={queue.description}
+                count={pending[queue.key] ?? null}
+                to={queue.to}
+              />
+            ))}
+          </div>
+        )}
       </section>
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
