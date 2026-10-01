@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Bell } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import useDismissable from '../hooks/useDismissable';
 import NotificationPanel, { destinationFor } from './NotificationPanel';
 
 // Mounted once in each authenticated layout's header (Navbar, AdminLayout,
@@ -13,6 +14,10 @@ export default function NotificationBell() {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  // Replaces the full-screen invisible backdrop this used to render. That
+  // backdrop closed the panel, but it also swallowed the click — so the first
+  // click on anything else only dismissed the menu instead of pressing it.
+  const panelRef = useDismissable(open, () => setOpen(false), { closeOnLeave: true, leaveDelayMs: 400 });
 
   async function handleSelect(notification) {
     setOpen(false);
@@ -28,7 +33,7 @@ export default function NotificationBell() {
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={panelRef}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -45,7 +50,6 @@ export default function NotificationBell() {
 
       {open && (
         <>
-          <button type="button" className="fixed inset-0 z-30 cursor-default" onClick={() => setOpen(false)} aria-label="Close notifications" />
           <div className="absolute right-0 z-40 mt-2 w-80 rounded-lg border border-gray-200 bg-surface shadow-lg">
             <div className="flex items-center justify-between border-b border-gray-100 px-4 py-2.5">
               <p className="text-sm font-semibold text-gray-900">Notifications</p>

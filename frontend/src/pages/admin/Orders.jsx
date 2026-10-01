@@ -52,32 +52,56 @@ export default function Orders() {
       {loading ? (
         <p className="mt-8 text-sm text-gray-400">Loading…</p>
       ) : (
-        <div className="mt-6 overflow-x-auto rounded-xl border border-gray-200 bg-surface">
+        <div className="mt-6 overflow-x-auto rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.07] to-white/[0.02] shadow-lg shadow-black/20 backdrop-blur-xl">
           <table className="w-full text-sm">
-            <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-400">
+            <thead className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-gray-400">
               <tr>
-                <th className="px-4 py-2">Restaurant</th>
-                <th className="px-4 py-2">Placed</th>
-                <th className="px-4 py-2">Payment</th>
-                <th className="px-4 py-2">Total</th>
-                <th className="px-4 py-2">Status</th>
-                <th className="px-4 py-2" />
+                <th className="px-4 py-3 font-semibold">Restaurant</th>
+                <th className="px-4 py-3 font-semibold">Placed</th>
+                <th className="px-4 py-3 font-semibold">Payment</th>
+                <th className="px-4 py-3 text-right font-semibold">Total</th>
+                <th className="px-4 py-3 font-semibold">Status</th>
+                <th className="px-4 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-white/[0.07]">
               {orders.map((order) => (
-                <tr key={order._id}>
-                  <td className="px-4 py-2.5 font-medium text-gray-900">{order.restaurant?.name}</td>
-                  <td className="px-4 py-2.5 text-gray-500">{new Date(order.createdAt).toLocaleString()}</td>
-                  <td className="px-4 py-2.5 text-gray-600">
-                    {order.paymentMethod === 'COD' ? 'COD' : 'Online'} · {order.paymentStatus}
+                <tr key={order._id} className="transition hover:bg-white/[0.04]">
+                  <td className="px-4 py-3 font-medium text-gray-900">{order.restaurant?.name}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-gray-500">
+                    {new Date(order.createdAt).toLocaleDateString([], { day: 'numeric', month: 'short' })}
+                    <span className="text-gray-400">
+                      {' '}
+                      {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
                   </td>
-                  <td className="px-4 py-2.5 text-gray-700">₹{order.totalAmount.toFixed(2)}</td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-4 py-3">
+                    <span className="text-gray-600">{order.paymentMethod === 'COD' ? 'COD' : 'Online'}</span>
+                    {/* Payment state is its own signal — a failed payment on a
+                        delivered order matters more than either value alone. */}
+                    <span
+                      className={`ml-1.5 rounded px-1.5 py-0.5 text-[11px] font-semibold ${
+                        order.paymentStatus === 'paid'
+                          ? 'bg-emerald-500/15 text-emerald-300'
+                          : order.paymentStatus === 'failed'
+                            ? 'bg-rose-500/15 text-rose-300'
+                            : 'bg-white/10 text-gray-500'
+                      }`}
+                    >
+                      {order.paymentStatus}
+                    </span>
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-gray-900">
+                    ₹{order.totalAmount.toFixed(2)}
+                  </td>
+                  <td className="px-4 py-3">
                     <OrderStatusBadge status={order.orderStatus} />
                   </td>
-                  <td className="px-4 py-2.5 text-right">
-                    <Link to={`/orders/${order._id}`} className="text-xs font-medium text-brand-600 hover:underline">
+                  <td className="px-4 py-3 text-right">
+                    <Link
+                      to={`/orders/${order._id}`}
+                      className="rounded-lg border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 transition hover:border-brand-600 hover:text-gray-900"
+                    >
                       View
                     </Link>
                   </td>

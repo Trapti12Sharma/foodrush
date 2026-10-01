@@ -142,7 +142,22 @@ export default function Orders() {
             const busy = busyId === order._id;
 
             return (
-              <div key={order._id} className="rounded-xl border border-gray-200 bg-surface p-4">
+              <div
+                key={order._id}
+                className={`relative overflow-hidden rounded-2xl border bg-surface p-4 transition ${
+                  order.orderStatus === 'PLACED'
+                    ? 'border-amber-500/40 shadow-lg shadow-amber-900/10'
+                    : 'border-gray-200 hover:border-brand-600/40'
+                }`}
+              >
+                {/* An unanswered order is the only one that needs the kitchen to
+                    do something right now, so it gets the warm accent edge. */}
+                <span
+                  className={`absolute inset-y-0 left-0 w-1 ${
+                    order.orderStatus === 'PLACED' ? 'bg-gradient-to-b from-amber-400 to-amber-600' : 'bg-transparent'
+                  }`}
+                  aria-hidden="true"
+                />
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleString()}</p>

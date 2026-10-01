@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useDeliveryLocation } from '../context/LocationContext';
 import { isAdminPanelUser } from '../constants/roles';
+import useDismissable from '../hooks/useDismissable';
 import NotificationBell from './NotificationBell';
 
 export default function Navbar() {
@@ -15,6 +16,10 @@ export default function Navbar() {
   const [query, setQuery] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  // Wraps the trigger AND the menu, so clicking the button to close it isn't
+  // treated as an outside click (which would close then instantly reopen).
+  const profileRef = useDismissable(profileOpen, () => setProfileOpen(false), { closeOnLeave: true });
+  const mobileRef = useDismissable(mobileOpen, () => setMobileOpen(false));
 
   function submitSearch(e) {
     e.preventDefault();
@@ -89,13 +94,13 @@ export default function Navbar() {
             {/* Each staff console renders its own bell, so showing this one too
                 just duplicates it in the header. */}
             {showStorefrontNav && <NotificationBell />}
-            <div className="relative">
+            <div className="relative" ref={profileRef}>
               <button
                 type="button"
                 onClick={() => setProfileOpen((v) => !v)}
                 className="flex items-center gap-2 rounded-full border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
-                <User size={16} /> {user.name.split(' ')[0]}
+                <User size={16} /> <span className="max-w-[12rem] truncate">{user.name}</span>
               </button>
               {profileOpen && (
                 <div className="absolute right-0 mt-2 w-48 rounded-lg border border-gray-200 bg-surface py-1 shadow-lg">
@@ -193,7 +198,7 @@ export default function Navbar() {
       </div>
 
       {mobileOpen && (
-        <div className="border-t border-gray-200 px-4 py-3 md:hidden">
+        <div className="border-t border-gray-200 px-4 py-3 md:hidden" ref={mobileRef}>
           {showStorefrontNav && (
             <>
               <button

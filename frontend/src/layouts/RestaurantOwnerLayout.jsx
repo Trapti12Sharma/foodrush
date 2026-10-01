@@ -64,7 +64,9 @@ function Sidebar() {
           ))}
         </select>
       ) : (
-        <p className="mb-4 truncate text-sm font-semibold text-gray-900">{selectedRestaurant?.name}</p>
+        // Wraps rather than truncating — the sidebar is only 14rem wide, so names
+        // like "Hyderabad House Biryani" were being clipped mid-word.
+        <p className="mb-4 break-words text-sm font-semibold leading-snug text-gray-900">{selectedRestaurant?.name}</p>
       )}
 
       {selectedRestaurant && !selectedRestaurant.isApproved && (

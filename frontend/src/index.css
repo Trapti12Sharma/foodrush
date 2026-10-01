@@ -36,4 +36,21 @@
   :root {
     color-scheme: dark;
   }
+
+  /* Hide every scrollbar while keeping the content scrollable. Firefox and old
+     Edge use the standard properties; Chrome/Safari need the pseudo-element,
+     and `display: none` there is what actually removes the track rather than
+     just making it thin.
+     NOTE: scrolling still works (wheel, trackpad, touch, keyboard, drag) — only
+     the visual indicator is gone, so long panels no longer advertise that there
+     is more below. If that ever reads as "content is missing", the fix is a slim
+     styled bar rather than restoring the default one. */
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  *::-webkit-scrollbar {
+    display: none;
+  }
 }
