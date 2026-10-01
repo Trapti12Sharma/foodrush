@@ -140,7 +140,7 @@ export default function Dashboard() {
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <KpiCard icon={Users} label="Users" value={stats.totalUsers} accent="violet" />
         <KpiCard icon={Store} label="Restaurants" value={stats.totalRestaurants} accent="blue" />
-        <KpiCard icon={ListOrdered} label="Total orders" value={stats.totalOrders} accent="violet" />
+        <KpiCard icon={ListOrdered} label="Total orders" value={stats.totalOrders} accent="cyan" />
         <KpiCard icon={Clock} label="Pending" value={stats.pendingOrders} accent="amber" />
         <KpiCard icon={CheckCircle2} label="Delivered" value={stats.deliveredOrders} accent="green" />
         <KpiCard icon={Wallet} label="Revenue" value={`₹${stats.revenue.toFixed(2)}`} accent="green" />
