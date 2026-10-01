@@ -2,6 +2,7 @@ const { body } = require('express-validator');
 const { isSafeImageUrl } = require('../utils/imageUrl');
 const { isValidPointCoordinates } = require('../utils/geo');
 const { MAX_SLOTS, isValidTimezone } = require('../utils/openingHours');
+const { isValidPan, isValidFssaiNumber, isValidGstNumber, isValidPincode } = require('../utils/indianDocuments');
 
 const TIME_RULE = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
@@ -32,7 +33,7 @@ const createRestaurantValidator = [
   body('cuisine.*').isString().trim().notEmpty(),
   body('address.addressLine').trim().notEmpty().withMessage('Address line is required'),
   body('address.state').optional({ checkFalsy: true }).trim(),
-  body('address.pincode').optional({ checkFalsy: true }).trim(),
+  body('address.pincode').optional({ checkFalsy: true }).trim().custom(isValidPincode).withMessage('Enter a valid 6-digit pincode'),
   body('city').trim().notEmpty().withMessage('City is required'),
   body('deliveryTime').isFloat({ min: 0 }).withMessage('Delivery time must be a positive number'),
   body('deliveryFee').optional().isFloat({ min: 0 }),
@@ -48,6 +49,7 @@ const updateRestaurantValidator = [
   body('cuisine').optional().isArray({ min: 1 }),
   body('cuisine.*').optional().isString().trim().notEmpty(),
   body('address.addressLine').optional().trim().notEmpty(),
+  body('address.pincode').optional({ checkFalsy: true }).trim().custom(isValidPincode).withMessage('Enter a valid 6-digit pincode'),
   body('city').optional().trim().notEmpty(),
   body('deliveryTime').optional().isFloat({ min: 0 }),
   body('deliveryFee').optional().isFloat({ min: 0 }),
@@ -65,12 +67,17 @@ const updateRestaurantValidator = [
 // isSafeImageUrl alone treats '' as valid (a normal, optional image field may be
 // cleared) — these documents are mandatory, so notEmpty() is checked first.
 const submitKycValidator = [
-  body('fssaiLicenseNumber').trim().notEmpty().withMessage('FSSAI license number is required').isLength({ max: 40 }),
+  // Format checks only (see utils/indianDocuments.js) — genuineness is what the
+  // human KYC review step is for. Previously these only checked "non-empty,
+  // under N characters", which random text satisfies as easily as a real
+  // document number, so an obviously-fake PAN/FSSAI/GST number reached a
+  // reviewer indistinguishable from a real one.
+  body('fssaiLicenseNumber').trim().notEmpty().withMessage('FSSAI license number is required').bail().custom(isValidFssaiNumber).withMessage('FSSAI license number must be 14 digits'),
   body('fssaiCertificateUrl').trim().notEmpty().withMessage('FSSAI certificate is required').custom(isSafeImageUrl).withMessage('fssaiCertificateUrl must be an uploaded image or an https:// URL'),
-  body('panNumber').trim().notEmpty().withMessage('PAN number is required').isLength({ max: 20 }),
+  body('panNumber').trim().notEmpty().withMessage('PAN number is required').bail().custom(isValidPan).withMessage('Enter a valid PAN number (e.g. ABCDE1234F)'),
   body('panCardUrl').trim().notEmpty().withMessage('PAN card image is required').custom(isSafeImageUrl).withMessage('panCardUrl must be an uploaded image or an https:// URL'),
   body('ownerIdentityProofUrl').trim().notEmpty().withMessage('An identity proof is required').custom(isSafeImageUrl).withMessage('ownerIdentityProofUrl must be an uploaded image or an https:// URL'),
-  body('gstNumber').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
+  body('gstNumber').optional({ checkFalsy: true }).trim().custom(isValidGstNumber).withMessage('Enter a valid 15-character GST number'),
   body('gstCertificateUrl').optional({ checkFalsy: true }).custom(isSafeImageUrl).withMessage('gstCertificateUrl must be an uploaded image or an https:// URL'),
 ];
 

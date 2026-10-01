@@ -45,7 +45,7 @@ function Sidebar() {
   const { profile } = useDeliveryPartner();
 
   return (
-    <aside className="w-full shrink-0 rounded-xl border border-gray-200 bg-surface p-4 md:w-56 md:rounded-none md:border-0 md:border-r">
+    <aside className="w-full shrink-0 border-b border-gray-200 bg-surface p-4 md:w-56 md:border-b-0 md:border-r">
       <p className="mb-4 truncate text-sm font-semibold text-gray-900">{profile?.fullName}</p>
 
       {profile?.kycStatus !== 'VERIFIED' && (
@@ -82,10 +82,11 @@ function LayoutInner() {
   if (loading) return <div className="py-24 text-center text-gray-400">Loading your profile…</div>;
   if (!profile) return <Onboarding />;
 
+  // Full-bleed shell — see the identical note in AdminLayout.jsx.
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6 md:flex-row md:gap-6">
+    <div className="flex min-h-screen flex-col md:flex-row">
       <Sidebar />
-      <div className="flex-1">
+      <div className="min-w-0 flex-1 px-4 py-6 md:px-8">
         <div className="mb-4 flex justify-end">
           <NotificationBell />
         </div>

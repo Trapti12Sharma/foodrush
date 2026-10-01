@@ -30,10 +30,42 @@ describe('Restaurant KYC — submission', () => {
   it('GST fields are optional', async () => {
     const { owner, restaurantId } = await freshRestaurant('sub-nogst');
     const res = await owner.post(`/api/restaurants/${restaurantId}/kyc/submit`).send({
-      fssaiLicenseNumber: '111', fssaiCertificateUrl: KYC_DOC_URL, panNumber: 'AAAAA1111A', panCardUrl: KYC_DOC_URL, ownerIdentityProofUrl: KYC_DOC_URL,
+      fssaiLicenseNumber: '12345678901234', fssaiCertificateUrl: KYC_DOC_URL, panNumber: 'AAAAA1111A', panCardUrl: KYC_DOC_URL, ownerIdentityProofUrl: KYC_DOC_URL,
     });
     expect(res.status).toBe(200);
     expect(res.body.data.restaurant.kycDocuments.gstNumber).toBe('');
+  });
+
+  it('rejects a PAN number that is not actually PAN-shaped', async () => {
+    const { owner, restaurantId } = await freshRestaurant('sub-badpan');
+    const res = await owner.post(`/api/restaurants/${restaurantId}/kyc/submit`).send({
+      fssaiLicenseNumber: '12345678901234', fssaiCertificateUrl: KYC_DOC_URL, panNumber: 'not-a-pan', panCardUrl: KYC_DOC_URL, ownerIdentityProofUrl: KYC_DOC_URL,
+    });
+    expect(res.status).toBe(422);
+    expect(res.body.errors.map((e) => e.field)).toContain('panNumber');
+  });
+
+  it('rejects an FSSAI number that is not 14 digits', async () => {
+    const { owner, restaurantId } = await freshRestaurant('sub-badfssai');
+    const res = await owner.post(`/api/restaurants/${restaurantId}/kyc/submit`).send({
+      fssaiLicenseNumber: '111', fssaiCertificateUrl: KYC_DOC_URL, panNumber: 'AAAAA1111A', panCardUrl: KYC_DOC_URL, ownerIdentityProofUrl: KYC_DOC_URL,
+    });
+    expect(res.status).toBe(422);
+    expect(res.body.errors.map((e) => e.field)).toContain('fssaiLicenseNumber');
+  });
+
+  it('accepts a real-shaped GST number and rejects a fake one', async () => {
+    const { owner, restaurantId } = await freshRestaurant('sub-gst');
+    const base = {
+      fssaiLicenseNumber: '12345678901234', fssaiCertificateUrl: KYC_DOC_URL, panNumber: 'AAAAA1111A', panCardUrl: KYC_DOC_URL, ownerIdentityProofUrl: KYC_DOC_URL,
+    };
+    const bad = await owner.post(`/api/restaurants/${restaurantId}/kyc/submit`).send({ ...base, gstNumber: 'not-a-gst-number' });
+    expect(bad.status).toBe(422);
+    expect(bad.body.errors.map((e) => e.field)).toContain('gstNumber');
+
+    const good = await owner.post(`/api/restaurants/${restaurantId}/kyc/submit`).send({ ...base, gstNumber: '27AAAAA1111A1Z5' });
+    expect(good.status).toBe(200);
+    expect(good.body.data.restaurant.kycDocuments.gstNumber).toBe('27AAAAA1111A1Z5');
   });
 
   it('rejects a submission missing any required document', async () => {

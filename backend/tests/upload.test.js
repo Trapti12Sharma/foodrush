@@ -35,12 +35,22 @@ describe('Image upload', () => {
     const customer = await registerAndLogin({ name: 'Cust', email: uniqueEmail('up-cust2'), role: 'CUSTOMER' });
     const res = await customer.post('/api/uploads/image').attach('image', PNG_BUFFER, 'test.png');
     expect(res.status).toBe(201);
-    expect(res.body.data.url).toMatch(/^\/uploads\//);
-    uploadedFiles.push(res.body.data.url);
 
-    const staticRes = await request(app).get(res.body.data.url);
-    expect(staticRes.status).toBe(200);
-    expect(staticRes.headers['content-type']).toMatch(/^image\//);
+    // storage.service.js picks Cloudinary over local disk the moment CLOUDINARY_*
+    // env vars are present (isPersistentStorage), with no test-environment
+    // override — so which one this upload actually used depends on whatever
+    // backend/.env has configured, not on anything this test controls. Asserting
+    // a hardcoded `/uploads/...` shape made the test fail the moment Cloudinary
+    // credentials were added, even though the upload itself worked correctly.
+    const { url } = res.body.data;
+    if (url.startsWith('/uploads/')) {
+      uploadedFiles.push(url);
+      const staticRes = await request(app).get(url);
+      expect(staticRes.status).toBe(200);
+      expect(staticRes.headers['content-type']).toMatch(/^image\//);
+    } else {
+      expect(url).toMatch(/^https:\/\/res\.cloudinary\.com\//);
+    }
   });
 
   it('rejects a file larger than the configured limit', async () => {

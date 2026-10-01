@@ -4,6 +4,9 @@ import { Upload, X, Image as ImageIcon } from 'lucide-react';
 import { adminService } from '../../services/adminService';
 import { restaurantService } from '../../services/restaurantService';
 import { optimizedUrl } from '../../utils/images';
+import Pagination from '../../components/Pagination';
+
+const PAGE_SIZE = 20;
 
 const IMAGE_SLOTS = [
   { type: 'image', label: 'Card image' },
@@ -13,10 +16,10 @@ const IMAGE_SLOTS = [
 
 // Kept separate from isApproved/isActive on purpose — see admin.service.js#approveRestaurant.
 const KYC_STYLES = {
-  NOT_SUBMITTED: 'bg-gray-100 text-gray-500',
-  SUBMITTED: 'bg-blue-100 text-blue-700',
-  VERIFIED: 'bg-green-100 text-green-700',
-  REJECTED: 'bg-red-100 text-red-700',
+  NOT_SUBMITTED: 'bg-white/10 text-gray-500 ring-1 ring-white/15',
+  SUBMITTED: 'bg-blue-500/15 text-blue-300 ring-1 ring-blue-500/30',
+  VERIFIED: 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30',
+  REJECTED: 'bg-rose-500/15 text-rose-300 ring-1 ring-rose-500/30',
 };
 const KYC_LABELS = {
   NOT_SUBMITTED: 'KYC: not submitted',
@@ -256,6 +259,8 @@ function ImageManagerModal({ restaurant, onClose, onUpdated }) {
 
 export default function Restaurants() {
   const [restaurants, setRestaurants] = useState([]);
+  const [pagination, setPagination] = useState(null);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [approvalFilter, setApprovalFilter] = useState('');
@@ -267,13 +272,17 @@ export default function Restaurants() {
   function load() {
     setLoading(true);
     adminService
-      .listRestaurants({ search: search || undefined, isApproved: approvalFilter || undefined, kycStatus: kycFilter || undefined, limit: 100 })
-      .then((res) => setRestaurants(res.restaurants))
+      .listRestaurants({ search: search || undefined, isApproved: approvalFilter || undefined, kycStatus: kycFilter || undefined, page, limit: PAGE_SIZE })
+      .then((res) => {
+        setRestaurants(res.restaurants);
+        setPagination(res.pagination);
+      })
       .catch((err) => toast.error(err.message || 'Could not load restaurants'))
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, [search, approvalFilter, kycFilter]);
+  useEffect(load, [search, approvalFilter, kycFilter, page]);
+  useEffect(() => setPage(1), [search, approvalFilter, kycFilter]);
 
   // Only meaningful once KYC has actually been submitted — the backend rejects
   // an approve attempt otherwise (see admin.service.js#approveRestaurant), so
@@ -366,10 +375,22 @@ export default function Restaurants() {
                     {restaurant.city} · Owner: {restaurant.owner?.name} ({restaurant.owner?.email})
                   </p>
                   <div className="mt-1 flex flex-wrap gap-2">
-                    <span className={`rounded-full px-2 py-0.5 text-xs ${restaurant.isApproved ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${
+                        restaurant.isApproved
+                          ? 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30'
+                          : 'bg-amber-500/15 text-amber-300 ring-amber-500/30'
+                      }`}
+                    >
                       {restaurant.isApproved ? 'Approved' : 'Pending approval'}
                     </span>
-                    <span className={`rounded-full px-2 py-0.5 text-xs ${restaurant.isActive ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${
+                        restaurant.isActive
+                          ? 'bg-blue-500/15 text-blue-300 ring-blue-500/30'
+                          : 'bg-white/10 text-gray-500 ring-white/15'
+                      }`}
+                    >
                       {restaurant.isActive ? 'Active' : 'Disabled'}
                     </span>
                     <KycBadge status={restaurant.kycStatus} />
@@ -413,6 +434,11 @@ export default function Restaurants() {
             </div>
           ))}
           {restaurants.length === 0 && <p className="p-6 text-center text-sm text-gray-400">No restaurants found.</p>}
+          {pagination && pagination.totalPages > 1 && (
+            <div className="overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.07] to-white/[0.02] backdrop-blur-xl">
+              <Pagination meta={pagination} onPageChange={setPage} />
+            </div>
+          )}
         </div>
       )}
 

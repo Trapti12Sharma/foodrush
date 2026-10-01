@@ -1,5 +1,6 @@
 const { body } = require('express-validator');
 const { isValidPointCoordinates } = require('../utils/geo');
+const { isValidPincode } = require('../utils/indianDocuments');
 
 const LABELS = ['Home', 'Work', 'Other'];
 const isMissing = (v) => v === undefined || v === null || v === '';
@@ -47,14 +48,14 @@ const commonRules = [
 const createAddressValidator = [
   body('addressLine').trim().notEmpty().withMessage('Address line is required'),
   body('city').trim().notEmpty().withMessage('City is required'),
-  body('pincode').trim().notEmpty().withMessage('Pincode is required'),
+  body('pincode').trim().notEmpty().withMessage('Pincode is required').bail().custom(isValidPincode).withMessage('Enter a valid 6-digit pincode'),
   ...commonRules,
 ];
 
 const updateAddressValidator = [
   body('addressLine').optional().trim().notEmpty(),
   body('city').optional().trim().notEmpty(),
-  body('pincode').optional().trim().notEmpty(),
+  body('pincode').optional().trim().notEmpty().bail().custom(isValidPincode).withMessage('Enter a valid 6-digit pincode'),
   ...commonRules,
 ];
 

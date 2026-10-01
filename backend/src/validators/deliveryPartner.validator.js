@@ -2,6 +2,9 @@ const { body } = require('express-validator');
 const { isSafeImageUrl } = require('../utils/imageUrl');
 const { isValidLatitude, isValidLongitude } = require('../utils/geo');
 const { DELIVERY_VEHICLE_TYPES, DELIVERY_AVAILABILITY } = require('../utils/constants');
+const { isValidPincode, isPlausibleLicenceNumber, isPastDate, isFutureDate, isAtLeastYearsOld } = require('../utils/indianDocuments');
+
+const MINIMUM_RIDER_AGE_YEARS = 18;
 
 const PHONE_RULE = /^\+?[0-9][0-9\s-]{6,14}$/;
 const isMissing = (v) => v === undefined || v === null || (typeof v === 'string' && v.trim() === '');
@@ -19,7 +22,12 @@ function requiredTextUnlessBicycle(field, label) {
   });
 }
 
-function validDateUnlessBicycle(field, label) {
+// `direction: 'future'` for an expiry date (a licence that already lapsed is not
+// currently valid, however well-formed the date is) — plain ISO-8601 validity
+// was letting an already-expired or nonsensical date through as long as it
+// parsed, which is exactly the "random things" the KYC review step shouldn't
+// have to catch by eye.
+function validDateUnlessBicycle(field, label, { direction } = {}) {
   return body(field).custom((value, { req }) => {
     const required = req.body.vehicleType !== 'BICYCLE';
     if (isMissing(value)) {
@@ -27,6 +35,20 @@ function validDateUnlessBicycle(field, label) {
       return true;
     }
     if (Number.isNaN(new Date(value).getTime())) throw new Error(`${label} must be a valid date`);
+    if (direction === 'future' && !isFutureDate(value)) throw new Error(`${label} must be in the future — this licence has expired`);
+    if (direction === 'past' && !isPastDate(value)) throw new Error(`${label} must be a real date in the past`);
+    return true;
+  });
+}
+
+// drivingLicenceNumber specifically, rather than the generic requiredTextUnlessBicycle:
+// still required-unless-bicycle, but the value also has to look like a licence
+// number (see isPlausibleLicenceNumber) once it is present.
+function requiredLicenceNumberUnlessBicycle(field, label) {
+  return body(field).custom((value, { req }) => {
+    if (req.body.vehicleType === 'BICYCLE') return true;
+    if (isMissing(value)) throw new Error(`${label} is required for this vehicle type`);
+    if (!isPlausibleLicenceNumber(value)) throw new Error(`Enter a valid ${label.toLowerCase()}`);
     return true;
   });
 }
@@ -57,16 +79,25 @@ const optionalDocumentUrlRule = (field, label) =>
 const createDeliveryPartnerValidator = [
   body('fullName').trim().notEmpty().withMessage('Full name is required').isLength({ max: 100 }),
   body('phone').trim().matches(PHONE_RULE).withMessage('Enter a valid phone number'),
-  body('dateOfBirth').optional({ nullable: true, checkFalsy: true }).isISO8601().withMessage('Enter a valid date of birth'),
+  body('dateOfBirth')
+    .optional({ nullable: true, checkFalsy: true })
+    .isISO8601()
+    .withMessage('Enter a valid date of birth')
+    .bail()
+    .custom((value) => isPastDate(value, { maxAgeYears: 100 }))
+    .withMessage('Enter a real date of birth')
+    .bail()
+    .custom((value) => isAtLeastYearsOld(value, MINIMUM_RIDER_AGE_YEARS))
+    .withMessage(`You must be at least ${MINIMUM_RIDER_AGE_YEARS} years old`),
   body('address.addressLine').trim().notEmpty().withMessage('Address line is required'),
   body('address.state').optional({ checkFalsy: true }).trim(),
-  body('address.pincode').optional({ checkFalsy: true }).trim(),
+  body('address.pincode').optional({ checkFalsy: true }).trim().custom(isValidPincode).withMessage('Enter a valid 6-digit pincode'),
   body('city').trim().notEmpty().withMessage('City is required'),
   body('vehicleType').isIn(DELIVERY_VEHICLE_TYPES).withMessage(`vehicleType must be one of: ${DELIVERY_VEHICLE_TYPES.join(', ')}`),
   requiredTextUnlessBicycle('vehicleNumber', 'A vehicle number'),
   body('vehicleNumber').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
-  requiredTextUnlessBicycle('drivingLicenceNumber', 'A driving licence number'),
-  validDateUnlessBicycle('drivingLicenceExpiry', 'A driving licence expiry date'),
+  requiredLicenceNumberUnlessBicycle('drivingLicenceNumber', 'A driving licence number'),
+  validDateUnlessBicycle('drivingLicenceExpiry', 'A driving licence expiry date', { direction: 'future' }),
   // Where the rider is based. Optional, but without it they are invisible to
   // dispatch: findEligibleRiders uses $geoNear, and $geoNear only ever returns
   // documents that actually carry the geo field — a rider with no location is
@@ -90,15 +121,28 @@ const createDeliveryPartnerValidator = [
 const updateDeliveryPartnerValidator = [
   body('fullName').optional().trim().notEmpty().isLength({ max: 100 }),
   body('phone').optional().trim().matches(PHONE_RULE).withMessage('Enter a valid phone number'),
-  body('dateOfBirth').optional({ nullable: true, checkFalsy: true }).isISO8601(),
+  body('dateOfBirth')
+    .optional({ nullable: true, checkFalsy: true })
+    .isISO8601()
+    .bail()
+    .custom((value) => isPastDate(value, { maxAgeYears: 100 }))
+    .withMessage('Enter a real date of birth')
+    .bail()
+    .custom((value) => isAtLeastYearsOld(value, MINIMUM_RIDER_AGE_YEARS))
+    .withMessage(`You must be at least ${MINIMUM_RIDER_AGE_YEARS} years old`),
   body('address.addressLine').optional().trim().notEmpty(),
   body('address.state').optional({ checkFalsy: true }).trim(),
-  body('address.pincode').optional({ checkFalsy: true }).trim(),
+  body('address.pincode').optional({ checkFalsy: true }).trim().custom(isValidPincode).withMessage('Enter a valid 6-digit pincode'),
   body('city').optional().trim().notEmpty(),
   body('vehicleType').optional().isIn(DELIVERY_VEHICLE_TYPES).withMessage(`vehicleType must be one of: ${DELIVERY_VEHICLE_TYPES.join(', ')}`),
   body('vehicleNumber').optional({ checkFalsy: true }).trim().isLength({ max: 20 }),
-  body('drivingLicenceNumber').optional({ checkFalsy: true }).trim(),
-  body('drivingLicenceExpiry').optional({ checkFalsy: true }).isISO8601(),
+  body('drivingLicenceNumber').optional({ checkFalsy: true }).trim().custom(isPlausibleLicenceNumber).withMessage('Enter a valid driving licence number'),
+  body('drivingLicenceExpiry')
+    .optional({ checkFalsy: true })
+    .isISO8601()
+    .bail()
+    .custom(isFutureDate)
+    .withMessage('Driving licence expiry must be in the future — this licence has expired'),
   optionalDocumentUrlRule('documents.identityProofUrl', 'documents.identityProofUrl'),
   optionalDocumentUrlRule('documents.profilePhotoUrl', 'documents.profilePhotoUrl'),
   optionalDocumentUrlRule('documents.drivingLicenceUrl', 'documents.drivingLicenceUrl'),

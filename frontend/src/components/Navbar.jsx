@@ -138,6 +138,12 @@ export default function Navbar() {
                   >
                     <User size={14} /> Profile
                   </Link>
+                  {/* My orders / Addresses / Favorites are customer-only concepts
+                      — a restaurant owner, rider or admin has none of these, so
+                      showing them here was just dead links in every staff
+                      member's own menu. */}
+                  {showStorefrontNav && (
+                    <>
                   <Link
                     to="/orders"
                     onClick={() => setProfileOpen(false)}
@@ -166,6 +172,8 @@ export default function Navbar() {
                   >
                     <LifeBuoy size={14} /> Support
                   </Link>
+                    </>
+                  )}
                   <button
                     type="button"
                     onClick={handleLogout}

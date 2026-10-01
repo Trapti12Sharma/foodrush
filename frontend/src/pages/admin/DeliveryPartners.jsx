@@ -2,29 +2,33 @@ import { useEffect, useState } from 'react';
 import toast from '@/utils/toast';
 import { adminService } from '../../services/adminService';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import Pagination from '../../components/Pagination';
 
+const PAGE_SIZE = 20;
 const KYC_FILTERS = ['', 'SUBMITTED', 'VERIFIED', 'REJECTED', 'PENDING'];
 const ACCOUNT_FILTERS = ['', 'PENDING', 'ACTIVE', 'SUSPENDED', 'REJECTED'];
 
 const KYC_STYLES = {
-  PENDING: 'bg-amber-100 text-amber-700',
-  SUBMITTED: 'bg-blue-100 text-blue-700',
-  VERIFIED: 'bg-green-100 text-green-700',
-  REJECTED: 'bg-red-100 text-red-700',
+  PENDING: 'bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30',
+  SUBMITTED: 'bg-blue-500/15 text-blue-300 ring-1 ring-blue-500/30',
+  VERIFIED: 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30',
+  REJECTED: 'bg-rose-500/15 text-rose-300 ring-1 ring-rose-500/30',
 };
 const ACCOUNT_STYLES = {
-  PENDING: 'bg-amber-100 text-amber-700',
-  ACTIVE: 'bg-green-100 text-green-700',
-  SUSPENDED: 'bg-red-100 text-red-700',
-  REJECTED: 'bg-red-100 text-red-700',
+  PENDING: 'bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30',
+  ACTIVE: 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30',
+  SUSPENDED: 'bg-rose-500/15 text-rose-300 ring-1 ring-rose-500/30',
+  REJECTED: 'bg-rose-500/15 text-rose-300 ring-1 ring-rose-500/30',
 };
 
 function Badge({ styles, value }) {
-  return <span className={`rounded-full px-2 py-0.5 text-xs ${styles[value] || 'bg-gray-100 text-gray-500'}`}>{value}</span>;
+  return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${styles[value] || 'bg-white/10 text-gray-500 ring-1 ring-white/15'}`}>{value}</span>;
 }
 
 export default function DeliveryPartners() {
   const [partners, setPartners] = useState([]);
+  const [pagination, setPagination] = useState(null);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [kycFilter, setKycFilter] = useState('');
@@ -41,21 +45,26 @@ export default function DeliveryPartners() {
     setLoading(true);
     setLoadError(null);
     adminService
-      .listDeliveryPartners({ search: search || undefined, kycStatus: kycFilter || undefined, accountStatus: accountFilter || undefined, limit: 100 })
-      .then((res) => setPartners(res.deliveryPartners || []))
+      .listDeliveryPartners({ search: search || undefined, kycStatus: kycFilter || undefined, accountStatus: accountFilter || undefined, page, limit: PAGE_SIZE })
+      .then((res) => {
+        setPartners(res.deliveryPartners || []);
+        setPagination(res.pagination || null);
+      })
       .catch((err) => {
         // A failed request used to leave `partners` at [] and render "No delivery
         // partners found." — telling an admin that nobody has applied when in
         // fact the server was never successfully asked. A rate-limit (429) or a
         // permissions error then looks identical to an empty queue.
         setPartners([]);
+        setPagination(null);
         setLoadError(err.status === 429 ? 'Too many requests — the list will load again shortly.' : err.message || 'Could not load delivery partners');
         toast.error(err.message || 'Could not load delivery partners');
       })
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, [search, kycFilter, accountFilter]);
+  useEffect(load, [search, kycFilter, accountFilter, page]);
+  useEffect(() => setPage(1), [search, kycFilter, accountFilter]);
 
   async function viewDetail(id) {
     try {
@@ -239,6 +248,11 @@ export default function DeliveryPartners() {
             ) : (
               <p className="p-6 text-center text-sm text-gray-400">No delivery partners found.</p>
             ))}
+          {pagination && pagination.totalPages > 1 && (
+            <div className="overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.07] to-white/[0.02] backdrop-blur-xl">
+              <Pagination meta={pagination} onPageChange={setPage} />
+            </div>
+          )}
         </div>
       )}
 

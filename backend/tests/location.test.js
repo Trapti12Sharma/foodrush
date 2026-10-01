@@ -57,7 +57,7 @@ describe('a restaurant without a location (the old [0,0] defect)', () => {
     const created = await makeRestaurant({ at: null });
     const raw = await Restaurant.collection.findOne({ _id: created._id });
     expect(raw.location).toBeUndefined();
-    expect(created.deliveryRadiusKm).toBe(5);
+    expect(created.deliveryRadiusKm).toBe(20);
 
     await makeRestaurant();
     expect(names(await nearby())).toEqual(['Place 2']);
@@ -105,7 +105,7 @@ describe('GET /api/restaurants/nearby', () => {
     expect(first.distanceKm).toBeCloseTo(km(28.573, 77.33), 1);
     expect(second.distanceKm).toBeCloseTo(km(28.627, 77.3648), 1);
     expect(first.estimatedDeliveryMinutes).toBe(Math.round(20 + first.distanceKm * 3));
-    expect(first).toMatchObject({ deliverable: true, radiusKm: 5, _id: close._id.toString() });
+    expect(first).toMatchObject({ deliverable: true, radiusKm: 20, _id: close._id.toString() });
     expect(res.body.data.searchedFrom).toEqual({ latitude: HERE.lat, longitude: HERE.lng, radiusKm: 10 });
   });
 
@@ -259,8 +259,10 @@ describe('delivery radius', () => {
     expect(near.body.data.distanceKm).toBeCloseTo(km(28.573, 77.33), 1);
     expect(await check(28.7041, 77.1025)).toMatchObject({ body: { data: { deliverable: false, radiusKm: 5 } } }); // Delhi, ~20+ km
 
+    // No explicit deliveryRadiusKm here, unlike `r` above — so this one reports
+    // the model's own default (20km), not the 5km `r` was deliberately given.
     const unknown = await makeRestaurant({ at: null });
-    expect((await check(HERE.lat, HERE.lng, unknown._id)).body.data).toEqual({ deliverable: null, distanceKm: null, radiusKm: 5 });
+    expect((await check(HERE.lat, HERE.lng, unknown._id)).body.data).toEqual({ deliverable: null, distanceKm: null, radiusKm: 20 });
   });
 
   it('validates input, and hides unapproved restaurants from the public', async () => {

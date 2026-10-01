@@ -76,6 +76,44 @@ describe('Delivery partner registration', () => {
     expect(res.status).toBe(422);
   });
 
+  it('rejects a driving licence number that is obviously not one', async () => {
+    const partner = await registerPartner('dp-badlicence');
+    const res = await partner.post('/api/delivery-partners').send(validPayload({ drivingLicenceNumber: 'asdkfj' }));
+    expect(res.status).toBe(422);
+    expect(res.body.errors.map((e) => e.field)).toContain('drivingLicenceNumber');
+  });
+
+  it('rejects a driving licence that has already expired', async () => {
+    const partner = await registerPartner('dp-expiredlicence');
+    const res = await partner.post('/api/delivery-partners').send(validPayload({ drivingLicenceExpiry: '2020-01-01' }));
+    expect(res.status).toBe(422);
+    expect(res.body.errors.map((e) => e.field)).toContain('drivingLicenceExpiry');
+  });
+
+  it('rejects a pincode that is not a real 6-digit Indian pincode', async () => {
+    const partner = await registerPartner('dp-badpincode');
+    const res = await partner
+      .post('/api/delivery-partners')
+      .send(validPayload({ address: { addressLine: '1 Rider Lane', pincode: '12345' } }));
+    expect(res.status).toBe(422);
+    expect(res.body.errors.map((e) => e.field)).toContain('address.pincode');
+  });
+
+  it('rejects a rider under the minimum age, and accepts one who clears it', async () => {
+    const tooYoung = await registerPartner('dp-tooyoung');
+    const underage = new Date();
+    underage.setFullYear(underage.getFullYear() - 15);
+    const res = await tooYoung.post('/api/delivery-partners').send(validPayload({ dateOfBirth: underage.toISOString().slice(0, 10) }));
+    expect(res.status).toBe(422);
+    expect(res.body.errors.map((e) => e.field)).toContain('dateOfBirth');
+
+    const oldEnough = await registerPartner('dp-oldenough');
+    const adult = new Date();
+    adult.setFullYear(adult.getFullYear() - 25);
+    const ok = await oldEnough.post('/api/delivery-partners').send(validPayload({ dateOfBirth: adult.toISOString().slice(0, 10) }));
+    expect(ok.status).toBe(201);
+  });
+
   it('rejects an unauthenticated registration attempt', async () => {
     const { app } = require('./helpers');
     const request = require('supertest');
