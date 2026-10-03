@@ -176,6 +176,9 @@ export default function Reviews() {
   const [filters, setFilters] = useState({ moderationStatus: '', reported: '', search: '' });
   const [loading, setLoading] = useState(true);
   const [openId, setOpenId] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+  const [rejectingId, setRejectingId] = useState(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   function load() {
     setLoading(true);
@@ -199,6 +202,39 @@ export default function Reviews() {
     e.preventDefault();
     setPage(1);
     load();
+  }
+
+  async function quickApprove(id) {
+    setBusyId(id);
+    try {
+      await adminService.approveReview(id);
+      toast.success('Review approved');
+      load();
+    } catch (err) {
+      toast.error(err.message || 'Could not approve review');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function confirmReject() {
+    const id = rejectingId;
+    if (!rejectReason.trim()) {
+      toast.error('A reason is required to reject');
+      return;
+    }
+    setBusyId(id);
+    setRejectingId(null);
+    try {
+      await adminService.rejectReview(id, rejectReason.trim());
+      toast.success('Review rejected');
+      setRejectReason('');
+      load();
+    } catch (err) {
+      toast.error(err.message || 'Could not reject review');
+    } finally {
+      setBusyId(null);
+    }
   }
 
   return (
@@ -250,7 +286,7 @@ export default function Reviews() {
                   <th>Status</th>
                   <th>Reports</th>
                   <th>Created</th>
-                  <th />
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -263,10 +299,62 @@ export default function Reviews() {
                     <td><Badge value={r.moderationStatus} /></td>
                     <td>{r.reportCount > 0 ? <span className="font-bold text-rose-400">{r.reportCount}</span> : '—'}</td>
                     <td>{new Date(r.createdAt).toLocaleDateString()}</td>
-                    <td className="text-right">
-                      <button type="button" onClick={() => setOpenId(r._id)} className="table-action-btn">
-                        Open
-                      </button>
+                    <td>
+                      <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                        {r.moderationStatus === 'PENDING' && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={busyId === r._id}
+                              onClick={() => quickApprove(r._id)}
+                              className="table-action-btn-success"
+                            >
+                              ✓ Approve
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busyId === r._id}
+                              onClick={() => { setRejectingId(r._id); setRejectReason(''); }}
+                              className="table-action-btn-danger"
+                            >
+                              ✕ Reject
+                            </button>
+                          </>
+                        )}
+                        {r.moderationStatus === 'APPROVED' && (
+                          <button
+                            type="button"
+                            disabled={busyId === r._id}
+                            onClick={async () => {
+                              setBusyId(r._id);
+                              try { await adminService.hideReview(r._id); toast.success('Review hidden'); load(); }
+                              catch (err) { toast.error(err.message || 'Could not hide review'); }
+                              finally { setBusyId(null); }
+                            }}
+                            className="table-action-btn-danger"
+                          >
+                            Hide
+                          </button>
+                        )}
+                        {r.moderationStatus === 'HIDDEN' && (
+                          <button
+                            type="button"
+                            disabled={busyId === r._id}
+                            onClick={async () => {
+                              setBusyId(r._id);
+                              try { await adminService.restoreReview(r._id); toast.success('Review restored'); load(); }
+                              catch (err) { toast.error(err.message || 'Could not restore review'); }
+                              finally { setBusyId(null); }
+                            }}
+                            className="table-action-btn-success"
+                          >
+                            Restore
+                          </button>
+                        )}
+                        <button type="button" onClick={() => setOpenId(r._id)} className="table-action-btn">
+                          Details
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -275,6 +363,41 @@ export default function Reviews() {
           </div>
           {reviews.length === 0 && <p className="p-6 text-center text-sm text-gray-400">No reviews found.</p>}
           <Pagination meta={pagination} onPageChange={setPage} />
+        </div>
+      )}
+
+      {/* Reject reason dialog */}
+      {rejectingId && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-surface p-5 shadow-2xl">
+            <h2 className="text-sm font-semibold text-gray-900">Reject this review</h2>
+            <p className="mt-1 text-xs text-gray-400">A reason is required and will be shown to the customer.</p>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              rows={3}
+              placeholder="e.g. Contains abusive language"
+              className="mt-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              autoFocus
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => { setRejectingId(null); setRejectReason(''); }}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!rejectReason.trim()}
+                onClick={confirmReject}
+                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50"
+              >
+                Reject
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

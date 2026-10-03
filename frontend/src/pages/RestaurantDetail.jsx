@@ -7,7 +7,6 @@ import { foodService } from '../services/foodService';
 import EmptyState from '../components/EmptyState';
 import FoodMenuItem from '../components/FoodMenuItem';
 import ConfirmDialog from '../components/ConfirmDialog';
-import ReviewsSection from '../components/ReviewsSection';
 import SmartImage from '../components/SmartImage';
 import { useAddToCart } from '../hooks/useAddToCart';
 import { useAuth } from '../context/AuthContext';
@@ -170,9 +169,15 @@ export default function RestaurantDetail() {
               <Heart size={16} className={isFavorite(id) ? 'fill-red-500 text-red-500' : 'text-gray-400'} />
             </button>
           </div>
-          <span className="flex items-center gap-1 rounded bg-green-600 px-2 py-1 text-sm font-medium text-white">
-            <Star size={14} fill="white" /> {restaurant.totalReviews > 0 ? restaurant.rating.toFixed(1) : 'New'}
-            <span className="ml-1 font-normal text-green-100">({restaurant.totalReviews} reviews)</span>
+          <span className="flex items-center gap-1.5 rounded-xl bg-green-600 px-3 py-1.5 text-sm font-bold text-white shadow">
+            <Star size={14} fill="white" />
+            {restaurant.totalReviews > 0 ? restaurant.rating.toFixed(1) : 'New'}
+            <span className="mx-1 font-normal text-green-100">|</span>
+            <span className="text-xs font-medium text-green-100">
+              {restaurant.totalReviews > 0
+                ? `${restaurant.totalReviews >= 1000 ? (restaurant.totalReviews / 1000).toFixed(1) + 'k' : restaurant.totalReviews}+ ratings`
+                : 'Be the first'}
+            </span>
           </span>
         </div>
 
@@ -235,7 +240,7 @@ export default function RestaurantDetail() {
         </div>
 
         <div className="mt-10 border-t border-gray-100 pt-8">
-          <ReviewsSection restaurantId={id} onReviewChange={loadRestaurant} />
+          {/* Reviews section removed — reviews are submitted from the order detail page */}
         </div>
       </div>
 

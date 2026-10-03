@@ -56,13 +56,13 @@ export default function Search() {
     setLoading(true);
     setFailed(false);
 
-    // With a chosen location, search through the location-aware endpoint so results carry
-    // real distance and an ETA — the same cards used everywhere else in the app.
+    // Always use the plain text-search endpoint for named queries — the geo/nearby
+    // endpoint only returns restaurants that have coordinates stored, so any
+    // restaurant without a location set would silently disappear from search results.
+    // Nearby browsing (no query) stays as-is returning an empty list here.
     const restaurantRequest = !q
       ? Promise.resolve({ restaurants: [] })
-      : hasCoordinates
-        ? restaurantService.nearby({ lat: location.latitude, lng: location.longitude, search: q, limit: 8 })
-        : restaurantService.list({ search: q, limit: 8 });
+      : restaurantService.list({ search: q, limit: 8 });
 
     Promise.all([
       restaurantRequest,
@@ -86,7 +86,7 @@ export default function Search() {
     return () => {
       cancelled = true;
     };
-  }, [q, hasOffer, page, hasCoordinates, location?.latitude, location?.longitude]);
+  }, [q, hasOffer, page]);
 
   function submit(e) {
     e.preventDefault();

@@ -1,11 +1,28 @@
 import { useEffect, useState } from 'react';
 import toast from '@/utils/toast';
-import { Star, MessageSquare, Trash2 } from 'lucide-react';
+import { Star, MessageSquare, Trash2, Clock, CheckCircle2, XCircle, EyeOff } from 'lucide-react';
 import { useRestaurantOwner } from '../../context/RestaurantOwnerContext';
 import { reviewService } from '../../services/reviewService';
 import StarRating from '../../components/StarRating';
 import EmptyState from '../../components/EmptyState';
 import ConfirmDialog from '../../components/ConfirmDialog';
+
+const STATUS_CONFIG = {
+  PENDING: { label: 'Awaiting approval', icon: Clock, color: 'text-amber-400', bg: 'bg-amber-500/10 ring-1 ring-amber-500/30' },
+  APPROVED: { label: 'Approved', icon: CheckCircle2, color: 'text-emerald-400', bg: 'bg-emerald-500/10 ring-1 ring-emerald-500/30' },
+  REJECTED: { label: 'Rejected', icon: XCircle, color: 'text-rose-400', bg: 'bg-rose-500/10 ring-1 ring-rose-500/30' },
+  HIDDEN: { label: 'Hidden', icon: EyeOff, color: 'text-gray-400', bg: 'bg-white/10 ring-1 ring-white/15' },
+};
+
+function ModerationBadge({ status }) {
+  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.PENDING;
+  const Icon = cfg.icon;
+  return (
+    <span className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${cfg.bg} ${cfg.color}`}>
+      <Icon size={11} /> {cfg.label}
+    </span>
+  );
+}
 
 // M21 — write or edit the restaurant's public answer to one review. Kept inline
 // rather than in a modal: the owner needs to read the review while writing the
@@ -60,7 +77,7 @@ export default function Reviews() {
     if (!selectedRestaurant) return;
     setLoading(true);
     reviewService
-      .listForRestaurant(selectedRestaurant._id, { limit: 100 })
+      .listForOwner(selectedRestaurant._id, { limit: 100 })
       .then((res) => setReviews(res.reviews))
       .catch((err) => toast.error(err.message || 'Could not load reviews'))
       .finally(() => setLoading(false));
@@ -118,50 +135,86 @@ export default function Reviews() {
       ) : (
         <div className="mt-6 space-y-4">
           {reviews.map((review) => (
-            <div key={review._id} className="rounded-xl border border-gray-200 bg-surface p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-gray-900">{review.user?.name || 'FoodRush user'}</p>
-                <span className="text-xs text-gray-400">{new Date(review.createdAt).toLocaleDateString()}</span>
+            <div
+              key={review._id}
+              className={`rounded-xl border bg-surface p-4 ${review.moderationStatus === 'PENDING'
+                  ? 'border-amber-500/30'
+                  : review.moderationStatus === 'REJECTED'
+                    ? 'border-rose-500/30'
+                    : 'border-gray-200'
+                }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">{review.user?.name || 'FoodRush user'}</p>
+                  <StarRating value={review.rating} readOnly size={14} />
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <ModerationBadge status={review.moderationStatus} />
+                  <span className="text-xs text-gray-400">{new Date(review.createdAt).toLocaleDateString()}</span>
+                </div>
               </div>
-              <StarRating value={review.rating} readOnly size={14} />
+
               {review.comment && <p className="mt-2 text-sm text-gray-600">{review.comment}</p>}
 
-              {review.reply && editingId !== review._id && (
-                <div className="mt-3 rounded-lg border-l-2 border-brand-200 bg-brand-50/40 py-2 pl-3">
-                  <p className="text-xs font-semibold text-brand-700">Your reply</p>
-                  <p className="mt-1 text-sm text-gray-700">{review.reply.text}</p>
-                  <div className="mt-2 flex items-center gap-3">
-                    <button type="button" onClick={() => setEditingId(review._id)} className="text-xs font-medium text-brand-600 hover:underline">
-                      Edit
-                    </button>
+              {/* Explain to the owner why they can't reply to non-approved reviews */}
+              {review.moderationStatus === 'PENDING' && (
+                <p className="mt-2 text-xs text-amber-500">
+                  This review is awaiting admin approval. You can reply once it's approved.
+                </p>
+              )}
+              {review.moderationStatus === 'REJECTED' && (
+                <p className="mt-2 text-xs text-rose-400">
+                  This review was rejected by an admin and is not visible to customers.
+                </p>
+              )}
+              {review.moderationStatus === 'HIDDEN' && (
+                <p className="mt-2 text-xs text-gray-400">
+                  This review is currently hidden by an admin.
+                </p>
+              )}
+
+              {/* Reply section — only for APPROVED reviews */}
+              {review.moderationStatus === 'APPROVED' && (
+                <>
+                  {review.reply && editingId !== review._id && (
+                    <div className="mt-3 rounded-lg border-l-2 border-brand-200 bg-brand-50/40 py-2 pl-3">
+                      <p className="text-xs font-semibold text-brand-700">Your reply</p>
+                      <p className="mt-1 text-sm text-gray-700">{review.reply.text}</p>
+                      <div className="mt-2 flex items-center gap-3">
+                        <button type="button" onClick={() => setEditingId(review._id)} className="text-xs font-medium text-brand-600 hover:underline">
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRemovingId(review._id)}
+                          className="flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-red-600"
+                        >
+                          <Trash2 size={12} /> Remove
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!review.reply && editingId !== review._id && (
                     <button
                       type="button"
-                      onClick={() => setRemovingId(review._id)}
-                      className="flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-red-600"
+                      onClick={() => setEditingId(review._id)}
+                      className="mt-3 flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:underline"
                     >
-                      <Trash2 size={12} /> Remove
+                      <MessageSquare size={14} /> Reply
                     </button>
-                  </div>
-                </div>
-              )}
+                  )}
 
-              {!review.reply && editingId !== review._id && (
-                <button
-                  type="button"
-                  onClick={() => setEditingId(review._id)}
-                  className="mt-3 flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:underline"
-                >
-                  <MessageSquare size={14} /> Reply
-                </button>
-              )}
-
-              {editingId === review._id && (
-                <ReplyForm
-                  initialText={review.reply?.text}
-                  submitting={submitting}
-                  onCancel={() => setEditingId(null)}
-                  onSubmit={(text) => handleReply(review._id, text)}
-                />
+                  {editingId === review._id && (
+                    <ReplyForm
+                      initialText={review.reply?.text}
+                      submitting={submitting}
+                      onCancel={() => setEditingId(null)}
+                      onSubmit={(text) => handleReply(review._id, text)}
+                    />
+                  )}
+                </>
               )}
             </div>
           ))}

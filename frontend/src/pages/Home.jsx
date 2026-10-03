@@ -105,20 +105,7 @@ export default function Home() {
           <p className="mx-auto mt-3 max-w-xl text-gray-500">Order from the best local restaurants — or list your own on FoodRush.</p>
 
 
-          <button
-            type="button"
-            onClick={openPicker}
-            className="mx-auto mt-6 flex max-w-xl items-center gap-2 rounded-full border border-gray-200 bg-surface px-4 py-2.5 text-left text-sm shadow-sm transition hover:border-brand-400 hover:shadow-md"
-          >
-            <MapPin size={16} className="shrink-0 text-brand-600" />
-            <span className="min-w-0 flex-1 truncate">
-              <span className="text-gray-400">Deliver to </span>
-              <span className="font-medium text-gray-900">{location?.label || 'Choose your location'}</span>
-            </span>
-            <span className="shrink-0 text-xs font-semibold text-brand-600">{location ? 'Change' : 'Set'}</span>
-          </button>
-
-          <form onSubmit={submitSearch} className="mx-auto mt-3 flex max-w-xl gap-2">
+          <form onSubmit={submitSearch} className="mx-auto mt-6 flex max-w-xl gap-2">
             <div className="relative flex-1">
               <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input

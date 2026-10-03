@@ -1,6 +1,10 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Search, MapPin, User, ShoppingCart, Menu, X, LogOut, ClipboardList, Heart, MapPinned, Store, LayoutDashboard, Bike, LifeBuoy } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import {
+  MapPin, User, ShoppingCart, Menu, X,
+  LogOut, ClipboardList, Heart, MapPinned, Store,
+  LayoutDashboard, Bike, LifeBuoy, ChevronDown,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useDeliveryLocation } from '../context/LocationContext';
@@ -11,77 +15,95 @@ import NotificationBell from './NotificationBell';
 export default function Navbar() {
   const { user, logout } = useAuth();
   const { itemCount } = useCart();
-  const navigate = useNavigate();
   const { location, openPicker } = useDeliveryLocation();
-  const [query, setQuery] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  // Wraps the trigger AND the menu, so clicking the button to close it isn't
-  // treated as an outside click (which would close then instantly reopen).
+
   const profileRef = useDismissable(profileOpen, () => setProfileOpen(false), { closeOnLeave: true });
   const mobileRef = useDismissable(mobileOpen, () => setMobileOpen(false));
-
-  function submitSearch(e) {
-    e.preventDefault();
-    setMobileOpen(false);
-    navigate(`/search?q=${encodeURIComponent(query.trim())}`);
-  }
 
   function handleLogout() {
     setProfileOpen(false);
     logout();
   }
 
-  // Restaurant owners, riders and admins run their own consoles — the storefront
-  // controls (location picker, search, Restaurants, cart) are dead weight there and
-  // make the console look like a half-logged-out customer session. Signed-out
-  // visitors still get the full storefront nav.
   const showStorefrontNav = !user || user.role === 'CUSTOMER';
+  const avatar = user?.name?.charAt(0)?.toUpperCase() || 'U';
 
   return (
-    <header className="sticky top-0 z-30 border-b border-gray-200 bg-surface/90 shadow-lg shadow-black/20 backdrop-blur-md">
-      <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3">
-        <Link to="/" className="shrink-0 text-2xl font-extrabold tracking-tight">
-          <span className="bg-gradient-to-r from-brand-500 to-brand-700 bg-clip-text text-transparent">Food</span>
-          <span className="text-gray-900">Rush</span>
+    <header
+      className="sticky top-0 z-30"
+      style={{
+        background: 'linear-gradient(135deg, #0f0b1e 0%, #1a0f33 50%, #0d1220 100%)',
+        borderBottom: '1px solid rgba(147,51,234,0.25)',
+        boxShadow: '0 4px 32px rgba(0,0,0,0.5), 0 1px 0 rgba(147,51,234,0.15)',
+      }}
+    >
+      {/* Top accent line */}
+      <div
+        className="absolute inset-x-0 top-0 h-[2px]"
+        style={{ background: 'linear-gradient(90deg, transparent, #9333ea 30%, #c084fc 50%, #9333ea 70%, transparent)' }}
+      />
+
+      <div className="mx-auto flex max-w-7xl items-center gap-3 px-4" style={{ height: '60px' }}>
+
+        {/* Logo */}
+        <Link to="/" className="shrink-0 text-xl font-extrabold tracking-tight">
+          <span style={{ background: 'linear-gradient(135deg, #c084fc, #9333ea)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+            Food
+          </span>
+          <span className="text-white">Rush</span>
         </Link>
 
+        {/* Location pill — desktop only */}
         {showStorefrontNav && (
-          <>
-            <button
-              type="button"
-              onClick={openPicker}
-              aria-label="Choose delivery location"
-              className="hidden shrink-0 items-center gap-1 rounded-md px-2 py-1 text-sm text-gray-600 hover:bg-gray-100 md:flex"
-            >
-              <MapPin size={16} className="text-brand-600" />
-              <span className="max-w-[10rem] truncate">{location?.label || 'Set location'}</span>
-            </button>
-
-            <form onSubmit={submitSearch} className="hidden flex-1 md:block">
-              <div className="relative">
-                <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search restaurants or food…"
-                  className="w-full rounded-full border border-gray-200 bg-gray-50 py-2 pl-9 pr-4 text-sm outline-none focus:border-brand-400"
-                />
-              </div>
-            </form>
-          </>
+          <button
+            type="button"
+            onClick={openPicker}
+            aria-label="Choose delivery location"
+            className="hidden shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all duration-150 md:flex"
+            style={{
+              background: 'rgba(147,51,234,0.12)',
+              border: '1px solid rgba(147,51,234,0.3)',
+              color: '#c084fc',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(147,51,234,0.22)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(147,51,234,0.12)'}
+          >
+            <MapPin size={13} />
+            <span className="max-w-[9rem] truncate">{location?.label || 'Set location'}</span>
+            <ChevronDown size={11} className="opacity-60" />
+          </button>
         )}
 
-        <nav className="ml-auto hidden items-center gap-4 md:flex">
+        {/* Right nav */}
+        <nav className="ml-auto hidden items-center gap-1 md:flex">
           {showStorefrontNav && (
             <>
-              <Link to="/restaurants" className="text-sm font-medium text-gray-700 hover:text-brand-600">
+              <Link
+                to="/restaurants"
+                className="rounded-lg px-3 py-2 text-sm font-medium transition-all duration-150"
+                style={{ color: 'rgba(233,227,245,0.8)' }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#c084fc'; e.currentTarget.style.background = 'rgba(147,51,234,0.12)'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = 'rgba(233,227,245,0.8)'; e.currentTarget.style.background = 'transparent'; }}
+              >
                 Restaurants
               </Link>
-              <Link to="/cart" className="relative text-gray-700 hover:text-brand-600" aria-label="Cart">
-                <ShoppingCart size={20} />
+
+              <Link
+                to="/cart"
+                aria-label="Cart"
+                className="relative flex h-9 w-9 items-center justify-center rounded-full transition-all duration-150"
+                style={{ color: 'rgba(233,227,245,0.8)' }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#c084fc'; e.currentTarget.style.background = 'rgba(147,51,234,0.15)'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = 'rgba(233,227,245,0.8)'; e.currentTarget.style.background = 'transparent'; }}
+              >
+                <ShoppingCart size={19} />
                 {itemCount > 0 && (
-                  <span className="absolute -right-2 -top-2 flex h-4 w-4 items-center justify-center rounded-full bg-brand-600 text-[10px] font-semibold text-white">
+                  <span
+                    className="absolute -right-0.5 -top-0.5 flex min-w-[1.1rem] items-center justify-center rounded-full px-1 text-[10px] font-bold text-white"
+                    style={{ height: '18px', background: 'linear-gradient(135deg, #9333ea, #c084fc)', boxShadow: '0 0 8px rgba(147,51,234,0.6)' }}
+                  >
                     {itemCount > 9 ? '9+' : itemCount}
                   </span>
                 )}
@@ -91,225 +113,215 @@ export default function Navbar() {
 
           {user ? (
             <>
-            {/* Each staff console renders its own bell, so showing this one too
-                just duplicates it in the header. */}
-            {showStorefrontNav && <NotificationBell />}
-            <div className="relative" ref={profileRef}>
-              <button
-                type="button"
-                onClick={() => setProfileOpen((v) => !v)}
-                className="flex items-center gap-2 rounded-full border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                <User size={16} /> <span className="max-w-[12rem] truncate">{user.name}</span>
-              </button>
-              {profileOpen && (
-                <div className="absolute right-0 mt-2 w-48 rounded-lg border border-gray-200 bg-surface py-1 shadow-lg">
-                  {user.role === 'RESTAURANT_OWNER' && (
-                    <Link
-                      to="/restaurant/dashboard"
-                      onClick={() => setProfileOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50"
-                    >
-                      <Store size={14} /> Restaurant dashboard
-                    </Link>
-                  )}
-                  {user.role === 'DELIVERY_PARTNER' && (
-                    <Link
-                      to="/delivery/dashboard"
-                      onClick={() => setProfileOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50"
-                    >
-                      <Bike size={14} /> Delivery dashboard
-                    </Link>
-                  )}
-                  {isAdminPanelUser(user) && (
-                    <Link
-                      to="/admin/dashboard"
-                      onClick={() => setProfileOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50"
-                    >
-                      <LayoutDashboard size={14} /> Admin dashboard
-                    </Link>
-                  )}
-                  <Link
-                    to="/profile"
-                    onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              {showStorefrontNav && <NotificationBell />}
+
+              {/* Profile dropdown */}
+              <div className="relative ml-1" ref={profileRef}>
+                <button
+                  type="button"
+                  onClick={() => setProfileOpen((v) => !v)}
+                  className="flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3 text-sm font-medium transition-all duration-150"
+                  style={{
+                    background: profileOpen ? 'rgba(147,51,234,0.2)' : 'rgba(147,51,234,0.1)',
+                    border: '1px solid rgba(147,51,234,0.3)',
+                    color: '#e9e3f5',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(147,51,234,0.2)'}
+                  onMouseLeave={e => !profileOpen && (e.currentTarget.style.background = 'rgba(147,51,234,0.1)')}
+                >
+                  <span
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+                    style={{ background: 'linear-gradient(135deg, #9333ea, #c084fc)' }}
                   >
-                    <User size={14} /> Profile
-                  </Link>
-                  {/* My orders / Addresses / Favorites are customer-only concepts
-                      — a restaurant owner, rider or admin has none of these, so
-                      showing them here was just dead links in every staff
-                      member's own menu. */}
-                  {showStorefrontNav && (
-                    <>
-                  <Link
-                    to="/orders"
-                    onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    {avatar}
+                  </span>
+                  <span className="max-w-[8rem] truncate">{user.name}</span>
+                  <ChevronDown
+                    size={13}
+                    className="opacity-60 transition-transform duration-200"
+                    style={{ transform: profileOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                  />
+                </button>
+
+                {profileOpen && (
+                  <div
+                    className="absolute right-0 mt-2 w-52 overflow-hidden rounded-2xl py-1.5"
+                    style={{
+                      background: 'linear-gradient(145deg, #1a1035, #120d28)',
+                      border: '1px solid rgba(147,51,234,0.25)',
+                      boxShadow: '0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(147,51,234,0.1)',
+                    }}
                   >
-                    <ClipboardList size={14} /> My orders
-                  </Link>
-                  <Link
-                    to="/profile/addresses"
-                    onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                  >
-                    <MapPinned size={14} /> Addresses
-                  </Link>
-                  <Link
-                    to="/favorites"
-                    onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                  >
-                    <Heart size={14} /> Favorites
-                  </Link>
-                  <Link
-                    to="/support"
-                    onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                  >
-                    <LifeBuoy size={14} /> Support
-                  </Link>
-                    </>
-                  )}
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                  >
-                    <LogOut size={14} /> Logout
-                  </button>
-                </div>
-              )}
-            </div>
+                    <div className="flex items-center gap-2.5 px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                      <span
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+                        style={{ background: 'linear-gradient(135deg, #9333ea, #c084fc)' }}
+                      >
+                        {avatar}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-white">{user.name}</p>
+                        <p className="text-[11px]" style={{ color: 'rgba(193,182,216,0.7)' }}>{user.role}</p>
+                      </div>
+                    </div>
+
+                    <div className="py-1">
+                      {user.role === 'RESTAURANT_OWNER' && <DropItem to="/restaurant/dashboard" icon={Store} label="Restaurant dashboard" accent onClick={() => setProfileOpen(false)} />}
+                      {user.role === 'DELIVERY_PARTNER' && <DropItem to="/delivery/dashboard" icon={Bike} label="Delivery dashboard" accent onClick={() => setProfileOpen(false)} />}
+                      {isAdminPanelUser(user) && <DropItem to="/admin/dashboard" icon={LayoutDashboard} label="Admin dashboard" accent onClick={() => setProfileOpen(false)} />}
+                      <DropItem to="/profile" icon={User} label="Profile" onClick={() => setProfileOpen(false)} />
+                      {showStorefrontNav && (
+                        <>
+                          <DropItem to="/orders" icon={ClipboardList} label="My orders" onClick={() => setProfileOpen(false)} />
+                          <DropItem to="/profile/addresses" icon={MapPinned} label="Addresses" onClick={() => setProfileOpen(false)} />
+                          <DropItem to="/favorites" icon={Heart} label="Favorites" onClick={() => setProfileOpen(false)} />
+                          <DropItem to="/support" icon={LifeBuoy} label="Support" onClick={() => setProfileOpen(false)} />
+                        </>
+                      )}
+                    </div>
+
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} className="pt-1">
+                      <button
+                        type="button"
+                        onClick={handleLogout}
+                        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm transition-all duration-150"
+                        style={{ color: '#f87171' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.1)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <LogOut size={14} /> Logout
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </>
           ) : (
             <Link
               to="/login"
-              className="rounded-full bg-gradient-to-r from-brand-600 to-brand-700 px-4 py-1.5 text-sm font-medium text-white shadow-sm transition hover:shadow-md hover:shadow-brand-200"
+              className="rounded-full px-5 py-2 text-sm font-semibold text-white transition-all duration-150"
+              style={{ background: 'linear-gradient(135deg, #9333ea, #7c3aed)', boxShadow: '0 0 20px rgba(147,51,234,0.4)' }}
+              onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 28px rgba(147,51,234,0.6)'}
+              onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 20px rgba(147,51,234,0.4)'}
             >
               Login
             </Link>
           )}
         </nav>
 
+        {/* Mobile hamburger */}
         <button
           type="button"
-          className="ml-auto text-gray-700 md:hidden"
+          className="ml-auto flex h-9 w-9 items-center justify-center rounded-full transition-all duration-150 md:hidden"
+          style={{ color: '#c084fc', background: 'rgba(147,51,234,0.1)', border: '1px solid rgba(147,51,234,0.2)' }}
           onClick={() => setMobileOpen((v) => !v)}
           aria-label="Toggle menu"
         >
-          {mobileOpen ? <X size={22} /> : <Menu size={22} />}
+          {mobileOpen ? <X size={18} /> : <Menu size={18} />}
         </button>
       </div>
 
+      {/* Mobile menu */}
       {mobileOpen && (
-        <div className="border-t border-gray-200 px-4 py-3 md:hidden" ref={mobileRef}>
-          {showStorefrontNav && (
-            <>
+        <div
+          ref={mobileRef}
+          className="md:hidden"
+          style={{
+            background: 'linear-gradient(180deg, #1a1035 0%, #120d28 100%)',
+            borderTop: '1px solid rgba(147,51,234,0.2)',
+          }}
+        >
+          <div className="px-4 py-3">
+            {showStorefrontNav && (
               <button
                 type="button"
-                onClick={() => {
-                  setMobileOpen(false);
-                  openPicker();
-                }}
-                className="mb-3 flex w-full items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-left text-sm text-gray-700"
+                onClick={() => { setMobileOpen(false); openPicker(); }}
+                className="mb-3 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm"
+                style={{ background: 'rgba(147,51,234,0.12)', border: '1px solid rgba(147,51,234,0.2)', color: '#c084fc' }}
               >
-                <MapPin size={16} className="shrink-0 text-brand-600" />
-                <span className="min-w-0 flex-1 truncate">
-                  <span className="text-gray-400">Deliver to </span>
+                <MapPin size={15} className="shrink-0" />
+                <span className="min-w-0 flex-1 truncate text-xs">
+                  <span style={{ color: 'rgba(193,182,216,0.6)' }}>Deliver to </span>
                   {location?.label || 'Set location'}
                 </span>
               </button>
-              <form onSubmit={submitSearch} className="mb-3">
-                <div className="relative">
-                  <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search restaurants or food…"
-                    className="w-full rounded-full border border-gray-200 bg-gray-50 py-2 pl-9 pr-4 text-sm outline-none"
-                  />
-                </div>
-              </form>
-            </>
-          )}
-          <div className="flex flex-col gap-1">
-            {showStorefrontNav && (
-              <>
-                <Link to="/restaurants" onClick={() => setMobileOpen(false)} className="rounded px-2 py-2 text-sm hover:bg-gray-50">
-                  Restaurants
-                </Link>
-                <Link to="/cart" onClick={() => setMobileOpen(false)} className="rounded px-2 py-2 text-sm hover:bg-gray-50">
-                  Cart
-                </Link>
-              </>
             )}
-            {user ? (
-              <>
-                {user.role === 'RESTAURANT_OWNER' && (
-                  <Link
-                    to="/restaurant/dashboard"
-                    onClick={() => setMobileOpen(false)}
-                    className="rounded px-2 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50"
+
+            <div className="space-y-0.5">
+              {showStorefrontNav && (
+                <>
+                  <MobileItem to="/restaurants" label="Restaurants" onClick={() => setMobileOpen(false)} />
+                  <MobileItem to="/cart" label={`Cart${itemCount > 0 ? ` (${itemCount})` : ''}`} onClick={() => setMobileOpen(false)} />
+                </>
+              )}
+              {user ? (
+                <>
+                  {user.role === 'RESTAURANT_OWNER' && <MobileItem to="/restaurant/dashboard" label="Restaurant dashboard" accent onClick={() => setMobileOpen(false)} />}
+                  {user.role === 'DELIVERY_PARTNER' && <MobileItem to="/delivery/dashboard" label="Delivery dashboard" accent onClick={() => setMobileOpen(false)} />}
+                  {isAdminPanelUser(user) && <MobileItem to="/admin/dashboard" label="Admin dashboard" accent onClick={() => setMobileOpen(false)} />}
+                  <MobileItem to="/profile" label="Profile" onClick={() => setMobileOpen(false)} />
+                  {showStorefrontNav && (
+                    <>
+                      <MobileItem to="/orders" label="My orders" onClick={() => setMobileOpen(false)} />
+                      <MobileItem to="/profile/addresses" label="Addresses" onClick={() => setMobileOpen(false)} />
+                      <MobileItem to="/favorites" label="Favorites" onClick={() => setMobileOpen(false)} />
+                      <MobileItem to="/support" label="Support" onClick={() => setMobileOpen(false)} />
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => { setMobileOpen(false); logout(); }}
+                    className="mt-2 w-full rounded-xl px-3 py-2.5 text-left text-sm font-medium"
+                    style={{ color: '#f87171', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)' }}
                   >
-                    Restaurant dashboard
-                  </Link>
-                )}
-                {user.role === 'DELIVERY_PARTNER' && (
-                  <Link
-                    to="/delivery/dashboard"
-                    onClick={() => setMobileOpen(false)}
-                    className="rounded px-2 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50"
-                  >
-                    Delivery dashboard
-                  </Link>
-                )}
-                {isAdminPanelUser(user) && (
-                  <Link
-                    to="/admin/dashboard"
-                    onClick={() => setMobileOpen(false)}
-                    className="rounded px-2 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50"
-                  >
-                    Admin dashboard
-                  </Link>
-                )}
-                <Link to="/profile" onClick={() => setMobileOpen(false)} className="rounded px-2 py-2 text-sm hover:bg-gray-50">
-                  Profile
-                </Link>
-                <Link to="/orders" onClick={() => setMobileOpen(false)} className="rounded px-2 py-2 text-sm hover:bg-gray-50">
-                  My orders
-                </Link>
-                <Link to="/profile/addresses" onClick={() => setMobileOpen(false)} className="rounded px-2 py-2 text-sm hover:bg-gray-50">
-                  Addresses
-                </Link>
-                <Link to="/favorites" onClick={() => setMobileOpen(false)} className="rounded px-2 py-2 text-sm hover:bg-gray-50">
-                  Favorites
-                </Link>
-                <Link to="/support" onClick={() => setMobileOpen(false)} className="rounded px-2 py-2 text-sm hover:bg-gray-50">
-                  Support
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMobileOpen(false);
-                    logout();
-                  }}
-                  className="rounded px-2 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <Link
+                  to="/login"
+                  onClick={() => setMobileOpen(false)}
+                  className="mt-2 block w-full rounded-xl py-2.5 text-center text-sm font-semibold text-white"
+                  style={{ background: 'linear-gradient(135deg, #9333ea, #7c3aed)' }}
                 >
-                  Logout
-                </button>
-              </>
-            ) : (
-              <Link to="/login" onClick={() => setMobileOpen(false)} className="rounded px-2 py-2 text-sm font-medium text-brand-600">
-                Login
-              </Link>
-            )}
+                  Login
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       )}
     </header>
+  );
+}
+
+function DropItem({ to, icon: Icon, label, accent, onClick }) {
+  return (
+    <Link
+      to={to}
+      onClick={onClick}
+      className="flex items-center gap-2.5 px-4 py-2.5 text-sm transition-all duration-150"
+      style={{ color: accent ? '#c084fc' : 'rgba(233,227,245,0.85)' }}
+      onMouseEnter={e => e.currentTarget.style.background = accent ? 'rgba(147,51,234,0.12)' : 'rgba(255,255,255,0.05)'}
+      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+    >
+      <Icon size={14} style={{ opacity: 0.7 }} />
+      {label}
+    </Link>
+  );
+}
+
+function MobileItem({ to, label, accent, onClick }) {
+  return (
+    <Link
+      to={to}
+      onClick={onClick}
+      className="block rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150"
+      style={{ color: accent ? '#c084fc' : 'rgba(233,227,245,0.85)' }}
+      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+    >
+      {label}
+    </Link>
   );
 }

@@ -3,11 +3,21 @@ import { useAuth } from '../context/AuthContext';
 import { landingPathFor } from '../constants/roles';
 
 // Redirects authenticated users away from auth-only pages (login, register)
-// to their role's dashboard.
+// to their role's dashboard — UNLESS they're a customer visiting
+// /register?role=DELIVERY_PARTNER or ?role=RESTAURANT_OWNER, which means they
+// are intentionally trying to sign up for a different role from the marketing page.
 export function AuthRedirect({ children }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return null;
-  if (user) return <Navigate to={landingPathFor(user)} replace />;
+  if (user) {
+    // Allow customers to visit /register?role=X to start a partner application.
+    const roleParam = new URLSearchParams(location.search).get('role');
+    const isPartnerSignup = roleParam && roleParam !== 'CUSTOMER' && user.role === 'CUSTOMER';
+    if (!isPartnerSignup) {
+      return <Navigate to={landingPathFor(user)} replace />;
+    }
+  }
   return children;
 }
 

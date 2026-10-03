@@ -20,6 +20,11 @@ const listForRestaurant = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, 'Reviews fetched', { reviews: items, pagination }));
 });
 
+const listForOwner = asyncHandler(async (req, res) => {
+  const { items, pagination } = await reviewService.listForOwner(req.params.id, req.query);
+  res.json(new ApiResponse(200, 'Reviews fetched', { reviews: items, pagination }));
+});
+
 const updateReview = asyncHandler(async (req, res) => {
   const review = await reviewService.updateReview(req.user, req.params.id, req.body);
   res.json(new ApiResponse(200, 'Review updated', { review }));
@@ -74,4 +79,4 @@ const deleteReply = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, 'Reply removed', { review }));
 });
 
-module.exports = { createReview, listForRestaurant, updateReview, deleteReview, reportReview, replyToReview, deleteReply };
+module.exports = { createReview, listForRestaurant, listForOwner, updateReview, deleteReview, reportReview, replyToReview, deleteReply };

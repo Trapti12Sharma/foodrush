@@ -323,7 +323,26 @@ async function deleteReply(user, reviewId) {
   return review;
 }
 
-// Admin moderation queue — every status, every restaurant, unlike the public
+// Owner listing — all reviews for the owner's own restaurant, every
+// moderationStatus, so PENDING reviews from customers are visible to the owner
+// even before an admin approves them. Ownership is verified by the caller
+// (restaurant.routes.js uses requireOwnerOrPermission), not re-checked here.
+async function listForOwner(restaurantId, query) {
+  const { page, limit, skip } = parsePagination(query);
+  const filter = { restaurant: restaurantId };
+  const [items, total] = await Promise.all([
+    Review.find(filter)
+      .sort('-createdAt')
+      .skip(skip)
+      .limit(limit)
+      .populate('user', 'name avatar')
+      .lean(),
+    Review.countDocuments(filter),
+  ]);
+  return { items, pagination: buildPaginationMeta(total, page, limit) };
+}
+
+// Admin moderation queue — every status, every restaurant
 // listing above. `search` matches the review text itself or the reviewing
 // customer's name/email (resolved to a set of ids first, mirroring
 // supportTicket.service.js#listForAdmin's orderNumber -> order._id pattern);
@@ -377,6 +396,7 @@ module.exports = {
   replyToReview,
   deleteReply,
   listForRestaurant,
+  listForOwner,
   updateReview,
   deleteReview,
   createReport,

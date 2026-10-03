@@ -334,6 +334,16 @@ router.get(
  */
 router.get('/:id/reviews', optionalAuth, reviewController.listForRestaurant);
 
+// Owner-scoped listing — all statuses (PENDING included), restricted to the
+// restaurant's own owner. A restaurant owner needs to see PENDING reviews so
+// they know customer feedback exists, even before admin moderation clears it.
+router.get(
+  '/:id/reviews/owner',
+  authenticateUser,
+  requireOwnerOrPermission(PERMISSIONS.REVIEWS_MODERATE),
+  reviewController.listForOwner
+);
+
 /**
  * @swagger
  * /restaurants/{id}:

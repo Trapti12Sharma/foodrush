@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import toast from '@/utils/toast';
-import { ArrowLeft, Check, MapPin, CreditCard, Bike, ReceiptText, UtensilsCrossed } from 'lucide-react';
+import { ArrowLeft, Check, MapPin, CreditCard, Bike, ReceiptText, UtensilsCrossed, Star } from 'lucide-react';
 import { orderService } from '../services/orderService';
+import { reviewService } from '../services/reviewService';
 import { useAuth } from '../context/AuthContext';
 import OrderStatusBadge, { ORDER_STATUS_LABELS } from '../components/OrderStatusBadge';
+import StarRating from '../components/StarRating';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EmptyState from '../components/EmptyState';
 import DeliveryTracker from '../components/DeliveryTracker';
@@ -21,6 +23,174 @@ const PROGRESS_STEPS = ['PLACED', 'CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP', 
 const TERMINAL_STATUSES = ['CANCELLED', 'REJECTED', 'REFUND_PENDING', 'REFUNDED'];
 
 const GLASS = 'rounded-2xl border border-gray-200 bg-surface';
+
+// ─── Inline review card ───────────────────────────────────────────────────────
+// Shown only on DELIVERED orders for the customer who placed it. Lets them rate
+// and review right from the order detail page — same as Zomato / Swiggy UX.
+function OrderReviewSection({ order }) {
+  const [existing, setExisting] = useState(null);   // review they've already written
+  const [checked, setChecked] = useState(false);     // have we fetched yet?
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Check if the customer already reviewed this specific order
+  useEffect(() => {
+    reviewService
+      .listForRestaurant(order.restaurant?._id || order.restaurant, { limit: 100 })
+      .then((res) => {
+        const mine = (res.reviews || []).find(
+          (r) => r.order === order._id || r.order?._id === order._id || r.order === order._id
+        );
+        if (mine) {
+          setExisting(mine);
+          setRating(mine.rating);
+          setComment(mine.comment || '');
+        }
+      })
+      .catch(() => { })
+      .finally(() => setChecked(true));
+  }, [order._id, order.restaurant]);
+
+  async function submit() {
+    if (!rating) return;
+    setSubmitting(true);
+    try {
+      if (existing) {
+        const updated = await reviewService.update(existing._id, { rating, comment });
+        setExisting(updated);
+        toast.success('Review updated');
+      } else {
+        const created = await reviewService.create({
+          restaurant: order.restaurant?._id || order.restaurant,
+          order: order._id,
+          rating,
+          comment,
+        });
+        setExisting(created);
+        toast.success('Review submitted — it will appear once approved');
+      }
+      setEditing(false);
+    } catch (err) {
+      toast.error(err.message || 'Could not submit review');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (!checked) return null;
+
+  // Already reviewed and not in edit mode — show the submitted review
+  if (existing && !editing) {
+    return (
+      <section className={`${GLASS} p-5`}>
+        <div className="flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+            <Star size={15} className="text-amber-400 fill-amber-400" /> Your review
+          </h2>
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="text-xs font-medium text-brand-600 hover:underline"
+          >
+            Edit
+          </button>
+        </div>
+
+        {/* Zomato-style compact rating display */}
+        <div className="mt-3 flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-600 text-base font-bold text-white shadow">
+            {existing.rating}.0
+          </div>
+          <div>
+            <StarRating value={existing.rating} readOnly size={16} />
+            {existing.moderationStatus === 'PENDING' && (
+              <p className="mt-1 text-xs text-amber-500">Awaiting admin approval</p>
+            )}
+            {existing.moderationStatus === 'APPROVED' && (
+              <p className="mt-1 text-xs text-emerald-400">Approved — visible publicly</p>
+            )}
+            {existing.moderationStatus === 'REJECTED' && (
+              <p className="mt-1 text-xs text-rose-400">
+                Rejected{existing.moderationReason ? `: ${existing.moderationReason}` : ''}
+              </p>
+            )}
+          </div>
+        </div>
+        {existing.comment && (
+          <p className="mt-2 text-sm text-gray-600">{existing.comment}</p>
+        )}
+      </section>
+    );
+  }
+
+  // Write / edit mode
+  return (
+    <section className={`${GLASS} overflow-hidden`}>
+      {/* Header band */}
+      <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+          <Star size={15} className="fill-amber-400 text-amber-400" />
+          {existing ? 'Edit your review' : 'Rate your experience'}
+        </h2>
+        {existing && (
+          <button
+            type="button"
+            onClick={() => { setEditing(false); setRating(existing.rating); setComment(existing.comment || ''); }}
+            className="text-xs text-gray-400 hover:underline"
+          >
+            Cancel
+          </button>
+        )}
+      </div>
+
+      <div className="p-5">
+        {/* Big tap-friendly star row */}
+        <div className="flex items-center gap-1">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <button
+              key={star}
+              type="button"
+              onClick={() => setRating(star)}
+              className="transition-transform hover:scale-110 active:scale-95"
+              aria-label={`${star} star${star > 1 ? 's' : ''}`}
+            >
+              <Star
+                size={36}
+                className={star <= rating ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}
+              />
+            </button>
+          ))}
+          <span className="ml-3 text-2xl font-bold text-gray-900">{rating}<span className="text-base font-normal text-gray-400">/5</span></span>
+        </div>
+
+        {/* Rating label like Zomato */}
+        <p className="mt-1 text-sm font-medium text-amber-500">
+          {rating === 5 ? 'Loved it!' : rating === 4 ? 'Really good' : rating === 3 ? 'Good' : rating === 2 ? 'Could be better' : 'Disappointed'}
+        </p>
+
+        <textarea
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          placeholder="Tell others what you liked or disliked (optional)…"
+          rows={3}
+          maxLength={1000}
+          className="mt-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-400"
+        />
+
+        <button
+          type="button"
+          disabled={submitting || !rating}
+          onClick={submit}
+          className="mt-3 w-full rounded-lg bg-gradient-to-r from-brand-600 to-brand-700 py-2.5 text-sm font-semibold text-white transition hover:shadow-md hover:shadow-brand-600/30 disabled:opacity-50"
+        >
+          {submitting ? 'Submitting…' : existing ? 'Update review' : 'Submit review'}
+        </button>
+      </div>
+    </section>
+  );
+}
 
 function timeOf(value) {
   return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -53,13 +223,12 @@ function ProgressTracker({ order }) {
                 {/* Connector before the dot, except on the first step. */}
                 <span className={`h-0.5 flex-1 ${i === 0 ? 'bg-transparent' : done || active ? 'bg-brand-600' : 'bg-gray-200'}`} />
                 <span
-                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition ${
-                    done
-                      ? 'bg-brand-600 text-white'
-                      : active
-                        ? 'bg-brand-600 text-white ring-4 ring-brand-600/25'
-                        : 'border border-gray-300 bg-surface text-gray-400'
-                  }`}
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition ${done
+                    ? 'bg-brand-600 text-white'
+                    : active
+                      ? 'bg-brand-600 text-white ring-4 ring-brand-600/25'
+                      : 'border border-gray-300 bg-surface text-gray-400'
+                    }`}
                 >
                   {done ? <Check size={14} /> : i + 1}
                 </span>
@@ -103,7 +272,7 @@ export default function OrderDetail() {
   // from OUT_FOR_DELIVERY+OTP straight to "Delivered" without a manual refresh
   // and without flashing a spinner over an already-rendered page.
   function refreshSilently() {
-    orderService.getById(id).then(setOrder).catch(() => {});
+    orderService.getById(id).then(setOrder).catch(() => { });
   }
 
   useEffect(load, [id]);
@@ -249,6 +418,11 @@ export default function OrderDetail() {
               <DeliveryTracker orderId={order._id} onDelivered={refreshSilently} />
             </>
           )}
+
+          {/* Review section — only for DELIVERED orders viewed by the customer who placed it */}
+          {order.orderStatus === 'DELIVERED' && isOwnOrder && user?.role === 'CUSTOMER' && (
+            <OrderReviewSection order={order} />
+          )}
         </div>
 
         {/* Sticky so the total and the actions stay in view while a long item
@@ -289,13 +463,12 @@ export default function OrderDetail() {
             <p className="flex items-center gap-2 text-gray-600">
               {order.paymentMethod === 'COD' ? 'Cash on Delivery' : 'Online Payment'}
               <span
-                className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${
-                  order.paymentStatus === 'paid'
-                    ? 'bg-emerald-500/15 text-emerald-300'
-                    : order.paymentStatus === 'failed'
-                      ? 'bg-rose-500/15 text-rose-300'
-                      : 'bg-white/10 text-gray-500'
-                }`}
+                className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${order.paymentStatus === 'paid'
+                  ? 'bg-emerald-500/15 text-emerald-300'
+                  : order.paymentStatus === 'failed'
+                    ? 'bg-rose-500/15 text-rose-300'
+                    : 'bg-white/10 text-gray-500'
+                  }`}
               >
                 {order.paymentStatus}
               </span>
