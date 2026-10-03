@@ -64,22 +64,31 @@ export default function CreateRestaurantForm({ onSubmit, submitting }) {
   }
 
   return (
-    <form onSubmit={handleSubmit(submit)} className="mx-auto max-w-lg space-y-4 rounded-xl border border-gray-200 bg-surface p-6">
-      <ImageUploadField label="Restaurant image" value={image} onChange={setImage} purpose="restaurant" />
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Restaurant name</label>
-        <input {...register('name', { required: true })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-        {errors.name && <p className="mt-1 text-xs text-red-600">Name is required</p>}
+    <form onSubmit={handleSubmit(submit)} className="space-y-5 rounded-xl border border-gray-200 bg-surface p-6">
+      {/* Row 1: image + name + cuisine side by side */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="sm:col-span-1">
+          <ImageUploadField label="Restaurant image" value={image} onChange={setImage} purpose="restaurant" />
+        </div>
+        <div className="flex flex-col gap-4 sm:col-span-2">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Restaurant name</label>
+            <input {...register('name', { required: true })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+            {errors.name && <p className="mt-1 text-xs text-red-600">Name is required</p>}
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Cuisine (comma separated)</label>
+            <input
+              {...register('cuisine', { required: true })}
+              placeholder="Indian, Chinese"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+            {errors.cuisine && <p className="mt-1 text-xs text-red-600">At least one cuisine is required</p>}
+          </div>
+        </div>
       </div>
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Cuisine (comma separated)</label>
-        <input
-          {...register('cuisine', { required: true })}
-          placeholder="Indian, Chinese"
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-        />
-        {errors.cuisine && <p className="mt-1 text-xs text-red-600">At least one cuisine is required</p>}
-      </div>
+
+      {/* Location picker */}
       <div className="space-y-2 rounded-lg bg-gray-50 p-3">
         <p className="text-sm font-medium text-gray-700">Where is your restaurant?</p>
         <PlaceSearch onSelect={fillFromPlace} enabled={locationSearchEnabled} placeholder="Search for your restaurant's address" />
@@ -94,11 +103,13 @@ export default function CreateRestaurantForm({ onSubmit, submitting }) {
           <p className="text-xs text-amber-600">No location yet. Without one, customers can&apos;t find you in &ldquo;near me&rdquo; results.</p>
         )}
       </div>
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Address line</label>
-        <input {...register('addressLine', { required: true })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
+
+      {/* Address row */}
+      <div className="grid gap-3 sm:grid-cols-4">
+        <div className="sm:col-span-2">
+          <label className="mb-1 block text-sm font-medium text-gray-700">Address line</label>
+          <input {...register('addressLine', { required: true })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+        </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">City</label>
           <input {...register('city', { required: true })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
@@ -108,7 +119,9 @@ export default function CreateRestaurantForm({ onSubmit, submitting }) {
           <input {...register('pincode')} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-3">
+
+      {/* Delivery config row */}
+      <div className="grid gap-3 sm:grid-cols-4">
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Delivery time (min)</label>
           <input type="number" {...register('deliveryTime', { required: true, min: 0 })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
@@ -121,26 +134,27 @@ export default function CreateRestaurantForm({ onSubmit, submitting }) {
           <label className="mb-1 block text-sm font-medium text-gray-700">Min order (₹)</label>
           <input type="number" {...register('minimumOrder', { min: 0 })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
         </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">Delivery radius (km)</label>
+          <input
+            type="number"
+            step="0.5"
+            {...register('deliveryRadiusKm', { min: { value: 0.5, message: 'At least 0.5 km' }, max: { value: 50, message: 'At most 50 km' } })}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          />
+          {errors.deliveryRadiusKm && <p className="mt-1 text-xs text-red-600">{errors.deliveryRadiusKm.message}</p>}
+        </div>
       </div>
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Delivery radius (km)</label>
-        <input
-          type="number"
-          step="0.5"
-          {...register('deliveryRadiusKm', { min: { value: 0.5, message: 'At least 0.5 km' }, max: { value: 50, message: 'At most 50 km' } })}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-        />
-        {errors.deliveryRadiusKm && <p className="mt-1 text-xs text-red-600">{errors.deliveryRadiusKm.message}</p>}
-        <p className="mt-1 text-xs text-gray-500">Customers farther than this from your restaurant can&apos;t order from you.</p>
-      </div>
+
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">Description (optional)</label>
         <textarea {...register('description')} rows={3} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
       </div>
+
       <button
         type="submit"
         disabled={submitting}
-        className="w-full rounded-lg bg-brand-600 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
+        className="rounded-lg bg-brand-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
       >
         {submitting ? 'Creating…' : 'Create restaurant'}
       </button>

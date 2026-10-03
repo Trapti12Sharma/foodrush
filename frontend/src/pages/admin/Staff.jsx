@@ -243,122 +243,117 @@ export default function Staff() {
         </form>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-surface">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-            <tr>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Role</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {loading && (
+      <div className="overflow-hidden rounded-2xl border border-brand-300/20 shadow-xl shadow-black/30">
+        <div className="overflow-x-auto">
+          <table className="data-table">
+            <thead>
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-gray-400">
-                  Loading…
-                </td>
+                <th>Name</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th />
               </tr>
-            )}
-            {!loading && items.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-gray-400">
-                  No staff accounts match these filters.
-                </td>
-              </tr>
-            )}
-            {!loading &&
-              items.map((member) => {
-                const isSelf = user && member._id === user._id;
-                return (
-                  <tr key={member._id}>
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-gray-900">
-                        {member.name}
-                        {isSelf && <span className="ml-1.5 text-xs font-normal text-gray-400">(you)</span>}
-                      </p>
-                      <p className="text-xs text-gray-400">{member.email}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      {/* A super admin cannot change their own role — the server
-                          refuses it, so the control is not offered at all. */}
-                      {isSelf ? (
-                        <RoleBadge role={member.role} />
-                      ) : (
-                        <select
-                          value={member.role}
-                          onChange={(e) => changeRole(member, e.target.value)}
-                          className="rounded-lg border border-gray-300 px-2 py-1 text-xs"
-                        >
-                          {roles.map((r) => (
-                            <option key={r.role} value={r.role}>
-                              {r.role}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {/* An expired invite is called out separately from a
-                          pending one: the first needs resending, the second only
-                          needs waiting. An account created directly (bootstrap
-                          or seed script) has a working password and no
-                          outstanding invite, so it reads Active. */}
-                      {!member.isActive ? (
-                        <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs text-gray-600">Deactivated</span>
-                      ) : member.inviteExpired ? (
-                        <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-700">Invite expired</span>
-                      ) : member.invitePending ? (
-                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">Invite pending</span>
-                      ) : (
-                        <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700">Active</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-3">
-                        {member.isActive && (
-                          <button onClick={() => resend(member)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-brand-700">
-                            <Mail size={14} /> {member.invitePending ? 'Resend invite' : 'Send reset link'}
-                          </button>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr>
+                  <td colSpan={4} className="px-5 py-6 text-center text-gray-400">
+                    Loading…
+                  </td>
+                </tr>
+              )}
+              {!loading && items.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-5 py-6 text-center text-gray-400">
+                    No staff accounts match these filters.
+                  </td>
+                </tr>
+              )}
+              {!loading &&
+                items.map((member) => {
+                  const isSelf = user && member._id === user._id;
+                  return (
+                    <tr key={member._id}>
+                      <td className="font-semibold text-gray-900">
+                        <p className="font-semibold text-gray-900">
+                          {member.name}
+                          {isSelf && <span className="ml-1.5 text-xs font-normal text-gray-400">(you)</span>}
+                        </p>
+                        <p className="text-xs text-gray-400">{member.email}</p>
+                      </td>
+                      <td>
+                        {isSelf ? (
+                          <RoleBadge role={member.role} />
+                        ) : (
+                          <select
+                            value={member.role}
+                            onChange={(e) => changeRole(member, e.target.value)}
+                            className="rounded-lg border border-gray-300 px-2 py-1 text-xs"
+                          >
+                            {roles.map((r) => (
+                              <option key={r.role} value={r.role}>
+                                {r.role}
+                              </option>
+                            ))}
+                          </select>
                         )}
-                        {!isSelf && (
-                          <button onClick={() => setConfirm(member)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-600">
-                            <ShieldOff size={14} /> Revoke
-                          </button>
+                      </td>
+                      <td>
+                        {!member.isActive ? (
+                          <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold text-gray-500 ring-1 ring-white/15">Deactivated</span>
+                        ) : member.inviteExpired ? (
+                          <span className="rounded-full bg-rose-500/15 px-2.5 py-1 text-xs font-medium text-rose-300 ring-1 ring-rose-500/30">Invite expired</span>
+                        ) : member.invitePending ? (
+                          <span className="rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-300 ring-1 ring-amber-500/30">Invite pending</span>
+                        ) : (
+                          <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-300 ring-1 ring-emerald-500/30">Active</span>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-          </tbody>
-        </table>
+                      </td>
+                      <td>
+                        <div className="flex items-center justify-end gap-3">
+                          {member.isActive && (
+                            <button onClick={() => resend(member)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-brand-400">
+                              <Mail size={14} /> {member.invitePending ? 'Resend invite' : 'Send reset link'}
+                            </button>
+                          )}
+                          {!isSelf && (
+                            <button onClick={() => setConfirm(member)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-rose-400">
+                              <ShieldOff size={14} /> Revoke
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {matrix && (
         <section className="rounded-xl border border-gray-200 bg-surface p-5">
           <h2 className="text-sm font-semibold text-gray-900">What each role can do</h2>
           <p className="mt-1 text-xs text-gray-500">Served from the server&apos;s own permission table, so this is exactly what the API enforces.</p>
-          <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full text-xs">
+          <div className="mt-4 overflow-x-auto rounded-xl border border-brand-300/20">
+            <table className="data-table text-xs">
               <thead>
-                <tr className="text-left text-gray-500">
-                  <th className="py-2 pr-4">Permission</th>
+                <tr>
+                  <th>Permission</th>
                   {roles.map((r) => (
-                    <th key={r.role} className="px-2 py-2 text-center font-medium">
+                    <th key={r.role} className="text-center">
                       {r.role.replace(/_/g, ' ')}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody>
                 {matrix.permissions.map((permission) => (
                   <tr key={permission}>
-                    <td className="py-2 pr-4 font-mono text-gray-600">{permission}</td>
+                    <td className="font-mono">{permission}</td>
                     {roles.map((r) => (
-                      <td key={r.role} className="px-2 py-2 text-center">
-                        {r.permissions.includes(permission) ? <span className="text-green-600">●</span> : <span className="text-gray-200">—</span>}
+                      <td key={r.role} className="text-center">
+                        {r.permissions.includes(permission) ? <span className="text-emerald-400">●</span> : <span className="text-white/10">—</span>}
                       </td>
                     ))}
                   </tr>

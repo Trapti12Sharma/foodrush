@@ -69,8 +69,8 @@ export default function AdminLayout() {
           ))}
         </nav>
       </aside>
-      <div className="min-w-0 flex-1 px-4 py-6 md:px-8">
-        <div className="mb-4 flex justify-end">
+      <div className="min-w-0 flex-1 px-4 py-4 md:px-8">
+        <div className="mb-3 flex items-center justify-end border-b border-white/[0.06] pb-3">
           <NotificationBell />
         </div>
         <Outlet />

@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import toast from '@/utils/toast';
 import { adminService } from '../../services/adminService';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import Pagination from '../../components/Pagination';
+
+const PAGE_SIZE = 10;
 
 const ASSIGNMENT_STYLES = {
   OFFERED: 'bg-amber-100 text-amber-700',
@@ -100,6 +103,8 @@ function WaitingOrderRow({ order, onAssigned }) {
 export default function DeliveryAssignments() {
   const [waitingOrders, setWaitingOrders] = useState([]);
   const [assignments, setAssignments] = useState([]);
+  const [assignmentPagination, setAssignmentPagination] = useState(null);
+  const [assignmentPage, setAssignmentPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(null);
@@ -108,17 +113,19 @@ export default function DeliveryAssignments() {
     setLoading(true);
     Promise.all([
       adminService.listOrders({ status: 'READY_FOR_PICKUP', limit: 50 }),
-      adminService.listDeliveryAssignments({ status: statusFilter || undefined, limit: 50 }),
+      adminService.listDeliveryAssignments({ status: statusFilter || undefined, page: assignmentPage, limit: PAGE_SIZE }),
     ])
       .then(([ordersRes, assignmentsRes]) => {
         setWaitingOrders(ordersRes.orders);
         setAssignments(assignmentsRes.assignments);
+        setAssignmentPagination(assignmentsRes.pagination || null);
       })
       .catch((err) => toast.error(err.message || 'Could not load dispatch data'))
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, [statusFilter]);
+  useEffect(() => { setAssignmentPage(1); }, [statusFilter]);
+  useEffect(load, [assignmentPage, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function confirmCancel() {
     const id = cancelling;
@@ -167,36 +174,39 @@ export default function DeliveryAssignments() {
         {loading ? (
           <p className="mt-4 text-sm text-gray-400">Loading…</p>
         ) : (
-          <div className="mt-3 overflow-x-auto rounded-xl border border-gray-200 bg-surface">
-            <table className="w-full text-sm">
-              <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-400">
-                <tr>
-                  <th className="px-4 py-2">Order</th>
-                  <th className="px-4 py-2">Rider</th>
-                  <th className="px-4 py-2">Status</th>
-                  <th className="px-4 py-2">Offered</th>
-                  <th className="px-4 py-2" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {assignments.map((a) => (
-                  <tr key={a._id}>
-                    <td className="px-4 py-2.5 text-gray-700">{a.order?.orderNumber}</td>
-                    <td className="px-4 py-2.5 text-gray-700">{a.deliveryPartner?.fullName}</td>
-                    <td className="px-4 py-2.5"><Badge value={a.status} /></td>
-                    <td className="px-4 py-2.5 text-gray-500">{new Date(a.offeredAt).toLocaleString()}</td>
-                    <td className="px-4 py-2.5 text-right">
-                      {ACTIVE_STATUSES.includes(a.status) && (
-                        <button type="button" onClick={() => setCancelling(a._id)} className="text-xs font-medium text-red-600 hover:underline">
-                          Cancel
-                        </button>
-                      )}
-                    </td>
+          <div className="mt-3 overflow-hidden rounded-2xl border border-brand-300/20 shadow-xl shadow-black/30">
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Order</th>
+                    <th>Rider</th>
+                    <th>Status</th>
+                    <th>Offered</th>
+                    <th />
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {assignments.map((a) => (
+                    <tr key={a._id}>
+                      <td className="font-semibold text-gray-900">{a.order?.orderNumber}</td>
+                      <td>{a.deliveryPartner?.fullName}</td>
+                      <td><Badge value={a.status} /></td>
+                      <td>{new Date(a.offeredAt).toLocaleString()}</td>
+                      <td className="text-right">
+                        {ACTIVE_STATUSES.includes(a.status) && (
+                          <button type="button" onClick={() => setCancelling(a._id)} className="table-action-btn-danger">
+                            Cancel
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             {assignments.length === 0 && <p className="p-6 text-center text-sm text-gray-400">No assignments found.</p>}
+            <Pagination meta={assignmentPagination} onPageChange={setAssignmentPage} />
           </div>
         )}
       </section>

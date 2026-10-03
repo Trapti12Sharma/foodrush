@@ -143,32 +143,34 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="mt-6 rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.07] to-white/[0.02] p-5 shadow-lg shadow-black/20 backdrop-blur-xl">
-            <h3 className="mb-3 text-sm font-semibold text-gray-700">Top menu items</h3>
-            <p className="mb-3 text-xs text-gray-400">By quantity sold in delivered orders. Item sales exclude delivery fee and tax.</p>
+          <div className="mt-6 overflow-hidden rounded-2xl border border-brand-300/20 shadow-xl shadow-black/30">
+            <div className="p-5">
+              <h3 className="mb-3 text-sm font-semibold text-gray-700">Top menu items</h3>
+              <p className="mb-3 text-xs text-gray-400">By quantity sold in delivered orders. Item sales exclude delivery fee and tax.</p>
+            </div>
             {analytics.topItems.length === 0 ? (
-              <p className="py-6 text-center text-sm text-gray-400">Nothing was sold in this range.</p>
+              <p className="p-6 pt-0 text-center text-sm text-gray-400">Nothing was sold in this range.</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                <thead className="text-left text-xs uppercase text-gray-400">
-                  <tr>
-                    <th className="pb-2">Item</th>
-                    <th className="pb-2 text-right">Qty</th>
-                    <th className="pb-2 text-right">Orders</th>
-                    <th className="pb-2 text-right">Sales</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {analytics.topItems.map((item) => (
-                    <tr key={item.foodId}>
-                      <td className="py-2 text-gray-800">{item.name}</td>
-                      <td className="py-2 text-right text-gray-600">{item.quantity}</td>
-                      <td className="py-2 text-right text-gray-600">{item.orderCount}</td>
-                      <td className="py-2 text-right font-medium text-gray-900">₹{item.sales.toFixed(2)}</td>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Item</th>
+                      <th className="text-right">Qty</th>
+                      <th className="text-right">Orders</th>
+                      <th className="text-right">Sales</th>
                     </tr>
-                  ))}
-                </tbody>
+                  </thead>
+                  <tbody>
+                    {analytics.topItems.map((item) => (
+                      <tr key={item.foodId}>
+                        <td className="font-semibold text-gray-900">{item.name}</td>
+                        <td className="text-right">{item.quantity}</td>
+                        <td className="text-right">{item.orderCount}</td>
+                        <td className="text-right font-bold text-gray-900">₹{item.sales.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
                 </table>
               </div>
             )}

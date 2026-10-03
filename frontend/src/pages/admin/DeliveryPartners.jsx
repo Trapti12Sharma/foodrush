@@ -4,7 +4,7 @@ import { adminService } from '../../services/adminService';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import Pagination from '../../components/Pagination';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 const KYC_FILTERS = ['', 'SUBMITTED', 'VERIFIED', 'REJECTED', 'PENDING'];
 const ACCOUNT_FILTERS = ['', 'PENDING', 'ACTIVE', 'SUSPENDED', 'REJECTED'];
 
@@ -249,9 +249,7 @@ export default function DeliveryPartners() {
               <p className="p-6 text-center text-sm text-gray-400">No delivery partners found.</p>
             ))}
           {pagination && pagination.totalPages > 1 && (
-            <div className="overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.07] to-white/[0.02] backdrop-blur-xl">
-              <Pagination meta={pagination} onPageChange={setPage} />
-            </div>
+            <Pagination meta={pagination} onPageChange={setPage} />
           )}
         </div>
       )}

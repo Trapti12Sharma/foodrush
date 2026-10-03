@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import toast from '@/utils/toast';
 import { adminService } from '../../services/adminService';
+import Pagination from '../../components/Pagination';
+
+const PAGE_SIZE = 10;
 
 const STATUS_OPTIONS = ['OPEN', 'IN_PROGRESS', 'WAITING_FOR_USER', 'RESOLVED', 'CLOSED'];
 const PRIORITY_OPTIONS = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
@@ -208,7 +211,7 @@ export default function SupportTickets() {
 
   function load() {
     setLoading(true);
-    const params = { page, limit: 20 };
+    const params = { page, limit: PAGE_SIZE };
     Object.entries(filters).forEach(([k, v]) => {
       if (v) params[k] = v;
     });
@@ -258,53 +261,44 @@ export default function SupportTickets() {
       {loading ? (
         <p className="mt-4 text-sm text-gray-400">Loading…</p>
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200 bg-surface">
-          <table className="w-full text-sm">
-            <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-400">
-              <tr>
-                <th className="px-4 py-2">Ticket</th>
-                <th className="px-4 py-2">From</th>
-                <th className="px-4 py-2">Category</th>
-                <th className="px-4 py-2">Priority</th>
-                <th className="px-4 py-2">Status</th>
-                <th className="px-4 py-2">Assigned</th>
-                <th className="px-4 py-2" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {tickets.map((t) => (
-                <tr key={t._id}>
-                  <td className="px-4 py-2.5">
-                    <p className="text-xs text-gray-400">{t.ticketNumber}</p>
-                    <p className="font-medium text-gray-800">{t.subject}</p>
-                  </td>
-                  <td className="px-4 py-2.5 text-gray-600">{t.createdBy?.name} <span className="text-gray-400">({t.createdByRole})</span></td>
-                  <td className="px-4 py-2.5 text-gray-600">{t.category}</td>
-                  <td className="px-4 py-2.5"><Badge value={t.priority} styles={PRIORITY_STYLES} /></td>
-                  <td className="px-4 py-2.5"><Badge value={t.status} styles={STATUS_STYLES} /></td>
-                  <td className="px-4 py-2.5 text-gray-500">{t.assignedTo?.name || '—'}</td>
-                  <td className="px-4 py-2.5 text-right">
-                    <button type="button" onClick={() => setOpenId(t._id)} className="text-xs font-medium text-brand-600 hover:underline">
-                      Open
-                    </button>
-                  </td>
+        <div className="mt-4 overflow-hidden rounded-2xl border border-brand-300/20 shadow-xl shadow-black/30">
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Ticket</th>
+                  <th>From</th>
+                  <th>Category</th>
+                  <th>Priority</th>
+                  <th>Status</th>
+                  <th>Assigned</th>
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {tickets.map((t) => (
+                  <tr key={t._id}>
+                    <td>
+                      <p className="text-xs text-gray-400">{t.ticketNumber}</p>
+                      <p className="font-semibold text-gray-900">{t.subject}</p>
+                    </td>
+                    <td>{t.createdBy?.name} <span className="text-gray-400">({t.createdByRole})</span></td>
+                    <td>{t.category}</td>
+                    <td><Badge value={t.priority} styles={PRIORITY_STYLES} /></td>
+                    <td><Badge value={t.status} styles={STATUS_STYLES} /></td>
+                    <td>{t.assignedTo?.name || '—'}</td>
+                    <td className="text-right">
+                      <button type="button" onClick={() => setOpenId(t._id)} className="table-action-btn">
+                        Open
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           {tickets.length === 0 && <p className="p-6 text-center text-sm text-gray-400">No support tickets found.</p>}
-        </div>
-      )}
-
-      {pagination && pagination.totalPages > 1 && (
-        <div className="mt-3 flex items-center justify-center gap-3 text-sm">
-          <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="rounded-lg border border-gray-200 px-3 py-1 disabled:opacity-40">
-            Prev
-          </button>
-          <span className="text-gray-500">Page {pagination.page} of {pagination.totalPages}</span>
-          <button type="button" disabled={page >= pagination.totalPages} onClick={() => setPage((p) => p + 1)} className="rounded-lg border border-gray-200 px-3 py-1 disabled:opacity-40">
-            Next
-          </button>
+          <Pagination meta={pagination} onPageChange={setPage} />
         </div>
       )}
 

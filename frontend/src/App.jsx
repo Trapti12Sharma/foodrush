@@ -8,7 +8,7 @@ import { FavoritesProvider } from './context/FavoritesContext';
 import { LocationProvider } from './context/LocationContext';
 import LocationPicker from './components/LocationPicker';
 import ErrorBoundary from './components/ErrorBoundary';
-import ProtectedRoute from './components/ProtectedRoute';
+import ProtectedRoute, { AuthRedirect, CustomerHomeGuard } from './components/ProtectedRoute';
 import { ADMIN_PANEL_ROLES } from './constants/roles';
 import MainLayout from './layouts/MainLayout';
 
@@ -115,13 +115,13 @@ function App() {
                 storefront chrome — a nav bar offering search, restaurants and a
                 cart is just a set of ways to wander off mid-sign-in. Each of
                 these pages carries its own FoodRush wordmark linking home. */}
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/register" element={<Register />} />
+                    <Route path="/login" element={<AuthRedirect><Login /></AuthRedirect>} />
+                    <Route path="/register" element={<AuthRedirect><Register /></AuthRedirect>} />
                     <Route path="/forgot-password" element={<ForgotPassword />} />
                     <Route path="/reset-password" element={<ResetPassword />} />
 
                     <Route element={<MainLayout />}>
-                      <Route path="/" element={<Home />} />
+                      <Route path="/" element={<CustomerHomeGuard><Home /></CustomerHomeGuard>} />
                       <Route path="/partner-with-us" element={<PartnerWithUs />} />
                       <Route path="/deliver-with-us" element={<DeliverWithUs />} />
                       <Route path="/restaurants" element={<RestaurantListing />} />

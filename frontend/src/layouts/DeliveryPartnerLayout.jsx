@@ -31,9 +31,9 @@ function Onboarding() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-12">
-      <h1 className="mb-2 text-center text-2xl font-bold text-gray-900">Deliver for FoodRush</h1>
-      <p className="mb-6 text-center text-sm text-gray-500">
+    <div className="px-4 py-8 md:px-8">
+      <h1 className="mb-2 text-2xl font-bold text-gray-900">Deliver for FoodRush</h1>
+      <p className="mb-6 text-sm text-gray-500">
         Tell us about yourself and your vehicle, and upload your documents. An admin will review your KYC before you can go online.
       </p>
       <CreateDeliveryPartnerForm onSubmit={handleCreate} submitting={submitting} />
@@ -63,8 +63,7 @@ function Sidebar() {
             key={to}
             to={to}
             className={({ isActive }) =>
-              `flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2.5 text-sm font-medium md:py-2 ${
-                isActive ? 'bg-brand-50 text-brand-700' : 'text-gray-600 hover:bg-gray-50'
+              `flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2.5 text-sm font-medium md:py-2 ${isActive ? 'bg-brand-50 text-brand-700' : 'text-gray-600 hover:bg-gray-50'
               }`
             }
           >
@@ -86,8 +85,8 @@ function LayoutInner() {
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
       <Sidebar />
-      <div className="min-w-0 flex-1 px-4 py-6 md:px-8">
-        <div className="mb-4 flex justify-end">
+      <div className="min-w-0 flex-1 px-4 py-4 md:px-8">
+        <div className="mb-3 flex items-center justify-end border-b border-white/[0.06] pb-3">
           <NotificationBell />
         </div>
         <Outlet />

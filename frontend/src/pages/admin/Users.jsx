@@ -3,7 +3,7 @@ import toast from '@/utils/toast';
 import { adminService } from '../../services/adminService';
 import Pagination from '../../components/Pagination';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 export default function Users() {
   const [users, setUsers] = useState([]);
@@ -57,41 +57,40 @@ export default function Users() {
       {loading ? (
         <p className="mt-8 text-sm text-gray-400">Loading…</p>
       ) : (
-        <div className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.07] to-white/[0.02] shadow-lg shadow-black/20 backdrop-blur-xl">
+        <div className="mt-6 overflow-hidden rounded-2xl border border-brand-300/20 shadow-xl shadow-black/30">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-gray-400">
+            <table className="data-table">
+              <thead>
                 <tr>
-                  <th className="px-4 py-3 font-semibold">Name</th>
-                  <th className="px-4 py-3 font-semibold">Email</th>
-                  <th className="px-4 py-3 font-semibold">Role</th>
-                  <th className="px-4 py-3 font-semibold">Status</th>
-                  <th className="px-4 py-3" />
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/[0.07]">
+              <tbody>
                 {users.map((user) => (
-                  <tr key={user._id} className="transition hover:bg-white/[0.04]">
-                    <td className="px-4 py-3 font-medium text-gray-900">{user.name}</td>
-                    <td className="px-4 py-3 text-gray-600">{user.email}</td>
-                    <td className="px-4 py-3 text-gray-600">{user.role}</td>
-                    <td className="px-4 py-3">
+                  <tr key={user._id}>
+                    <td className="font-semibold text-gray-900">{user.name}</td>
+                    <td>{user.email}</td>
+                    <td>{user.role}</td>
+                    <td>
                       <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${
-                          user.isActive
-                            ? 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30'
-                            : 'bg-white/10 text-gray-500 ring-white/15'
-                        }`}
+                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${user.isActive
+                          ? 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30'
+                          : 'bg-white/10 text-gray-500 ring-white/15'
+                          }`}
                       >
                         {user.isActive ? 'Active' : 'Disabled'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="text-right">
                       <button
                         type="button"
                         disabled={busyId === user._id}
                         onClick={() => toggleActive(user)}
-                        className="text-xs font-medium text-brand-600 hover:underline disabled:opacity-50"
+                        className={user.isActive ? 'table-action-btn-danger' : 'table-action-btn-success'}
                       >
                         {user.isActive ? 'Disable' : 'Enable'}
                       </button>

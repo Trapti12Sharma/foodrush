@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom';
 import toast from '@/utils/toast';
 import { adminService } from '../../services/adminService';
 import OrderStatusBadge from '../../components/OrderStatusBadge';
+import Pagination from '../../components/Pagination';
+
+const PAGE_SIZE = 10;
 
 const STATUS_FILTERS = [
   { value: '', label: 'All' },
@@ -20,17 +23,28 @@ const STATUS_FILTERS = [
 
 export default function Orders() {
   const [orders, setOrders] = useState([]);
+  const [pagination, setPagination] = useState(null);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
 
-  useEffect(() => {
+  function load() {
     setLoading(true);
     adminService
-      .listOrders({ status: statusFilter || undefined, limit: 100 })
-      .then((res) => setOrders(res.orders))
+      .listOrders({ status: statusFilter || undefined, page, limit: PAGE_SIZE })
+      .then((res) => {
+        setOrders(res.orders);
+        setPagination(res.pagination || null);
+      })
       .catch((err) => toast.error(err.message || 'Could not load orders'))
       .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    setPage(1);
   }, [statusFilter]);
+
+  useEffect(load, [page, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div>
@@ -52,64 +66,60 @@ export default function Orders() {
       {loading ? (
         <p className="mt-8 text-sm text-gray-400">Loading…</p>
       ) : (
-        <div className="mt-6 overflow-x-auto rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.07] to-white/[0.02] shadow-lg shadow-black/20 backdrop-blur-xl">
-          <table className="w-full text-sm">
-            <thead className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-gray-400">
-              <tr>
-                <th className="px-4 py-3 font-semibold">Restaurant</th>
-                <th className="px-4 py-3 font-semibold">Placed</th>
-                <th className="px-4 py-3 font-semibold">Payment</th>
-                <th className="px-4 py-3 text-right font-semibold">Total</th>
-                <th className="px-4 py-3 font-semibold">Status</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/[0.07]">
-              {orders.map((order) => (
-                <tr key={order._id} className="transition hover:bg-white/[0.04]">
-                  <td className="px-4 py-3 font-medium text-gray-900">{order.restaurant?.name}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-gray-500">
-                    {new Date(order.createdAt).toLocaleDateString([], { day: 'numeric', month: 'short' })}
-                    <span className="text-gray-400">
-                      {' '}
-                      {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="text-gray-600">{order.paymentMethod === 'COD' ? 'COD' : 'Online'}</span>
-                    {/* Payment state is its own signal — a failed payment on a
-                        delivered order matters more than either value alone. */}
-                    <span
-                      className={`ml-1.5 rounded px-1.5 py-0.5 text-[11px] font-semibold ${
-                        order.paymentStatus === 'paid'
-                          ? 'bg-emerald-500/15 text-emerald-300'
-                          : order.paymentStatus === 'failed'
-                            ? 'bg-rose-500/15 text-rose-300'
-                            : 'bg-white/10 text-gray-500'
-                      }`}
-                    >
-                      {order.paymentStatus}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-gray-900">
-                    ₹{order.totalAmount.toFixed(2)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <OrderStatusBadge status={order.orderStatus} />
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <Link
-                      to={`/orders/${order._id}`}
-                      className="rounded-lg border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 transition hover:border-brand-600 hover:text-gray-900"
-                    >
-                      View
-                    </Link>
-                  </td>
+        <div className="mt-6 overflow-hidden rounded-2xl border border-brand-300/20 shadow-xl shadow-black/30">
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Restaurant</th>
+                  <th>Placed</th>
+                  <th>Payment</th>
+                  <th className="text-right">Total</th>
+                  <th>Status</th>
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {orders.map((order) => (
+                  <tr key={order._id}>
+                    <td className="font-semibold text-gray-900">{order.restaurant?.name}</td>
+                    <td className="whitespace-nowrap">
+                      {new Date(order.createdAt).toLocaleDateString([], { day: 'numeric', month: 'short' })}
+                      <span className="ml-1 text-gray-400">
+                        {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="text-gray-600">{order.paymentMethod === 'COD' ? 'COD' : 'Online'}</span>
+                      <span
+                        className={`ml-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${order.paymentStatus === 'paid'
+                            ? 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30'
+                            : order.paymentStatus === 'failed'
+                              ? 'bg-rose-500/15 text-rose-300 ring-rose-500/30'
+                              : 'bg-white/10 text-gray-500 ring-white/15'
+                          }`}
+                      >
+                        {order.paymentStatus}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap text-right font-bold text-gray-900">
+                      ₹{order.totalAmount.toFixed(2)}
+                    </td>
+                    <td>
+                      <OrderStatusBadge status={order.orderStatus} />
+                    </td>
+                    <td className="text-right">
+                      <Link to={`/orders/${order._id}`} className="table-action-btn">
+                        View
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           {orders.length === 0 && <p className="p-6 text-center text-sm text-gray-400">No orders found.</p>}
+          <Pagination meta={pagination} onPageChange={setPage} />
         </div>
       )}
     </div>

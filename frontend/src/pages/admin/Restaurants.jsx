@@ -6,7 +6,7 @@ import { restaurantService } from '../../services/restaurantService';
 import { optimizedUrl } from '../../utils/images';
 import Pagination from '../../components/Pagination';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 const IMAGE_SLOTS = [
   { type: 'image', label: 'Card image' },
@@ -376,20 +376,18 @@ export default function Restaurants() {
                   </p>
                   <div className="mt-1 flex flex-wrap gap-2">
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${
-                        restaurant.isApproved
-                          ? 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30'
-                          : 'bg-amber-500/15 text-amber-300 ring-amber-500/30'
-                      }`}
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${restaurant.isApproved
+                        ? 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30'
+                        : 'bg-amber-500/15 text-amber-300 ring-amber-500/30'
+                        }`}
                     >
                       {restaurant.isApproved ? 'Approved' : 'Pending approval'}
                     </span>
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${
-                        restaurant.isActive
-                          ? 'bg-blue-500/15 text-blue-300 ring-blue-500/30'
-                          : 'bg-white/10 text-gray-500 ring-white/15'
-                      }`}
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${restaurant.isActive
+                        ? 'bg-blue-500/15 text-blue-300 ring-blue-500/30'
+                        : 'bg-white/10 text-gray-500 ring-white/15'
+                        }`}
                     >
                       {restaurant.isActive ? 'Active' : 'Disabled'}
                     </span>
@@ -435,9 +433,7 @@ export default function Restaurants() {
           ))}
           {restaurants.length === 0 && <p className="p-6 text-center text-sm text-gray-400">No restaurants found.</p>}
           {pagination && pagination.totalPages > 1 && (
-            <div className="overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.07] to-white/[0.02] backdrop-blur-xl">
-              <Pagination meta={pagination} onPageChange={setPage} />
-            </div>
+            <Pagination meta={pagination} onPageChange={setPage} />
           )}
         </div>
       )}

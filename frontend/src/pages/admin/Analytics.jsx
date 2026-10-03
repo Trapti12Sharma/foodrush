@@ -155,31 +155,31 @@ export default function Analytics() {
                   <p className="py-6 text-center text-sm text-gray-400">No restaurant had orders in this range.</p>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                    <thead className="text-left text-xs uppercase text-gray-400">
-                      <tr>
-                        <th className="pb-2">Restaurant</th>
-                        <th className="pb-2 text-right">Orders</th>
-                        <th className="pb-2 text-right">Delivered</th>
-                        <th className="pb-2 text-right">Gross</th>
-                        <th className="pb-2 text-right">AOV</th>
-                        <th className="pb-2 text-right">Rating</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {restaurants.data.breakdown.map((r) => (
-                        <tr key={r.restaurantId}>
-                          <td className="py-2 text-gray-800">{r.name}</td>
-                          <td className="py-2 text-right text-gray-600">{r.orders}</td>
-                          <td className="py-2 text-right text-gray-600">{r.fulfilledOrders}</td>
-                          <td className="py-2 text-right font-medium text-gray-900">₹{r.grossSales.toFixed(2)}</td>
-                          <td className="py-2 text-right text-gray-600">₹{r.averageOrderValue.toFixed(2)}</td>
-                          <td className="py-2 text-right text-gray-500">
-                            {r.reviewCount > 0 ? `${r.rating.toFixed(1)} (${r.reviewCount})` : '—'}
-                          </td>
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Restaurant</th>
+                          <th className="text-right">Orders</th>
+                          <th className="text-right">Delivered</th>
+                          <th className="text-right">Gross</th>
+                          <th className="text-right">AOV</th>
+                          <th className="text-right">Rating</th>
                         </tr>
-                      ))}
-                    </tbody>
+                      </thead>
+                      <tbody>
+                        {restaurants.data.breakdown.map((r) => (
+                          <tr key={r.restaurantId}>
+                            <td className="font-medium text-gray-900">{r.name}</td>
+                            <td className="text-right">{r.orders}</td>
+                            <td className="text-right">{r.fulfilledOrders}</td>
+                            <td className="text-right font-bold text-gray-900">₹{r.grossSales.toFixed(2)}</td>
+                            <td className="text-right">₹{r.averageOrderValue.toFixed(2)}</td>
+                            <td className="text-right">
+                              {r.reviewCount > 0 ? `${r.rating.toFixed(1)} (${r.reviewCount})` : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
                     </table>
                   </div>
                 ))}
@@ -191,25 +191,25 @@ export default function Analytics() {
                   <p className="py-6 text-center text-sm text-gray-400">No items were sold in this range.</p>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                    <thead className="text-left text-xs uppercase text-gray-400">
-                      <tr>
-                        <th className="pb-2">Item</th>
-                        <th className="pb-2 text-right">Qty</th>
-                        <th className="pb-2 text-right">Orders</th>
-                        <th className="pb-2 text-right">Sales</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {food.data.breakdown.map((f) => (
-                        <tr key={f.foodId}>
-                          <td className="py-2 text-gray-800">{f.name}</td>
-                          <td className="py-2 text-right text-gray-600">{f.quantity}</td>
-                          <td className="py-2 text-right text-gray-600">{f.orderCount}</td>
-                          <td className="py-2 text-right font-medium text-gray-900">₹{f.sales.toFixed(2)}</td>
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Item</th>
+                          <th className="text-right">Qty</th>
+                          <th className="text-right">Orders</th>
+                          <th className="text-right">Sales</th>
                         </tr>
-                      ))}
-                    </tbody>
+                      </thead>
+                      <tbody>
+                        {food.data.breakdown.map((f) => (
+                          <tr key={f.foodId}>
+                            <td className="font-medium text-gray-900">{f.name}</td>
+                            <td className="text-right">{f.quantity}</td>
+                            <td className="text-right">{f.orderCount}</td>
+                            <td className="text-right font-bold text-gray-900">₹{f.sales.toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
                     </table>
                   </div>
                 ))}

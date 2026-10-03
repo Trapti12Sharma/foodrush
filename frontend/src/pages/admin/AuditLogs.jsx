@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import toast from '@/utils/toast';
 import { adminService } from '../../services/adminService';
+import Pagination from '../../components/Pagination';
+
+const PAGE_SIZE = 10;
 
 export default function AuditLogs() {
   const [logs, setLogs] = useState([]);
@@ -12,7 +15,7 @@ export default function AuditLogs() {
 
   function load() {
     setLoading(true);
-    const params = { page, limit: 20 };
+    const params = { page, limit: PAGE_SIZE };
     Object.entries(filters).forEach(([k, v]) => {
       if (v) params[k] = v;
     });
@@ -85,48 +88,39 @@ export default function AuditLogs() {
       {loading ? (
         <p className="mt-4 text-sm text-gray-400">Loading…</p>
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200 bg-surface">
-          <table className="w-full text-sm">
-            <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-400">
-              <tr>
-                <th className="px-4 py-2">Action</th>
-                <th className="px-4 py-2">Actor</th>
-                <th className="px-4 py-2">Entity</th>
-                <th className="px-4 py-2">When</th>
-                <th className="px-4 py-2" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {logs.map((log) => (
-                <tr key={log._id}>
-                  <td className="px-4 py-2.5 font-mono text-xs text-gray-800">{log.action}</td>
-                  <td className="px-4 py-2.5 text-gray-600">
-                    {log.actor?.name || <span className="text-gray-400">system</span>} <span className="text-gray-400">({log.actorRole || '—'})</span>
-                  </td>
-                  <td className="px-4 py-2.5 text-gray-500">{log.entityType ? `${log.entityType} · ${log.entityId}` : '—'}</td>
-                  <td className="px-4 py-2.5 text-gray-500">{new Date(log.createdAt).toLocaleString()}</td>
-                  <td className="px-4 py-2.5 text-right">
-                    <button type="button" onClick={() => viewDetail(log._id)} className="text-xs font-medium text-brand-600 hover:underline">
-                      View
-                    </button>
-                  </td>
+        <div className="mt-4 overflow-hidden rounded-2xl border border-brand-300/20 shadow-xl shadow-black/30">
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Action</th>
+                  <th>Actor</th>
+                  <th>Entity</th>
+                  <th>When</th>
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {logs.length === 0 && <p className="p-6 text-center text-sm text-gray-400">No audit log entries found.</p>}
-        </div>
-      )}
-
-      {pagination && pagination.totalPages > 1 && (
-        <div className="mt-3 flex items-center justify-center gap-3 text-sm">
-          <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="rounded-lg border border-gray-200 px-3 py-1 disabled:opacity-40">
-            Prev
-          </button>
-          <span className="text-gray-500">Page {pagination.page} of {pagination.totalPages}</span>
-          <button type="button" disabled={page >= pagination.totalPages} onClick={() => setPage((p) => p + 1)} className="rounded-lg border border-gray-200 px-3 py-1 disabled:opacity-40">
-            Next
-          </button>
+              </thead>
+              <tbody>
+                {logs.map((log) => (
+                  <tr key={log._id}>
+                    <td className="font-mono text-xs">{log.action}</td>
+                    <td>
+                      {log.actor?.name || <span className="text-gray-400">system</span>} <span className="text-gray-400">({log.actorRole || '—'})</span>
+                    </td>
+                    <td>{log.entityType ? `${log.entityType} · ${log.entityId}` : '—'}</td>
+                    <td>{new Date(log.createdAt).toLocaleString()}</td>
+                    <td className="text-right">
+                      <button type="button" onClick={() => viewDetail(log._id)} className="table-action-btn">
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {logs.length === 0 && <p className="p-6 text-center text-sm text-gray-400">No audit log entries found.</p>}
+          </div>
+          <Pagination meta={pagination} onPageChange={setPage} />
         </div>
       )}
 

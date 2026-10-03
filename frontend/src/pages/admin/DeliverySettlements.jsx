@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import toast from '@/utils/toast';
 import { adminService } from '../../services/adminService';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import Pagination from '../../components/Pagination';
+
+const PAGE_SIZE = 10;
 
 const SETTLEMENT_STYLES = {
   PENDING: 'bg-amber-100 text-amber-700',
@@ -77,6 +80,8 @@ function GenerateSettlementForm({ onGenerated }) {
 
 export default function DeliverySettlements() {
   const [settlements, setSettlements] = useState([]);
+  const [pagination, setPagination] = useState(null);
+  const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
@@ -89,13 +94,17 @@ export default function DeliverySettlements() {
   function load() {
     setLoading(true);
     adminService
-      .listDeliverySettlements({ status: statusFilter || undefined, limit: 50 })
-      .then((res) => setSettlements(res.settlements))
+      .listDeliverySettlements({ status: statusFilter || undefined, page, limit: PAGE_SIZE })
+      .then((res) => {
+        setSettlements(res.settlements);
+        setPagination(res.pagination || null);
+      })
       .catch((err) => toast.error(err.message || 'Could not load settlements'))
       .finally(() => setLoading(false));
   }
 
-  useEffect(load, [statusFilter]);
+  useEffect(() => { setPage(1); }, [statusFilter]);
+  useEffect(load, [page, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function viewDetail(id) {
     try {
@@ -179,55 +188,58 @@ export default function DeliverySettlements() {
       {loading ? (
         <p className="mt-4 text-sm text-gray-400">Loading…</p>
       ) : (
-        <div className="mt-3 overflow-x-auto rounded-xl border border-gray-200 bg-surface">
-          <table className="w-full text-sm">
-            <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-400">
-              <tr>
-                <th className="px-4 py-2">Rider</th>
-                <th className="px-4 py-2">Period</th>
-                <th className="px-4 py-2">Deliveries</th>
-                <th className="px-4 py-2">Net amount</th>
-                <th className="px-4 py-2">Status</th>
-                <th className="px-4 py-2" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {settlements.map((s) => (
-                <tr key={s._id}>
-                  <td className="px-4 py-2.5 text-gray-700">{s.deliveryPartner?.fullName}</td>
-                  <td className="px-4 py-2.5 text-gray-500">
-                    {new Date(s.periodStart).toLocaleDateString()} – {new Date(s.periodEnd).toLocaleDateString()}
-                  </td>
-                  <td className="px-4 py-2.5 text-gray-700">{s.deliveryCount}</td>
-                  <td className="px-4 py-2.5 font-medium text-gray-900">₹{s.netAmount.toFixed(2)}</td>
-                  <td className="px-4 py-2.5"><Badge value={s.status} /></td>
-                  <td className="px-4 py-2.5 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button type="button" onClick={() => viewDetail(s._id)} className="text-xs font-medium text-brand-600 hover:underline">
-                        View
-                      </button>
-                      {s.status === 'PENDING' && (
-                        <button type="button" disabled={busyId === s._id} onClick={() => approve(s._id)} className="text-xs font-medium text-blue-600 hover:underline disabled:opacity-50">
-                          Approve
-                        </button>
-                      )}
-                      {s.status === 'APPROVED' && (
-                        <>
-                          <button type="button" disabled={busyId === s._id} onClick={() => setPayingId(s._id)} className="text-xs font-medium text-green-700 hover:underline disabled:opacity-50">
-                            Mark Paid
-                          </button>
-                          <button type="button" disabled={busyId === s._id} onClick={() => setFailing(s._id)} className="text-xs font-medium text-red-600 hover:underline disabled:opacity-50">
-                            Mark Failed
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
+        <div className="mt-3 overflow-hidden rounded-2xl border border-brand-300/20 shadow-xl shadow-black/30">
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Rider</th>
+                  <th>Period</th>
+                  <th>Deliveries</th>
+                  <th>Net amount</th>
+                  <th>Status</th>
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {settlements.map((s) => (
+                  <tr key={s._id}>
+                    <td className="font-semibold text-gray-900">{s.deliveryPartner?.fullName}</td>
+                    <td>
+                      {new Date(s.periodStart).toLocaleDateString()} – {new Date(s.periodEnd).toLocaleDateString()}
+                    </td>
+                    <td>{s.deliveryCount}</td>
+                    <td className="font-bold text-gray-900">₹{s.netAmount.toFixed(2)}</td>
+                    <td><Badge value={s.status} /></td>
+                    <td className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <button type="button" onClick={() => viewDetail(s._id)} className="table-action-btn">
+                          View
+                        </button>
+                        {s.status === 'PENDING' && (
+                          <button type="button" disabled={busyId === s._id} onClick={() => approve(s._id)} className="table-action-btn-success">
+                            Approve
+                          </button>
+                        )}
+                        {s.status === 'APPROVED' && (
+                          <>
+                            <button type="button" disabled={busyId === s._id} onClick={() => setPayingId(s._id)} className="table-action-btn-success">
+                              Mark Paid
+                            </button>
+                            <button type="button" disabled={busyId === s._id} onClick={() => setFailing(s._id)} className="table-action-btn-danger">
+                              Mark Failed
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           {settlements.length === 0 && <p className="p-6 text-center text-sm text-gray-400">No settlements found.</p>}
+          <Pagination meta={pagination} onPageChange={setPage} />
         </div>
       )}
 

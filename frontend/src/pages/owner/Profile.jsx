@@ -50,19 +50,19 @@ export default function Profile() {
   } = useForm({
     values: selectedRestaurant
       ? {
-          name: selectedRestaurant.name,
-          description: selectedRestaurant.description,
-          cuisine: selectedRestaurant.cuisine.join(', '),
-          addressLine: selectedRestaurant.address?.addressLine,
-          state: selectedRestaurant.address?.state,
-          pincode: selectedRestaurant.address?.pincode,
-          city: selectedRestaurant.city,
-          deliveryTime: selectedRestaurant.deliveryTime,
-          deliveryFee: selectedRestaurant.deliveryFee,
-          minimumOrder: selectedRestaurant.minimumOrder,
-          deliveryRadiusKm: selectedRestaurant.deliveryRadiusKm ?? 5,
-          isOpen: selectedRestaurant.isOpen,
-        }
+        name: selectedRestaurant.name,
+        description: selectedRestaurant.description,
+        cuisine: selectedRestaurant.cuisine.join(', '),
+        addressLine: selectedRestaurant.address?.addressLine,
+        state: selectedRestaurant.address?.state,
+        pincode: selectedRestaurant.address?.pincode,
+        city: selectedRestaurant.city,
+        deliveryTime: selectedRestaurant.deliveryTime,
+        deliveryFee: selectedRestaurant.deliveryFee,
+        minimumOrder: selectedRestaurant.minimumOrder,
+        deliveryRadiusKm: selectedRestaurant.deliveryRadiusKm ?? 5,
+        isOpen: selectedRestaurant.isOpen,
+      }
       : undefined,
   });
 
@@ -130,33 +130,22 @@ export default function Profile() {
       {/* Was pinned to max-w-lg, which left this page as a narrow ribbon of
           controls down the left of a wide dashboard. The form now uses the
           available width and lays its short fields out side by side. */}
-      <div className="mt-6 max-w-4xl">
+      <div className="mt-6">
         <KycSection restaurant={selectedRestaurant} onUpdated={refresh} />
       </div>
 
       <form
         onSubmit={handleSubmit(onSubmit)}
-        className="mt-6 max-w-4xl space-y-4 rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.07] to-white/[0.02] p-6 shadow-lg shadow-black/20 backdrop-blur-xl"
+        className="mt-6 space-y-5 rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.07] to-white/[0.02] p-6 shadow-lg shadow-black/20 backdrop-blur-xl"
       >
         <div className="grid gap-4 sm:grid-cols-3">
           <ImageUploadField label="Card image (shown in listings)" value={image} onChange={setImage} purpose="restaurant" />
           <ImageUploadField label="Cover banner (wide, e.g. 3:1)" value={coverImage} onChange={setCoverImage} purpose="restaurant" />
           <ImageUploadField label="Logo" value={logo} onChange={setLogo} purpose="restaurant" />
         </div>
-        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-          <input type="checkbox" {...register('isOpen')} /> Open for orders right now
-        </label>
-        <p className="text-xs text-gray-500">
-          Currently: <span className={selectedRestaurant.isOpenNow ? 'font-medium text-green-700' : 'font-medium text-red-600'}>{selectedRestaurant.isOpenNow ? 'Open' : 'Closed'}</span>
-          {' '}(based on the switch above and the schedule below)
-        </p>
 
-        <div className="rounded-lg bg-gray-50 p-3">
-          <p className="mb-2 text-sm font-medium text-gray-700">Opening hours</p>
-          <OpeningHoursEditor slots={hoursSlots} onChange={setHoursSlots} />
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
+        {/* Name + cuisine + open status */}
+        <div className="grid gap-4 sm:grid-cols-3">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Name</label>
             <input {...register('name', { required: true })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
@@ -165,7 +154,23 @@ export default function Profile() {
             <label className="mb-1 block text-sm font-medium text-gray-700">Cuisine (comma separated)</label>
             <input {...register('cuisine', { required: true })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
           </div>
+          <div className="flex flex-col justify-end gap-1">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <input type="checkbox" {...register('isOpen')} /> Open for orders right now
+            </label>
+            <p className="text-xs text-gray-500">
+              Currently: <span className={selectedRestaurant.isOpenNow ? 'font-medium text-green-700' : 'font-medium text-red-600'}>{selectedRestaurant.isOpenNow ? 'Open' : 'Closed'}</span>
+            </p>
+          </div>
         </div>
+
+        {/* Opening hours */}
+        <div className="rounded-lg bg-gray-50 p-3">
+          <p className="mb-2 text-sm font-medium text-gray-700">Opening hours</p>
+          <OpeningHoursEditor slots={hoursSlots} onChange={setHoursSlots} />
+        </div>
+
+        {/* Location */}
         <div className="space-y-2 rounded-lg bg-gray-50 p-3">
           <p className="text-sm font-medium text-gray-700">Restaurant location</p>
           <PlaceSearch onSelect={fillFromPlace} enabled={locationSearchEnabled} placeholder="Search to update your restaurant's address" />
@@ -180,21 +185,13 @@ export default function Profile() {
             <p className="text-xs text-amber-600">No location yet — customers can&apos;t find you in &ldquo;near me&rdquo; results. Set one above.</p>
           )}
         </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Delivery radius (km)</label>
-          <input
-            type="number"
-            step="0.5"
-            {...register('deliveryRadiusKm', { min: { value: 0.5, message: 'At least 0.5 km' }, max: { value: 50, message: 'At most 50 km' } })}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-          />
-          {errors.deliveryRadiusKm && <p className="mt-1 text-xs text-red-600">{errors.deliveryRadiusKm.message}</p>}
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Address line</label>
-          <input {...register('addressLine', { required: true })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
+
+        {/* Address row */}
+        <div className="grid gap-3 sm:grid-cols-4">
+          <div className="sm:col-span-2">
+            <label className="mb-1 block text-sm font-medium text-gray-700">Address line</label>
+            <input {...register('addressLine', { required: true })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">City</label>
             <input {...register('city', { required: true })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
@@ -204,20 +201,33 @@ export default function Profile() {
             <input {...register('pincode')} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+
+        {/* Delivery config row */}
+        <div className="grid gap-3 sm:grid-cols-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Delivery time</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Delivery time (min)</label>
             <input type="number" {...register('deliveryTime', { required: true, min: 0 })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Delivery fee</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Delivery fee (₹)</label>
             <input type="number" {...register('deliveryFee', { min: 0 })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Min order</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Min order (₹)</label>
             <input type="number" {...register('minimumOrder', { min: 0 })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
           </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Delivery radius (km)</label>
+            <input
+              type="number"
+              step="0.5"
+              {...register('deliveryRadiusKm', { min: { value: 0.5, message: 'At least 0.5 km' }, max: { value: 50, message: 'At most 50 km' } })}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+            {errors.deliveryRadiusKm && <p className="mt-1 text-xs text-red-600">{errors.deliveryRadiusKm.message}</p>}
+          </div>
         </div>
+
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Description</label>
           <textarea {...register('description')} rows={3} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />

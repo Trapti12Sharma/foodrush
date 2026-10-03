@@ -3,6 +3,9 @@ import toast from '@/utils/toast';
 import { Flag } from 'lucide-react';
 import { adminService } from '../../services/adminService';
 import StarRating from '../../components/StarRating';
+import Pagination from '../../components/Pagination';
+
+const PAGE_SIZE = 10;
 
 const STATUS_OPTIONS = ['PENDING', 'APPROVED', 'REJECTED', 'HIDDEN'];
 const STATUS_STYLES = {
@@ -176,7 +179,7 @@ export default function Reviews() {
 
   function load() {
     setLoading(true);
-    const params = { page, limit: 20 };
+    const params = { page, limit: PAGE_SIZE };
     Object.entries(filters).forEach(([k, v]) => {
       if (v) params[k] = v;
     });
@@ -235,52 +238,43 @@ export default function Reviews() {
       {loading ? (
         <p className="mt-4 text-sm text-gray-400">Loading…</p>
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200 bg-surface">
-          <table className="w-full text-sm">
-            <thead className="border-b border-gray-100 text-left text-xs uppercase text-gray-400">
-              <tr>
-                <th className="px-4 py-2">Restaurant</th>
-                <th className="px-4 py-2">Customer</th>
-                <th className="px-4 py-2">Rating</th>
-                <th className="px-4 py-2">Comment</th>
-                <th className="px-4 py-2">Status</th>
-                <th className="px-4 py-2">Reports</th>
-                <th className="px-4 py-2">Created</th>
-                <th className="px-4 py-2" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {reviews.map((r) => (
-                <tr key={r._id}>
-                  <td className="px-4 py-2.5 text-gray-700">{r.restaurant?.name}</td>
-                  <td className="px-4 py-2.5 text-gray-600">{r.user?.name}</td>
-                  <td className="px-4 py-2.5"><StarRating value={r.rating} readOnly size={12} /></td>
-                  <td className="max-w-xs truncate px-4 py-2.5 text-gray-500">{r.comment || '—'}</td>
-                  <td className="px-4 py-2.5"><Badge value={r.moderationStatus} /></td>
-                  <td className="px-4 py-2.5 text-gray-500">{r.reportCount > 0 ? <span className="font-medium text-red-600">{r.reportCount}</span> : '—'}</td>
-                  <td className="px-4 py-2.5 text-gray-400">{new Date(r.createdAt).toLocaleDateString()}</td>
-                  <td className="px-4 py-2.5 text-right">
-                    <button type="button" onClick={() => setOpenId(r._id)} className="text-xs font-medium text-brand-600 hover:underline">
-                      Open
-                    </button>
-                  </td>
+        <div className="mt-4 overflow-hidden rounded-2xl border border-brand-300/20 shadow-xl shadow-black/30">
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Restaurant</th>
+                  <th>Customer</th>
+                  <th>Rating</th>
+                  <th>Comment</th>
+                  <th>Status</th>
+                  <th>Reports</th>
+                  <th>Created</th>
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {reviews.map((r) => (
+                  <tr key={r._id}>
+                    <td className="font-medium text-gray-900">{r.restaurant?.name}</td>
+                    <td>{r.user?.name}</td>
+                    <td><StarRating value={r.rating} readOnly size={12} /></td>
+                    <td className="max-w-xs truncate">{r.comment || '—'}</td>
+                    <td><Badge value={r.moderationStatus} /></td>
+                    <td>{r.reportCount > 0 ? <span className="font-bold text-rose-400">{r.reportCount}</span> : '—'}</td>
+                    <td>{new Date(r.createdAt).toLocaleDateString()}</td>
+                    <td className="text-right">
+                      <button type="button" onClick={() => setOpenId(r._id)} className="table-action-btn">
+                        Open
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           {reviews.length === 0 && <p className="p-6 text-center text-sm text-gray-400">No reviews found.</p>}
-        </div>
-      )}
-
-      {pagination && pagination.totalPages > 1 && (
-        <div className="mt-3 flex items-center justify-center gap-3 text-sm">
-          <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="rounded-lg border border-gray-200 px-3 py-1 disabled:opacity-40">
-            Prev
-          </button>
-          <span className="text-gray-500">Page {pagination.page} of {pagination.totalPages}</span>
-          <button type="button" disabled={page >= pagination.totalPages} onClick={() => setPage((p) => p + 1)} className="rounded-lg border border-gray-200 px-3 py-1 disabled:opacity-40">
-            Next
-          </button>
+          <Pagination meta={pagination} onPageChange={setPage} />
         </div>
       )}
 
