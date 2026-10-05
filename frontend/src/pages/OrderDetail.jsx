@@ -12,6 +12,7 @@ import EmptyState from '../components/EmptyState';
 import DeliveryTracker from '../components/DeliveryTracker';
 import DeliveryOtpCard from '../components/DeliveryOtpCard';
 import { loadRazorpayScript, openRazorpayCheckout } from '../utils/razorpay';
+import AnimatedPizza from '../components/food/AnimatedPizza';
 
 const CUSTOMER_CANCELLABLE_STATUSES = ['PLACED', 'CONFIRMED'];
 const RETRYABLE_STATUSES = ['PLACED', 'CONFIRMED'];
@@ -350,12 +351,19 @@ export default function OrderDetail() {
       </Link>
 
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{order.restaurant?.name}</h1>
-          <p className="mt-1 text-xs text-gray-400">
-            Placed {new Date(order.createdAt).toLocaleString()}
-            {order.orderNumber ? ` · ${order.orderNumber}` : ''}
-          </p>
+        <div className="flex items-center gap-2">
+          {/* A fresh, unconfirmed order is the one moment worth a small
+              celebratory touch — once the kitchen has acted on it (any other
+              status), this goes away so it never looks like stale decoration
+              on an order from last week. */}
+          {order.orderStatus === 'PLACED' && <AnimatedPizza size="sm" animation="bob" className="shrink-0" />}
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{order.restaurant?.name}</h1>
+            <p className="mt-1 text-xs text-gray-400">
+              Placed {new Date(order.createdAt).toLocaleString()}
+              {order.orderNumber ? ` · ${order.orderNumber}` : ''}
+            </p>
+          </div>
         </div>
         <OrderStatusBadge status={order.orderStatus} />
       </div>

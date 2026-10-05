@@ -63,6 +63,78 @@ export default {
           600: '#ea580c',
         },
       },
+      // Idle micro-animations for the AnimatedFood component family
+      // (src/components/food/). Pure transform/opacity — no layout-affecting
+      // properties — so these stay on the GPU compositor and never trigger
+      // reflow. `prefers-reduced-motion` is handled centrally in index.css
+      // (forces `animation: none` on anything carrying `data-food-anim`)
+      // rather than per-keyframe here, so one rule covers all of them.
+      keyframes: {
+        'food-float': {
+          '0%, 100%': { transform: 'translateY(0) rotate(0deg)' },
+          '50%': { transform: 'translateY(-10px) rotate(-3deg)' },
+        },
+        'food-bob': {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-7px)' },
+        },
+        'food-wiggle': {
+          '0%, 100%': { transform: 'rotate(-2deg)' },
+          '50%': { transform: 'rotate(2deg)' },
+        },
+        'food-pop': {
+          '0%, 60%, 100%': { transform: 'translateY(0)' },
+          '30%': { transform: 'translateY(-14px)' },
+        },
+        'food-click-bounce': {
+          '0%': { transform: 'scale(1)' },
+          '30%': { transform: 'scale(0.9)' },
+          '55%': { transform: 'scale(1.12)' },
+          '75%': { transform: 'scale(0.97)' },
+          '100%': { transform: 'scale(1)' },
+        },
+        'food-steam': {
+          '0%': { transform: 'translateY(0) scaleX(1)', opacity: '0.35' },
+          '50%': { transform: 'translateY(-8px) scaleX(1.4)', opacity: '0.15' },
+          '100%': { transform: 'translateY(-16px) scaleX(1)', opacity: '0' },
+        },
+        'food-bubble': {
+          '0%': { transform: 'translateY(0)', opacity: '0' },
+          '20%': { opacity: '0.8' },
+          '100%': { transform: 'translateY(-22px)', opacity: '0' },
+        },
+        'food-crumb': {
+          '0%, 100%': { transform: 'translate(0, 0) rotate(0deg)', opacity: '0.7' },
+          '50%': { transform: 'translate(3px, -5px) rotate(20deg)', opacity: '1' },
+        },
+        // A lazy full rotation, distinct from float/wiggle's small back-and-forth
+        // tilt — used for the donut, since a donut slowly turning end-over-end
+        // reads naturally where a pizza slice doing the same would not.
+        'food-spin-slow': {
+          '0%': { transform: 'translateY(0) rotate(0deg)' },
+          '50%': { transform: 'translateY(-6px) rotate(180deg)' },
+          '100%': { transform: 'translateY(0) rotate(360deg)' },
+        },
+        // Twinkle for the new Sparkle accent (see components/food/Sparkle.jsx) —
+        // scale+opacity only, never adds a third animated property, so it stays
+        // as cheap as the rest of this family.
+        'food-twinkle': {
+          '0%, 100%': { transform: 'scale(0.4) rotate(0deg)', opacity: '0' },
+          '50%': { transform: 'scale(1) rotate(45deg)', opacity: '1' },
+        },
+      },
+      animation: {
+        'food-float': 'food-float 4.5s ease-in-out infinite',
+        'food-bob': 'food-bob 3.2s ease-in-out infinite',
+        'food-wiggle': 'food-wiggle 2.4s ease-in-out infinite',
+        'food-pop': 'food-pop 2.8s ease-in-out infinite',
+        'food-click-bounce': 'food-click-bounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 1',
+        'food-steam': 'food-steam 3s ease-out infinite',
+        'food-bubble': 'food-bubble 2.4s ease-in infinite',
+        'food-crumb': 'food-crumb 1.8s ease-in-out infinite',
+        'food-spin-slow': 'food-spin-slow 7s linear infinite',
+        'food-twinkle': 'food-twinkle 2.2s ease-in-out infinite',
+      },
     },
   },
   plugins: [],

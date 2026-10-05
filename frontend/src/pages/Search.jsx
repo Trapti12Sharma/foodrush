@@ -191,7 +191,7 @@ export default function Search() {
 
       {!loading && !failed && (q || hasOffer) && restaurants.length === 0 && foods.length === 0 && (
         <EmptyState
-          icon={SearchIcon}
+          food="fries"
           title="No results found"
           description={`Nothing matched "${q}". Try a different search term.`}
         />

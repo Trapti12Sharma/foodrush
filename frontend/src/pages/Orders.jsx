@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ClipboardList, ChevronRight, Receipt } from 'lucide-react';
+import { ChevronRight, Receipt } from 'lucide-react';
 import toast from '@/utils/toast';
 import { orderService } from '../services/orderService';
 import OrderStatusBadge from '../components/OrderStatusBadge';
@@ -88,7 +88,7 @@ export default function Orders() {
     return (
       <div className="mx-auto max-w-md px-4 py-24">
         <EmptyState
-          icon={ClipboardList}
+          food="drink"
           title="No orders yet"
           description="Your order history will show up here."
           action={

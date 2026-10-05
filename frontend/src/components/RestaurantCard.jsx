@@ -46,7 +46,8 @@ export default function RestaurantCard({ restaurant }) {
           className={`w-full transition duration-300 group-hover:scale-105 ${closed ? 'grayscale' : ''}`}
         />
         {restaurant.hasOffer && !closed && (
-          <span className="absolute left-2 top-2 rounded-full bg-gradient-to-r from-brand-600 to-brand-500 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm">
+          <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-gradient-to-r from-brand-600 to-brand-500 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm">
+            <span data-food-anim className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" aria-hidden="true" />
             Offers available
           </span>
         )}

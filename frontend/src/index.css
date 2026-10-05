@@ -53,6 +53,28 @@
   *::-webkit-scrollbar {
     display: none;
   }
+
+  /* Every AnimatedFood instance (src/components/food/) marks its animated
+     element with data-food-anim, which is what this targets — a single rule
+     covering the whole family rather than a reduced-motion check repeated in
+     each keyframe. `!important` because the whole point is to override
+     whichever `animate-food-*` utility class is present. Transitions (hover/
+     click) are killed too, not just the infinite idle keyframes. */
+  @media (prefers-reduced-motion: reduce) {
+    [data-food-anim],
+    [data-food-anim] * {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+}
+
+/* Cross-fade for RotatingHeadline's swapped word (src/components/home/) — a
+   plain CSS keyframe rather than a Tailwind config entry since it's a single
+   UI-text effect, not part of the food-mascot animation family. */
+@keyframes word-in {
+  0% { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
 /* ─── Modern striped table ───────────────────────────────────────────────────

@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import toast from '@/utils/toast';
 import { useAuth } from '../context/AuthContext';
 import { landingPathFor } from '../constants/roles';
+import AnimatedDrink from '../components/food/AnimatedDrink';
+import AnimatedPizza from '../components/food/AnimatedPizza';
 
 export default function Login() {
   const { login } = useAuth();
@@ -27,8 +29,11 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-[80vh] items-center justify-center bg-gradient-to-br from-[#1a0f33] via-[#140d26] to-[#0f0b16] px-4 py-12">
-      <div className="w-full max-w-md rounded-2xl border border-gray-100 bg-surface p-8 shadow-2xl shadow-black/40">
+    <div className="relative flex min-h-[80vh] items-center justify-center overflow-hidden bg-gradient-to-br from-[#1a0f33] via-[#140d26] to-[#0f0b16] px-4 py-12">
+      {/* Decorative only — hidden below `lg` so it never sits anywhere near the form on a phone. */}
+      <AnimatedDrink size="md" className="absolute left-[8%] top-[15%] hidden opacity-70 lg:block" />
+      <AnimatedPizza size="sm" className="absolute bottom-[12%] right-[10%] hidden opacity-60 lg:block" />
+      <div className="relative w-full max-w-md rounded-2xl border border-gray-100 bg-surface p-8 shadow-2xl shadow-black/40">
         <Link to="/" className="text-xl font-extrabold tracking-tight">
           <span className="bg-gradient-to-r from-brand-500 to-brand-700 bg-clip-text text-transparent">Food</span>
           <span className="text-gray-900">Rush</span>

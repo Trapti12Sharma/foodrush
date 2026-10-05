@@ -50,7 +50,7 @@ export default function Cart() {
     return (
       <div className="mx-auto max-w-md px-4 py-24">
         <EmptyState
-          icon={ShoppingCart}
+          food="burger"
           title="Your cart is empty"
           description="Browse restaurants and add something delicious."
           action={

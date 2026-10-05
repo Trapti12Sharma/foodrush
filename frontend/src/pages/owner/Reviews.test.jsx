@@ -8,7 +8,12 @@ import { reviewService } from '../../services/reviewService';
 vi.mock('../../context/RestaurantOwnerContext', () => ({ useRestaurantOwner: vi.fn() }));
 vi.mock('../../services/reviewService', () => ({
   reviewService: {
-    listForRestaurant: vi.fn(),
+    // The owner page loads via listForOwner (ALL statuses, including
+    // PENDING — see reviewService.js), not listForRestaurant (the public,
+    // approved-only one). The mock previously only stubbed listForRestaurant,
+    // which Reviews.jsx never calls, so every test here failed on mount with
+    // "listForOwner is not a function" — a stale mock, not a real bug.
+    listForOwner: vi.fn(),
     reply: vi.fn(),
     removeReply: vi.fn(),
   },
@@ -26,6 +31,12 @@ const UNANSWERED = {
   createdAt: '2026-03-01T00:00:00.000Z',
   user: { _id: 'c1', name: 'Asha' },
   reply: null,
+  // The reply/edit/remove UI only renders for an APPROVED review (Reviews.jsx)
+  // — a moderation gate added after these fixtures were first written. Without
+  // this every assertion in the file silently found nothing, because the
+  // component correctly rendered no reply controls at all for a review with no
+  // (i.e. undefined) moderation status.
+  moderationStatus: 'APPROVED',
 };
 
 const ANSWERED = {
@@ -38,7 +49,7 @@ const ANSWERED = {
 describe('Owner Reviews page — replies', () => {
   beforeEach(() => {
     useRestaurantOwner.mockReturnValue({ selectedRestaurant: RESTAURANT });
-    reviewService.listForRestaurant.mockResolvedValue({ reviews: [UNANSWERED, ANSWERED] });
+    reviewService.listForOwner.mockResolvedValue({ reviews: [UNANSWERED, ANSWERED] });
   });
 
   it('offers Reply on an unanswered review and shows the existing reply on an answered one', async () => {
@@ -65,7 +76,7 @@ describe('Owner Reviews page — replies', () => {
 
     await waitFor(() => expect(reviewService.reply).toHaveBeenCalledWith('rev1', 'Sorry about that — refund sent.'));
     // Patched in place: the list is not refetched, so the page does not jump.
-    expect(reviewService.listForRestaurant).toHaveBeenCalledTimes(1);
+    expect(reviewService.listForOwner).toHaveBeenCalledTimes(1);
     expect(await screen.findByText('Sorry about that — refund sent.')).toBeInTheDocument();
   });
 

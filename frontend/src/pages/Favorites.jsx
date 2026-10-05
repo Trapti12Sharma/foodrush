@@ -1,4 +1,3 @@
-import { Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useFavorites } from '../context/FavoritesContext';
 import RestaurantCard from '../components/RestaurantCard';
@@ -13,7 +12,7 @@ export default function Favorites() {
     return (
       <div className="mx-auto max-w-md px-4 py-24">
         <EmptyState
-          icon={Heart}
+          food="fries"
           title="No favorites yet"
           description="Tap the heart on a restaurant to save it here."
           action={

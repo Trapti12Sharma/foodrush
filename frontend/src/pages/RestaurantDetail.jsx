@@ -224,7 +224,7 @@ export default function RestaurantDetail() {
           )}
 
           {groupedMenu.length === 0 && (
-            <EmptyState title="No menu items found" description="Try a different search, or check back later." />
+            <EmptyState food="fries" title="No menu items found" description="Try a different search, or check back later." />
           )}
 
           {groupedMenu.map(([categoryName, items]) => (

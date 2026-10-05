@@ -19,6 +19,12 @@ function renderAt(path, element) {
         <Route path="/" element={<p>home page</p>} />
         <Route path="/login" element={<p>login page</p>} />
         <Route path="/secret" element={element} />
+        {/* A role-mismatch redirect goes through landingPathFor, not a flat
+            "/" — a staff role lands back in their own console, not the
+            customer storefront (see constants/roles.js). Stubbed here so
+            that redirect has somewhere to land instead of hitting "No routes
+            matched" and rendering nothing. */}
+        <Route path="/admin/dashboard" element={<p>admin dashboard</p>} />
       </Routes>
     </MemoryRouter>
   );
@@ -80,7 +86,9 @@ describe('ProtectedRoute', () => {
   it('does not admit a staff role that is merely adjacent to the allowed one', () => {
     // SUPPORT_AGENT can open the admin panel generally, but must not reach a
     // route restricted to SUPER_ADMIN. Role lists are exact membership, never
-    // "is some kind of staff".
+    // "is some kind of staff". It lands back on its own console
+    // (/admin/dashboard, via landingPathFor), not the customer home page —
+    // SUPPORT_AGENT is a staff role and has no use for the storefront.
     useAuth.mockReturnValue({ user: { _id: 's1', role: 'SUPPORT_AGENT' }, loading: false });
     renderAt(
       '/secret',
@@ -90,6 +98,6 @@ describe('ProtectedRoute', () => {
     );
 
     expect(screen.queryByText('super admin only')).not.toBeInTheDocument();
-    expect(screen.getByText('home page')).toBeInTheDocument();
+    expect(screen.getByText('admin dashboard')).toBeInTheDocument();
   });
 });

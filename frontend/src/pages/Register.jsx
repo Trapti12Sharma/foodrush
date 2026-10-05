@@ -3,6 +3,8 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from '@/utils/toast';
 import { useAuth } from '../context/AuthContext';
 import { landingPathFor } from '../constants/roles';
+import AnimatedBurger from '../components/food/AnimatedBurger';
+import AnimatedFries from '../components/food/AnimatedFries';
 
 const SIGNUP_ROLES = ['CUSTOMER', 'RESTAURANT_OWNER', 'DELIVERY_PARTNER'];
 
@@ -37,8 +39,10 @@ export default function Register() {
   }
 
   return (
-    <div className="flex min-h-[80vh] items-center justify-center bg-gradient-to-br from-[#1a0f33] via-[#140d26] to-[#0f0b16] px-4 py-12">
-      <div className="w-full max-w-md rounded-2xl border border-gray-100 bg-surface p-8 shadow-2xl shadow-black/40">
+    <div className="relative flex min-h-[80vh] items-center justify-center overflow-hidden bg-gradient-to-br from-[#1a0f33] via-[#140d26] to-[#0f0b16] px-4 py-12">
+      <AnimatedBurger size="md" className="absolute right-[8%] top-[12%] hidden opacity-70 lg:block" />
+      <AnimatedFries size="sm" className="absolute bottom-[10%] left-[10%] hidden opacity-60 lg:block" />
+      <div className="relative w-full max-w-md rounded-2xl border border-gray-100 bg-surface p-8 shadow-2xl shadow-black/40">
         <Link to="/" className="text-xl font-extrabold tracking-tight">
           <span className="bg-gradient-to-r from-brand-500 to-brand-700 bg-clip-text text-transparent">Food</span>
           <span className="text-gray-900">Rush</span>

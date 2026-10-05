@@ -1,15 +1,27 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Tag, LocateFixed, MapPin } from 'lucide-react';
+import { Search, LocateFixed } from 'lucide-react';
 import { restaurantService } from '../services/restaurantService';
 import { useDeliveryLocation } from '../context/LocationContext';
-import { FEATURED_CATEGORIES } from '../constants/cuisines';
 import RestaurantCard from '../components/RestaurantCard';
 import SkeletonCard from '../components/SkeletonCard';
 import EmptyState from '../components/EmptyState';
+import ScrollReveal from '../components/ScrollReveal';
+import HeroFoodDecorations from '../components/food/HeroFoodDecorations';
+import AnimatedFood from '../components/food/AnimatedFood';
+import RotatingHeadline from '../components/home/RotatingHeadline';
+import FoodCategories from '../components/home/FoodCategories';
+import PromoCarousel from '../components/home/PromoCarousel';
 
-function RestaurantRow({ title, restaurants, loading, emptyMessage, action }) {
-  if (!loading && restaurants.length === 0 && !emptyMessage) return null;
+// Renders nothing once loading finishes with no results — "Popular in X" /
+// "New on FoodRush" used to show their heading plus a "No restaurants found"
+// line even when empty, which just reads as a broken-looking row on a new or
+// sparsely-seeded city. A row with nothing in it is not information; hiding
+// it entirely is the correct empty state here (unlike "Delivering to you",
+// which gets its own deliberate EmptyState below with a "Change location"
+// action, because that one IS something the visitor can act on).
+function RestaurantRow({ title, restaurants, loading, action }) {
+  if (!loading && restaurants.length === 0) return null;
   return (
     <section className="mx-auto max-w-7xl px-4 py-8">
       <div className="mb-4 flex items-end justify-between gap-3">
@@ -21,7 +33,6 @@ function RestaurantRow({ title, restaurants, loading, emptyMessage, action }) {
           ? Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
           : restaurants.map((r) => <RestaurantCard key={r._id} restaurant={r} />)}
       </div>
-      {!loading && restaurants.length === 0 && <p className="text-sm text-gray-400">{emptyMessage}</p>}
     </section>
   );
 }
@@ -97,62 +108,47 @@ export default function Home() {
         <div className="pointer-events-none absolute -right-16 top-10 h-72 w-72 rounded-full bg-accent-500/15 blur-3xl" aria-hidden="true" />
         <div className="pointer-events-none absolute bottom-0 left-1/3 h-64 w-64 rounded-full bg-brand-500/15 blur-3xl" aria-hidden="true" />
 
-        <div className="relative mx-auto max-w-4xl px-4 py-20 text-center sm:py-24">
+        <HeroFoodDecorations />
+
+        <div className="relative z-10 mx-auto max-w-4xl px-4 py-20 text-center sm:py-24">
           <h1 className="text-4xl font-extrabold text-white sm:text-5xl">
-            Food you love,{' '}
-            <span className="bg-gradient-to-r from-brand-500 to-accent-400 bg-clip-text text-transparent">delivered fast.</span>
+            Craving <RotatingHeadline /> ?
+            <br className="hidden sm:block" /> We&apos;ll deliver it, fast.
           </h1>
           <p className="mx-auto mt-3 max-w-xl text-gray-500">Order from the best local restaurants — or list your own on FoodRush.</p>
 
-
           <form onSubmit={submitSearch} className="mx-auto mt-6 flex max-w-xl gap-2">
-            <div className="relative flex-1">
-              <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <div className="group relative flex-1">
+              <Search
+                size={16}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 transition-all duration-300 group-focus-within:scale-110 group-focus-within:text-brand-400"
+              />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search for restaurants or food…"
-                className="w-full rounded-full border border-gray-200 bg-surface py-3 pl-10 pr-4 text-sm shadow-sm outline-none focus:border-brand-400"
+                className="w-full rounded-full border border-gray-200 bg-surface py-3 pl-10 pr-4 text-sm shadow-sm outline-none transition-all duration-300 focus:border-brand-400 focus:shadow-lg focus:shadow-brand-900/40"
               />
             </div>
-            <button type="submit" className="rounded-full bg-gradient-to-r from-brand-600 to-brand-700 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:shadow-md hover:shadow-brand-200">
+            <button
+              type="submit"
+              className="rounded-full bg-gradient-to-r from-brand-600 to-brand-700 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:scale-105 hover:shadow-md hover:shadow-brand-200 active:scale-95"
+            >
               Search
             </button>
           </form>
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-8">
+      <ScrollReveal as="section" className="mx-auto max-w-7xl px-4 py-8">
         <h2 className="mb-4 text-xl font-bold text-gray-900">What&apos;s on your mind?</h2>
-        <div className="grid grid-cols-4 gap-3 sm:grid-cols-8">
-          {FEATURED_CATEGORIES.map((c) => (
-            <Link
-              key={c.label}
-              to={`/search?q=${encodeURIComponent(c.label)}`}
-              className="flex flex-col items-center gap-1 rounded-xl border border-gray-100 bg-surface p-3 text-center shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-md"
-            >
-              <span className="text-2xl">{c.emoji}</span>
-              <span className="text-xs font-medium text-gray-700">{c.label}</span>
-            </Link>
-          ))}
-        </div>
-      </section>
+        <FoodCategories />
+      </ScrollReveal>
 
-      <section className="mx-auto max-w-7xl px-4">
-        <Link
-          to="/search?hasOffer=true"
-          className="flex items-center justify-between rounded-xl bg-gradient-to-r from-brand-600 to-brand-800 px-6 py-5 text-white shadow-sm transition hover:from-brand-700 hover:to-brand-900"
-        >
-          <div className="flex items-center gap-3">
-            <Tag size={22} />
-            <div>
-              <p className="font-semibold">Deals of the day</p>
-              <p className="text-sm text-white/75">Browse items with a live discount, across restaurants</p>
-            </div>
-          </div>
-          <span className="text-sm font-medium underline">View offers</span>
-        </Link>
-      </section>
+      <ScrollReveal as="section" className="relative mx-auto max-w-7xl px-4">
+        <AnimatedFood type="donut" size="sm" className="absolute -right-2 -top-8 hidden opacity-30 sm:block" />
+        <PromoCarousel />
+      </ScrollReveal>
 
       {hasCoordinates ? (
         <>
@@ -199,14 +195,18 @@ export default function Home() {
         </section>
       )}
 
-      <RestaurantRow
-        title={city ? `Popular in ${city}` : 'Popular on FoodRush'}
-        restaurants={popular}
-        loading={popularLoading}
-        emptyMessage="No restaurants found yet — try a different location."
-      />
+      <ScrollReveal>
+        <RestaurantRow
+          title={city ? `Popular in ${city}` : 'Popular on FoodRush'}
+          restaurants={popular}
+          loading={popularLoading}
+        />
+      </ScrollReveal>
 
-      <RestaurantRow title="New on FoodRush" restaurants={fresh} loading={freshLoading} emptyMessage="No new restaurants yet." />
+      <ScrollReveal className="relative">
+        <AnimatedFood type="fries" size="sm" className="absolute -left-2 top-2 hidden opacity-25 lg:block" />
+        <RestaurantRow title="New on FoodRush" restaurants={fresh} loading={freshLoading} />
+      </ScrollReveal>
     </div>
   );
 }
