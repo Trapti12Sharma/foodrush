@@ -122,6 +122,14 @@ export default {
           '0%, 100%': { transform: 'scale(0.4) rotate(0deg)', opacity: '0' },
           '50%': { transform: 'scale(1) rotate(45deg)', opacity: '1' },
         },
+        // Continuous right-to-left scroll for the promo carousel track (see
+        // components/home/PromoCarousel.jsx), which renders its card list
+        // twice back to back — looping exactly at -50% is therefore seamless,
+        // since the second copy is already sitting where the first started.
+        marquee: {
+          '0%': { transform: 'translateX(0)' },
+          '100%': { transform: 'translateX(-50%)' },
+        },
       },
       animation: {
         'food-float': 'food-float 4.5s ease-in-out infinite',
@@ -134,6 +142,9 @@ export default {
         'food-crumb': 'food-crumb 1.8s ease-in-out infinite',
         'food-spin-slow': 'food-spin-slow 7s linear infinite',
         'food-twinkle': 'food-twinkle 2.2s ease-in-out infinite',
+        // 26s: within the spec's suggested 20-30s range, linear for a
+        // constant (not easing in/out) scroll speed.
+        marquee: 'marquee 26s linear infinite',
       },
     },
   },
